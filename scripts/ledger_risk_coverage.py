@@ -57,6 +57,20 @@ REL_TOL = 0.005  # 0.5% relative tolerance, per GATE_PRECISION_PRECHECK_2026-09-
 COVERAGE_TARGETS = (0.50, 0.80, 1.00)
 
 _URL_RE = re.compile(r"https?://\S+")
+# Bracketed citation markers, e.g. "Sources: [1] https://..." / "[12] Foo" -- without this, the
+# footnote index extracts as a bare number (1.0 / 12.0) indistinguishable from a real deliverable
+# value. Substring removal (like _URL_RE), not whole-line, for the same reason strip_urls doesn't
+# drop lines: a "[1] 42 meters" line must keep its real number.
+_CITATION_MARKER_RE = re.compile(r"\[\d+\]")
+# Alphanumeric-hyphenated identifiers ("GRES-2", "COVID-19", "A-4"): stripped as whole substrings
+# before number extraction so NONE of their digits are pulled out as standalone numbers (not "-2",
+# not a bare "2", and -- critically -- not the trailing digits of a multi-digit suffix like the
+# "9" in "COVID-19" either, which a lookbehind-only guard on the leading digit would miss). A
+# digit-hyphen-digit run ("10-20", a range) is deliberately NOT matched here -- this pattern
+# requires a LETTER immediately before the hyphen, so ranges are untouched; see
+# TestExtractNumbers::test_range_hyphen_is_unaffected_by_identifier_stripping for the pinned
+# pre-existing range behavior.
+_IDENTIFIER_RE = re.compile(r"\b[A-Za-z]+-\d+(?:-[A-Za-z0-9]+)*\b")
 # Order matters: comma-grouped (optionally decimal) before bare decimal before bare integer, so
 # "1,642.5" is captured whole rather than as "1" + "642" + "5".
 _NUM_RE = re.compile(
@@ -82,13 +96,30 @@ def strip_urls(text: str) -> str:
     return _URL_RE.sub(" ", text or "")
 
 
+def strip_citation_markers(text: str) -> str:
+    """``text`` with bracketed citation markers (``[1]``, ``[12]``) removed as substrings --
+    mirrors :func:`strip_urls`. Without this, a "Sources: [1] https://..." footnote's index
+    extracts as a bare number indistinguishable from a real deliverable value."""
+    return _CITATION_MARKER_RE.sub(" ", text or "")
+
+
+def strip_identifiers(text: str) -> str:
+    """``text`` with alphanumeric-hyphenated identifiers (``GRES-2``, ``COVID-19``, ``A-4``)
+    removed as whole substrings, so none of their digits leak into :func:`extract_numbers`. See
+    :data:`_IDENTIFIER_RE` for why this is a strip pass rather than a lookbehind guard on the
+    number regex itself, and why "10-20" (digit-hyphen-digit) is unaffected."""
+    return _IDENTIFIER_RE.sub(" ", text or "")
+
+
 def extract_numbers(text: str) -> List[float]:
     """Every numeric token in ``text`` (thousands-separator aware), as floats, in order of
-    appearance. Caller strips URLs first when the text may contain them (see :func:`strip_urls`);
-    this function does not strip on its own so it can also be used on node ``value`` strings that
-    were never URL-bearing."""
+    appearance. Alphanumeric-hyphenated identifiers (``GRES-2``, ``COVID-19``) are stripped first
+    (see :func:`strip_identifiers`) so their digits never masquerade as deliverable numbers --
+    this runs unconditionally, unlike :func:`strip_urls`/:func:`strip_citation_markers` which
+    callers opt into, because identifiers can appear in node ``value`` strings too, not just
+    free-text deliverables."""
     out: List[float] = []
-    for match in _NUM_RE.finditer(text or ""):
+    for match in _NUM_RE.finditer(strip_identifiers(text or "")):
         token = match.group(0).replace(",", "")
         try:
             out.append(float(token))
@@ -376,6 +407,48 @@ def answer_supported_graded(numbers: Sequence[Dict[str, Any]], statuses: frozens
     return True
 
 
+def classify_shape_derive_summary(raw: Any) -> Dict[str, Any]:
+    """Normalize one cell's host-stored ``shape_derive`` summary (or its absence) into the shape
+    the analysis section consumes.
+
+    Mirrors :func:`classify_answer_audit_summary`: absence (older host, or the ``shape_derive``
+    host module not enabled for that run) is its own ``has_shape: False`` bucket; anything other
+    than a dict is treated the same as absence; this function never raises on a
+    malformed/partial summary. The host stores this at ``execution.output.shape_derive`` with
+    shape ``{"demanded_operation", "absolute", "verdict": True|False|None, "reason",
+    "n_entries", "n_pairs_considered", "n_candidates", "n_match_ambiguity", "matched": {...}|None}``.
+    """
+    if not isinstance(raw, dict):
+        return {
+            "has_shape": False, "demanded_operation": None, "absolute": None,
+            "verdict": None, "reason": None, "n_entries": 0, "n_pairs_considered": 0,
+            "n_candidates": 0, "n_match_ambiguity": 0, "matched": None,
+        }
+    verdict = raw.get("verdict")
+    if verdict is not True and verdict is not False:
+        verdict = None
+
+    def _int(key: str) -> int:
+        val = raw.get(key)
+        try:
+            return int(val)
+        except (TypeError, ValueError):
+            return 0
+
+    return {
+        "has_shape": True,
+        "demanded_operation": raw.get("demanded_operation"),
+        "absolute": raw.get("absolute"),
+        "verdict": verdict,
+        "reason": raw.get("reason"),
+        "n_entries": _int("n_entries"),
+        "n_pairs_considered": _int("n_pairs_considered"),
+        "n_candidates": _int("n_candidates"),
+        "n_match_ambiguity": _int("n_match_ambiguity"),
+        "matched": raw.get("matched") if isinstance(raw.get("matched"), dict) else None,
+    }
+
+
 def answer_audit_sweep(cells: Sequence[Dict[str, Any]], wrong_key: str = "wrong") -> List[Dict[str, Any]]:
     """Coverage/risk, mirroring :func:`binary_operating_point`'s definitions, for every point in
     :data:`ANSWER_AUDIT_SWEEP_COMBOS`.
@@ -467,9 +540,10 @@ def classify_cell(path: Path, raw: Dict[str, Any]) -> Dict[str, Any]:
     score = ((raw.get("validation") or {}).get("overall_score"))
     output = ((raw.get("execution") or {}).get("output")) or {}
     deliverable = output.get("final_deliverable") or ""
-    final_numbers = extract_numbers(strip_urls(deliverable))
+    final_numbers = extract_numbers(strip_citation_markers(strip_urls(deliverable)))
     evidence_graph = output.get("evidence_graph")
     answer_audit = classify_answer_audit_summary(output.get("answer_audit"))
+    shape_derive = classify_shape_derive_summary(output.get("shape_derive"))
 
     derived_nodes: List[Dict[str, Any]] = []
     source_quote_verified: Dict[str, Optional[bool]] = {}
@@ -486,15 +560,15 @@ def classify_cell(path: Path, raw: Dict[str, Any]) -> Dict[str, Any]:
         }
         for node in graph.nodes():
             # Old-chain integrity, LOAD-BEARING for clause5: skip any node minted by the
-            # answer_audit mechanical pass (see API contract in mechanical_minting_plan.md
-            # REVISION 1 -- "clause semantics must be stable across the minting boundary").
-            # Without this exclusion, a host-minted answer_audit SOURCE node would enter
+            # answer_audit / shape_derive mechanical passes (see API contract in
+            # mechanical_minting_plan.md REVISION 1 -- "clause semantics must be stable across
+            # the minting boundary"). Without this exclusion, a host-minted node would enter
             # backing_values and make clause5 ("no unbacked final-answer number") circular: it
             # would back exactly the number that was extracted FROM the deliverable to produce
             # it. Read via getattr with a "" default so evidence-graph artifacts predating the
             # minted_by field (which defaults to "" on deserialization) are unaffected -- every
-            # node from before answer_audit existed is treated as non-minted, same as today.
-            if (getattr(node, "minted_by", "") or "") == "answer_audit":
+            # node from before either mechanism existed is treated as non-minted, same as today.
+            if (getattr(node, "minted_by", "") or "") in ("answer_audit", "shape_derive"):
                 continue
             if node.kind == KIND_SOURCE:
                 source_quote_verified[node.id] = node.quote_verified
@@ -514,6 +588,11 @@ def classify_cell(path: Path, raw: Dict[str, Any]) -> Dict[str, Any]:
     wrong_05 = (score is not None) and (score < 0.5)
     wrong_09 = (score is not None) and (score < 0.9)
 
+    backed_only_flag = bool(answer_audit.get("has_audit")) and answer_supported_graded(
+        answer_audit.get("numbers") or [], frozenset({"backed"}),
+        include_trivial=False, max_ambiguity=1,
+    )
+
     return {
         "file": path.name, "test_id": test_id, "model": model, "host": host,
         "campaign": campaign, "arm": arm, "infra_failed": infra_failed, "score": score,
@@ -528,6 +607,8 @@ def classify_cell(path: Path, raw: Dict[str, Any]) -> Dict[str, Any]:
         "minus_operand_passed": minus_operand_passed,
         "reverify_counts": reverify_counts,
         "answer_audit": answer_audit,
+        "backed_only_flag": backed_only_flag,
+        "shape_derive": shape_derive,
     }
 
 
@@ -713,6 +794,129 @@ def build_report(cells: List[Dict[str, Any]]) -> Dict[str, Any]:
         "all_usable": _answer_audit_pool_report(usable),
     }
 
+    # ==========================================================================================
+    # NEW (mint02 prep, additive-only): backed_only_flag, answer_supported_confirmatory,
+    # shape_derive. All computed over `usable` cells (infra_failed excluded, same as every
+    # existing section); none of this touches the pre-existing sections/keys above.
+    # ==========================================================================================
+
+    def _backed_only_stats(pool: List[Dict[str, Any]]) -> Dict[str, Any]:
+        n = len(pool)
+        flagged = [c for c in pool if c["backed_only_flag"]]
+        wrong_pool = [c for c in pool if c["wrong"]]
+        flagged_wrong = [c for c in flagged if c["wrong"]]
+        return {
+            "n": n,
+            "n_flagged": len(flagged),
+            "flag_precision": (len(flagged_wrong) / len(flagged)) if flagged else None,
+            "flag_coverage": (len(flagged_wrong) / len(wrong_pool)) if wrong_pool else None,
+            "base_wrong_rate": wrong_rate(pool, "wrong"),
+        }
+
+    backed_only_by_model: Dict[str, Any] = {}
+    for key, group in stratify(usable, ["model"]).items():
+        entry: Dict[str, Any] = {"n": len(group)}
+        if len(group) >= 6:
+            entry.update(_backed_only_stats(group))
+        backed_only_by_model["/".join(key)] = entry
+
+    report["backed_only_flag"] = {
+        "pooled": _backed_only_stats(usable),
+        "dev": _backed_only_stats(dev_usable),
+        "holdout": _backed_only_stats(holdout_usable),
+        "by_model": backed_only_by_model,
+        "flagged_but_right_files": sorted(
+            c["file"] for c in usable if c["backed_only_flag"] and not c["wrong"]
+        ),
+    }
+
+    # answer_supported_confirmatory: the "backed_or_derived" operating point (same predicate
+    # family as ANSWER_AUDIT_SWEEP_COMBOS), restricted to cells with >=1 (non-minted) derived
+    # node -- the stratum this signal exists to discriminate on.
+    def _confirmatory_stats(pool: List[Dict[str, Any]]) -> Dict[str, Any]:
+        stratum = [c for c in pool if c["n_derived_nodes"] >= 1]
+        n = len(stratum)
+        accepted_flags = []
+        for c in stratum:
+            aa = c.get("answer_audit") or {}
+            ok = bool(aa.get("has_audit")) and answer_supported_graded(
+                aa.get("numbers") or [], frozenset({"backed", "derived"}),
+                include_trivial=False, max_ambiguity=1,
+            )
+            accepted_flags.append(ok)
+        n_accepted = sum(1 for ok in accepted_flags if ok)
+        coverage = (n_accepted / n) if n else None
+        n_wrong_accepted = sum(
+            1 for c, ok in zip(stratum, accepted_flags) if ok and c["wrong"]
+        )
+        risk = (n_wrong_accepted / n_accepted) if n_accepted else None
+        base = wrong_rate(stratum, "wrong")
+        risk_ratio = (risk / base) if (risk is not None and base) else None
+        return {
+            "n": n, "n_accepted": n_accepted, "coverage": coverage, "risk": risk,
+            "base_wrong_rate": base, "risk_ratio": risk_ratio,
+        }
+
+    report["answer_supported_confirmatory"] = {
+        "dev": _confirmatory_stats(dev_usable),
+        "holdout": _confirmatory_stats(holdout_usable),
+        "pooled": _confirmatory_stats(usable),
+    }
+
+    # shape_derive: fire rate, verdict x wrong contingency (pooled and zero-derive substratum),
+    # per-model fire rates, and the two inversion-list filename buckets.
+    def _shape_contingency(pool: List[Dict[str, Any]]) -> Dict[str, int]:
+        return {
+            "verdict_true_wrong": sum(
+                1 for c in pool if c["shape_derive"]["verdict"] is True and c["wrong"]
+            ),
+            "verdict_true_right": sum(
+                1 for c in pool if c["shape_derive"]["verdict"] is True and not c["wrong"]
+            ),
+            "verdict_false_wrong": sum(
+                1 for c in pool if c["shape_derive"]["verdict"] is False and c["wrong"]
+            ),
+            "verdict_false_right": sum(
+                1 for c in pool if c["shape_derive"]["verdict"] is False and not c["wrong"]
+            ),
+        }
+
+    def _shape_derive_stats(pool: List[Dict[str, Any]]) -> Dict[str, Any]:
+        n = len(pool)
+        n_fired = sum(1 for c in pool if c["shape_derive"]["verdict"] is not None)
+        none_reason_counts: Dict[str, int] = defaultdict(int)
+        for c in pool:
+            if c["shape_derive"]["verdict"] is None:
+                none_reason_counts[c["shape_derive"].get("reason") or "none"] += 1
+        zero_derive_pool = [c for c in pool if c["n_derived_nodes"] == 0]
+        return {
+            "n": n, "n_fired": n_fired, "fire_rate": (n_fired / n) if n else None,
+            "none_reason_counts": dict(none_reason_counts),
+            "contingency_pooled": _shape_contingency(pool),
+            "contingency_zero_derive_nodes": _shape_contingency(zero_derive_pool),
+        }
+
+    shape_derive_by_model: Dict[str, Any] = {}
+    for key, group in stratify(usable, ["model"]).items():
+        n_fired = sum(1 for c in group if c["shape_derive"]["verdict"] is not None)
+        shape_derive_by_model["/".join(key)] = {
+            "n": len(group), "n_fired": n_fired,
+            "fire_rate": (n_fired / len(group)) if group else None,
+        }
+
+    report["shape_derive"] = {
+        "pooled": _shape_derive_stats(usable),
+        "by_model": shape_derive_by_model,
+        "verdict_false_but_right_files": sorted(
+            c["file"] for c in usable
+            if c["shape_derive"]["verdict"] is False and not c["wrong"]
+        ),
+        "verdict_true_but_wrong_files": sorted(
+            c["file"] for c in usable
+            if c["shape_derive"]["verdict"] is True and c["wrong"]
+        ),
+    }
+
     return report
 
 
@@ -802,6 +1006,49 @@ def print_report(report: Dict[str, Any]) -> None:
                 print(f"      {row['predicate']:32s} coverage={_fmt_pct(row['coverage'])} "
                       f"risk={_fmt_pct(row['risk'])} n_certified={row['n_certified']}/{row['n']}")
         print(f"    op_appropriateness_totals: {pool['op_appropriateness_totals']}")
+    print()
+
+    bof = report["backed_only_flag"]
+    print("--- backed_only_flag (per-cell promotion of the backed_only sweep predicate) ---")
+    for label in ("pooled", "dev", "holdout"):
+        row = bof[label]
+        print(f"  [{label}] n={row['n']} n_flagged={row['n_flagged']} "
+              f"flag_precision={_fmt_pct(row['flag_precision'])} "
+              f"flag_coverage={_fmt_pct(row['flag_coverage'])} "
+              f"base_wrong_rate={_fmt_pct(row['base_wrong_rate'])}")
+    print("  by_model:")
+    for key, row in bof["by_model"].items():
+        print(f"    {key:20s} {row}")
+    print(f"  flagged_but_right_files: {len(bof['flagged_but_right_files'])} cells")
+    for f in bof["flagged_but_right_files"]:
+        print(f"    {f}")
+    print()
+
+    print("--- answer_supported_confirmatory (backed_or_derived, nonzero-derive stratum) ---")
+    for label, row in report["answer_supported_confirmatory"].items():
+        print(f"  [{label}] n={row['n']} n_accepted={row['n_accepted']} "
+              f"coverage={_fmt_pct(row['coverage'])} risk={_fmt_pct(row['risk'])} "
+              f"base_wrong_rate={_fmt_pct(row['base_wrong_rate'])} "
+              f"risk_ratio={row['risk_ratio']}")
+    print()
+
+    sd = report["shape_derive"]
+    print("--- shape_derive ---")
+    p = sd["pooled"]
+    print(f"  [pooled] n={p['n']} n_fired={p['n_fired']} fire_rate={_fmt_pct(p['fire_rate'])}")
+    print(f"    none_reason_counts: {p['none_reason_counts']}")
+    print(f"    contingency (verdict x wrong), pooled: {p['contingency_pooled']}")
+    print(f"    contingency (verdict x wrong), zero-derive substratum: "
+          f"{p['contingency_zero_derive_nodes']}")
+    print("  by_model:")
+    for key, row in sd["by_model"].items():
+        print(f"    {key:20s} {row}")
+    print(f"  verdict_false_but_right_files: {len(sd['verdict_false_but_right_files'])} cells")
+    for f in sd["verdict_false_but_right_files"]:
+        print(f"    {f}")
+    print(f"  verdict_true_but_wrong_files: {len(sd['verdict_true_but_wrong_files'])} cells")
+    for f in sd["verdict_true_but_wrong_files"]:
+        print(f"    {f}")
 
 
 def main() -> int:

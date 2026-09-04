@@ -78,6 +78,86 @@ class TestExtractNumbers:
     def test_none_safe(self):
         assert lrc.extract_numbers(None) == []
 
+    # -- Defect A: letter-hyphen-digit identifiers (GRES-2, COVID-19, A-4) -----------------------
+    # Forensically verified on mint01 inversion cells (task 210): the old `-?\d+` alternative had
+    # no guard against a letter-hyphen-digit context, so "GRES-2" extracted as -2.0, poisoning
+    # clause5's final-numbers list and costing 3 rejected-but-right cells.
+
+    def test_hyphenated_identifier_extracts_no_number_at_all(self):
+        """Regression for the exact mint01 defect: 'GRES-2' must not extract as -2.0, nor as a
+        bare 2.0 -- the identifier's digits are not a number at all."""
+        assert lrc.extract_numbers("The GRES-2 Power Station chimney is tall") == []
+
+    def test_hyphenated_identifier_does_not_poison_a_real_number_in_the_same_sentence(self):
+        text = "The GRES-2 Power Station chimney is 419.7 meters"
+        assert lrc.extract_numbers(text) == [419.7]
+
+    def test_multi_digit_identifier_suffix_fully_excluded(self):
+        """COVID-19: a lookbehind guard on only the leading digit would still leak the trailing
+        '9' as a bare positive number. Both digits must be excluded."""
+        assert lrc.extract_numbers("COVID-19 cases rose sharply") == []
+
+    def test_single_digit_letter_hyphen_digit_identifier(self):
+        assert lrc.extract_numbers("A-4 identifier code") == []
+
+    def test_range_hyphen_is_unaffected_by_identifier_stripping(self):
+        """Pinning current (pre-existing, unchanged) behavior for a digit-hyphen-digit range: the
+        identifier fix only matches when a LETTER precedes the hyphen, so '10-20' keeps splitting
+        into a positive left number and a negative-looking right number, exactly as before."""
+        assert lrc.extract_numbers("a range of 10-20 units") == [10.0, -20.0]
+
+    def test_genuine_negative_decimal_at_start_of_string_unaffected(self):
+        assert lrc.extract_numbers("-2.5 degrees") == [-2.5]
+
+    def test_genuine_negative_in_parentheses_unaffected(self):
+        assert lrc.extract_numbers("the delta was (-3) units") == [-3.0]
+
+    def test_negative_after_word_unaffected(self):
+        assert lrc.extract_numbers("a temperature of -40 degrees") == [-40.0]
+
+    # -- Defect B: bracketed citation markers -----------------------------------------------------
+    # "Sources: [1] ..." footnote markers extracted as bare 1.0/2.0, indistinguishable from a real
+    # deliverable number. Cost 2 cells (task 212). Fixed via strip_citation_markers, mirroring the
+    # existing strip_urls pre-pass -- extract_numbers itself is unchanged for bracket text (callers
+    # must opt in, same as URL stripping).
+
+    def test_bracketed_citation_marker_extracts_as_a_bare_number_without_stripping(self):
+        """Pin the defect itself: extract_numbers alone (no citation-marker stripping) still pulls
+        the footnote index out as a number -- callers must strip first, exactly like URLs."""
+        assert lrc.extract_numbers("Sources: [1] https://example.org") == [1.0]
+
+    def test_strip_citation_markers_removes_single_digit_marker(self):
+        text = "Answer: 42. Sources: [1] https://example.org/page"
+        stripped = lrc.strip_citation_markers(text)
+        assert "[1]" not in stripped
+        assert lrc.extract_numbers(stripped) == [42.0]
+
+    def test_strip_citation_markers_removes_multi_digit_marker(self):
+        stripped = lrc.strip_citation_markers("See [12] for details")
+        assert lrc.extract_numbers(stripped) == []
+
+    def test_strip_citation_markers_does_not_drop_the_whole_line(self):
+        text = "42 [1]"
+        stripped = lrc.strip_citation_markers(text)
+        assert lrc.extract_numbers(stripped) == [42.0]
+
+    def test_citation_marker_and_url_stripped_together_leaves_only_the_real_answer(self):
+        """The real classify_cell pipeline: strip_citation_markers(strip_urls(text))."""
+        text = "Answer: 42. Sources: [1] https://example.org/page"
+        cleaned = lrc.strip_citation_markers(lrc.strip_urls(text))
+        assert lrc.extract_numbers(cleaned) == [42.0]
+
+    # -- Regression pins for behavior the fix must not touch --------------------------------------
+
+    def test_comma_grouped_number_unaffected(self):
+        assert lrc.extract_numbers("population of 1,642 people") == [1642.0]
+
+    def test_comma_grouped_decimal_unaffected(self):
+        assert lrc.extract_numbers("distance of 1,642.5 metres") == [1642.5]
+
+    def test_multiple_plain_numbers_unaffected(self):
+        assert lrc.extract_numbers("A. 419.7 meters B. 381 meters") == [419.7, 381.0]
+
 
 class TestIsAbstention:
     def test_detects_cannot_determine(self):
@@ -682,6 +762,252 @@ class TestAnswerAuditSweep:
         rows = {r["predicate"]: r for r in lrc.answer_audit_sweep(cells)}
         # "backed_only" is strictly stricter than "backed_or_derived" for a status=="derived" cell
         assert rows["backed_only"]["coverage"] <= rows["backed_or_derived"]["coverage"]
+
+
+# ==============================================================================================
+# mint02 prep: backed_only_flag, classify_shape_derive_summary, report sections
+# ==============================================================================================
+
+class TestBackedOnlyFlag:
+    def _num(self, status="backed", trivial=False, ambiguity=1, unit_consistent=True):
+        return {"status": status, "trivial": trivial, "ambiguity": ambiguity,
+                "unit_consistent": unit_consistent}
+
+    def test_flag_matches_backed_only_sweep_predicate_when_flagged(self, tmp_path):
+        raw = _make_cell_raw(None, deliverable="The answer is 38.7 meters.")
+        raw["execution"]["output"]["answer_audit"] = {
+            "numbers_total": 1,
+            "numbers": [self._num(status="backed")],
+            "answer_supported": True,
+        }
+        result = lrc.classify_cell(tmp_path / "cell.json", raw)
+        expected = lrc.answer_supported_graded(
+            [self._num(status="backed")], frozenset({"backed"}),
+            include_trivial=False, max_ambiguity=1,
+        )
+        assert expected is True
+        assert result["backed_only_flag"] is expected
+
+    def test_flag_false_when_status_is_derived_not_backed(self, tmp_path):
+        raw = _make_cell_raw(None, deliverable="The answer is 38.7 meters.")
+        raw["execution"]["output"]["answer_audit"] = {
+            "numbers_total": 1,
+            "numbers": [self._num(status="derived")],
+        }
+        result = lrc.classify_cell(tmp_path / "cell.json", raw)
+        assert result["backed_only_flag"] is False
+
+    def test_flag_false_when_only_trivial_numbers(self, tmp_path):
+        raw = _make_cell_raw(None, deliverable="The year is 2026.")
+        raw["execution"]["output"]["answer_audit"] = {
+            "numbers_total": 1,
+            "numbers": [self._num(status="backed", trivial=True)],
+        }
+        result = lrc.classify_cell(tmp_path / "cell.json", raw)
+        assert result["backed_only_flag"] is False
+
+    def test_flag_false_when_no_audit(self, tmp_path):
+        raw = _make_cell_raw(None, deliverable="The answer is 38.7 meters.")
+        result = lrc.classify_cell(tmp_path / "cell.json", raw)
+        assert result["backed_only_flag"] is False
+
+
+class TestClassifyShapeDeriveSummary:
+    def test_absent_summary_is_no_shape(self):
+        result = lrc.classify_shape_derive_summary(None)
+        assert result["has_shape"] is False
+        assert result["verdict"] is None
+
+    def test_non_dict_summary_is_no_shape(self):
+        assert lrc.classify_shape_derive_summary("garbage")["has_shape"] is False
+        assert lrc.classify_shape_derive_summary([1, 2])["has_shape"] is False
+
+    def test_malformed_input_never_raises(self):
+        result = lrc.classify_shape_derive_summary({
+            "verdict": "not-a-bool", "n_entries": "not-an-int", "matched": "not-a-dict",
+        })
+        assert result["has_shape"] is True
+        assert result["verdict"] is None
+        assert result["n_entries"] == 0
+        assert result["matched"] is None
+
+    def test_valid_input_surfaces_all_fields(self):
+        summary = {
+            "demanded_operation": "difference", "absolute": True, "verdict": True,
+            "reason": "matched", "n_entries": 4, "n_pairs_considered": 6, "n_candidates": 2,
+            "n_match_ambiguity": 0, "matched": {"a": 1, "b": 2},
+        }
+        result = lrc.classify_shape_derive_summary(summary)
+        assert result == {"has_shape": True, **summary}
+
+    def test_verdict_false_is_preserved_not_coerced_to_none(self):
+        result = lrc.classify_shape_derive_summary({"verdict": False, "reason": "mismatch"})
+        assert result["verdict"] is False
+
+
+class TestShapeDeriveMintedNodeExclusion:
+    def test_minted_shape_derive_node_excluded_from_backing_values_and_derived_count(self, tmp_path):
+        from agent.app.testing.evidence_graph import EvidenceGraph
+
+        graph = EvidenceGraph()
+        graph.add_page("p1", "https://example.org/a", "The height is 38.7 metres.")
+        graph.add_source("p1", "38.7", quote="38.7 metres", minted_by="shape_derive")
+
+        raw = _make_cell_raw(graph.to_dict())
+        result = lrc.classify_cell(tmp_path / "cell.json", raw)
+
+        assert result["n_derived_nodes"] == 0
+        assert result["clause1"] is False
+        assert result["clause5"] is False
+
+    def test_old_chain_identical_with_and_without_coexisting_shape_derive_node(self, tmp_path):
+        from agent.app.testing.evidence_graph import EvidenceGraph
+
+        baseline = _build_plain_graph()
+        result_baseline = lrc.classify_cell(
+            tmp_path / "baseline.json", _make_cell_raw(baseline.to_dict())
+        )
+
+        with_minted = _build_plain_graph()
+        with_minted.add_page("p2", "https://example.org/b", "A stray figure: 999 metres.")
+        with_minted.add_source("p2", "999", quote="999 metres", minted_by="shape_derive")
+        result_with_minted = lrc.classify_cell(
+            tmp_path / "with_minted.json", _make_cell_raw(with_minted.to_dict())
+        )
+
+        for clause in ("clause1", "clause2", "clause3", "clause4", "clause5", "certified",
+                       "clauses_passed", "n_derived_nodes"):
+            assert result_baseline[clause] == result_with_minted[clause], clause
+
+
+# ==============================================================================================
+# mint02 prep: report sections on a small synthetic pool (dev/holdout mix)
+# ==============================================================================================
+
+def _synthetic_cell(file, test_id, model, wrong, n_derived_nodes, backed_only_flag,
+                     answer_audit_numbers=None, shape_verdict=None, shape_reason=None,
+                     infra_failed=False, arm="derive"):
+    return {
+        "file": file, "test_id": test_id, "model": model, "host": "sequential_react",
+        "campaign": "mint02", "arm": arm, "infra_failed": infra_failed,
+        "score": 0.0 if wrong else 1.0, "wrong": wrong, "wrong_05": wrong, "wrong_09": wrong,
+        "n_final_numbers": 1, "has_evidence_graph": True,
+        "n_derived_nodes": n_derived_nodes,
+        "split": "holdout" if test_id in lrc.HOLDOUT_TEST_IDS else "dev",
+        "clause1": n_derived_nodes >= 1, "clause2": True, "clause3": True, "clause4": True,
+        "clause5": True, "certified": n_derived_nodes >= 1, "clauses_passed": 5,
+        "quote_null_count": 0, "quote_checked_count": 0,
+        "minus_quote_certified": True, "minus_quote_passed": 4,
+        "minus_operand_certified": True, "minus_operand_passed": 4,
+        "reverify_counts": {},
+        "answer_audit": {
+            "has_audit": answer_audit_numbers is not None,
+            "numbers_total": len(answer_audit_numbers or []),
+            "numbers": answer_audit_numbers or [],
+            "answer_supported_raw": None,
+            "op_appropriateness_n": 0, "op_sign_implausible_n": 0, "op_shape_mismatch_n": 0,
+        },
+        "backed_only_flag": backed_only_flag,
+        "shape_derive": {
+            "has_shape": shape_verdict is not None or shape_reason is not None,
+            "demanded_operation": "difference", "absolute": True,
+            "verdict": shape_verdict, "reason": shape_reason,
+            "n_entries": 2, "n_pairs_considered": 1, "n_candidates": 1,
+            "n_match_ambiguity": 0, "matched": None,
+        },
+    }
+
+
+class TestBuildReportNewSections:
+    def _pool(self):
+        backed_num = {"status": "backed", "trivial": False, "ambiguity": 1,
+                      "unit_consistent": True}
+        derived_num = {"status": "derived", "trivial": False, "ambiguity": 1,
+                       "unit_consistent": True}
+        cells = [
+            # dev cells (test_id 210-220), several models w/ n>=6 for model "m1"
+            _synthetic_cell("f1.json", "210", "m1", wrong=False, n_derived_nodes=0,
+                             backed_only_flag=True, answer_audit_numbers=[backed_num],
+                             shape_verdict=True, shape_reason="matched"),
+            _synthetic_cell("f2.json", "211", "m1", wrong=True, n_derived_nodes=0,
+                             backed_only_flag=True, answer_audit_numbers=[backed_num],
+                             shape_verdict=False, shape_reason="mismatch"),
+            _synthetic_cell("f3.json", "212", "m1", wrong=True, n_derived_nodes=0,
+                             backed_only_flag=False, answer_audit_numbers=[derived_num],
+                             shape_verdict=None, shape_reason="no_candidates"),
+            _synthetic_cell("f4.json", "214", "m1", wrong=False, n_derived_nodes=1,
+                             backed_only_flag=False,
+                             answer_audit_numbers=[derived_num],
+                             shape_verdict=True, shape_reason="matched"),
+            _synthetic_cell("f5.json", "215", "m1", wrong=True, n_derived_nodes=1,
+                             backed_only_flag=False,
+                             answer_audit_numbers=[derived_num],
+                             shape_verdict=True, shape_reason="matched"),
+            _synthetic_cell("f6.json", "216", "m1", wrong=False, n_derived_nodes=0,
+                             backed_only_flag=False, answer_audit_numbers=None,
+                             shape_verdict=None, shape_reason=None),
+            # holdout cells (213, 217, 221)
+            _synthetic_cell("f7.json", "213", "m1", wrong=False, n_derived_nodes=0,
+                             backed_only_flag=True, answer_audit_numbers=[backed_num],
+                             shape_verdict=True, shape_reason="matched"),
+            _synthetic_cell("f8.json", "217", "m1", wrong=True, n_derived_nodes=1,
+                             backed_only_flag=False, answer_audit_numbers=[derived_num],
+                             shape_verdict=False, shape_reason="mismatch"),
+            # an infra_failed cell that must be excluded from all "usable"-based sections
+            _synthetic_cell("f9.json", "221", "m1", wrong=True, n_derived_nodes=0,
+                             backed_only_flag=True, answer_audit_numbers=[backed_num],
+                             shape_verdict=True, shape_reason="matched", infra_failed=True),
+        ]
+        return cells
+
+    def test_backed_only_flag_section(self):
+        report = lrc.build_report(self._pool())
+        bof = report["backed_only_flag"]
+        # usable pool excludes f9 (infra_failed) -> 8 cells, 3 flagged (f1,f2,f7), 2 of those wrong (f2 only... check)
+        assert bof["pooled"]["n"] == 8
+        assert bof["pooled"]["n_flagged"] == 3  # f1, f2, f7
+        # wrong among flagged: f2 wrong=True, f1 wrong=False, f7 wrong=False -> 1/3
+        assert bof["pooled"]["flag_precision"] == pytest.approx(1 / 3)
+        # total wrong in pool: f2,f3,f5,f8 = 4; flagged-and-wrong = f2 = 1 -> 1/4
+        assert bof["pooled"]["flag_coverage"] == pytest.approx(1 / 4)
+        assert bof["dev"]["n"] == 6
+        assert bof["holdout"]["n"] == 2
+        assert bof["flagged_but_right_files"] == ["f1.json", "f7.json"]
+
+    def test_answer_supported_confirmatory_section(self):
+        report = lrc.build_report(self._pool())
+        asc = report["answer_supported_confirmatory"]
+        # nonzero-derive stratum in usable pool: f4 (right), f5 (wrong), f8 (wrong) -> n=3
+        assert asc["pooled"]["n"] == 3
+        # all have status="derived" -> accepted under backed_or_derived
+        assert asc["pooled"]["n_accepted"] == 3
+        assert asc["pooled"]["coverage"] == pytest.approx(1.0)
+        assert asc["pooled"]["risk"] == pytest.approx(2 / 3)
+        assert asc["pooled"]["base_wrong_rate"] == pytest.approx(2 / 3)
+        assert asc["pooled"]["risk_ratio"] == pytest.approx(1.0)
+        # dev-only nonzero-derive: f4 (right), f5 (wrong) -> n=2
+        assert asc["dev"]["n"] == 2
+        # holdout-only nonzero-derive: f8 (wrong) -> n=1
+        assert asc["holdout"]["n"] == 1
+
+    def test_shape_derive_section(self):
+        report = lrc.build_report(self._pool())
+        sd = report["shape_derive"]
+        pooled = sd["pooled"]
+        assert pooled["n"] == 8
+        # fired (verdict is not None): f1,f2,f4,f5,f7,f8 = 6; f3,f6 = None
+        assert pooled["n_fired"] == 6
+        assert pooled["fire_rate"] == pytest.approx(6 / 8)
+        assert pooled["none_reason_counts"] == {"no_candidates": 1, "none": 1}
+        # contingency pooled: verdict True & wrong: f4(right,skip),f5(True,wrong)=1; True&right: f1,f4,f7=3
+        # verdict False & wrong: f2,f8 = 2; False & right: none = 0
+        contingency = pooled["contingency_pooled"]
+        assert contingency["verdict_true_wrong"] == 1  # f5
+        assert contingency["verdict_true_right"] == 3  # f1, f4, f7
+        assert contingency["verdict_false_wrong"] == 2  # f2, f8
+        assert contingency["verdict_false_right"] == 0
+        assert sd["verdict_false_but_right_files"] == []
+        assert sd["verdict_true_but_wrong_files"] == ["f5.json"]
 
 
 def test_derive_arm_detection_is_token_membership_not_string_equality():
