@@ -276,3 +276,142 @@ async def test_run_sequential_execution_persists_evidence_graph_when_flag_on(mon
 
     reverified = reverify_graph(graph)
     assert reverified is not None
+
+
+# -- W1: `answer_audit` token -- host wiring only (LedgerToolkit.audit_answer itself is Lane A's) ---
+
+def _system_message(io, step):
+    return io.build_llm_payload.call_args_list[step].kwargs["messages"][0]["content"]
+
+
+def test_token_parsing_derive_alone(monkeypatch):
+    monkeypatch.setenv("LEDGER_HOST_MODULES", "derive")
+    assert seq._ledger_derive_enabled() is True
+    assert seq._ledger_answer_audit_enabled() is False
+
+
+def test_token_parsing_answer_audit_alone(monkeypatch):
+    monkeypatch.setenv("LEDGER_HOST_MODULES", "answer_audit")
+    assert seq._ledger_derive_enabled() is False
+    assert seq._ledger_answer_audit_enabled() is True
+
+
+def test_token_parsing_both(monkeypatch):
+    monkeypatch.setenv("LEDGER_HOST_MODULES", "derive,answer_audit")
+    assert seq._ledger_derive_enabled() is True
+    assert seq._ledger_answer_audit_enabled() is True
+
+
+def test_token_parsing_neither(monkeypatch):
+    monkeypatch.delenv("LEDGER_HOST_MODULES", raising=False)
+    assert seq._ledger_derive_enabled() is False
+    assert seq._ledger_answer_audit_enabled() is False
+
+
+def test_derive_tool_stays_model_invisible_when_only_answer_audit_bound():
+    """A `ledger_kit` bound with `derive_enabled=False` (what `run_sequential_execution` passes
+    when only `answer_audit` is in `LEDGER_HOST_MODULES`) must reproduce the flag-off model
+    surface EXACTLY -- no `derive` mention in the system prompt, `derive` still rejected as an
+    invalid action -- even though a real `LedgerToolkit` is bound (so pages still register for
+    `audit_answer` to have an index to match against)."""
+    kit = LedgerToolkit()
+    decisions = [
+        {"thought": "read", "action": "visit", "args": {"url": "https://example.com/a"}},
+        {"thought": "t", "action": "derive",
+         "args": {"operation": "difference", "operands": ["419.7 metres", "380.0 metres"]}},
+        {"thought": "done", "action": "finish", "args": {"answer": "A"}},
+    ]
+    io = _agent_io(decisions)
+    io_baseline = _agent_io(decisions)
+    asyncio.run(seq._run_react(io, "task", "m", max_steps=6, max_tokens=512,
+                               ledger_kit=kit, derive_enabled=False))
+    asyncio.run(seq._run_react(io_baseline, "task", "m", max_steps=6, max_tokens=512))  # no kit at all
+
+    assert _system_message(io, 0) == _system_message(io_baseline, 0)
+    assert "derive" not in _system_message(io, 0).lower()
+    obs = _observation(io, 2)
+    assert "INVALID ACTION" in obs
+    assert "DERIVED" not in obs
+    # the "Use <verb>/<verb>/..." available-actions list must not name derive -- unlike the
+    # scratchpad above it (which legitimately echoes the model's OWN rejected "derive" attempt)
+    assert "derive" not in obs.split("INVALID ACTION")[-1].lower()
+    obs_baseline = _observation(io_baseline, 2)
+    assert obs.split("INVALID ACTION")[-1] == obs_baseline.split("INVALID ACTION")[-1]
+    # but the kit DID register the page, unlike a truly unbound one -- proven via the audit path
+    assert kit.audit_answer("the chimney is 419.7 metres tall")["numbers"][0]["status"] == "backed"
+
+
+@pytest.mark.asyncio
+async def test_run_sequential_execution_stores_answer_audit_and_includes_minted_nodes(monkeypatch):
+    """W1 outer hook: `output["answer_audit"]` is the dict `audit_answer` returns, and its minted
+    SOURCE node is present in the SAME `output["evidence_graph"]` artifact (audit_answer called
+    BEFORE `artifact()`, per the ordering requirement) -- even though the model never called
+    `derive` at all here (zero-derive cell, the case W1 exists to cover)."""
+    monkeypatch.setenv("LEDGER_HOST_MODULES", "answer_audit")
+    decisions = [
+        {"thought": "read", "action": "visit", "args": {"url": "https://example.com/a"}},
+        {"thought": "done", "action": "finish", "args": {"answer": "The chimney is 419.7 metres tall."}},
+    ]
+
+    class _FakeAgentIO:
+        def __init__(self, *a, **kw):
+            pass
+        build_llm_payload = MagicMock(return_value={"messages": []})
+        query_llm = AsyncMock(side_effect=[*(json.dumps(d) for d in decisions), "SYNTH"])
+        search = AsyncMock(return_value=[])
+        visit = AsyncMock(return_value=PAGE)
+
+    monkeypatch.setattr(seq, "AgentIO", _FakeAgentIO)
+    tm = MagicMock()
+    tm.metadata = {"test_id": "999"}
+    tm.get_task_statement.return_value = "How tall is the chimney?"
+    result = await seq.run_sequential_execution(
+        test_module=tm, model_name="m",
+        connector_llm=MagicMock(), connector_search=MagicMock(),
+        connector_http=MagicMock(), connector_chroma=MagicMock(),
+        run_stamp="r1",
+        summarize_observability_func=lambda *a, **kw: {},
+    )
+    output = result["output"]
+    assert "answer_audit" in output
+    audit = output["answer_audit"]
+    assert audit["numbers_total"] >= 1
+    assert any(n["status"] == "backed" for n in audit["numbers"])
+
+    graph = output["evidence_graph"]
+    minted_ids = {n["node_id"] for n in audit["numbers"] if n["node_id"]}
+    graph_ids = {n["id"] for n in graph["nodes"]}
+    assert minted_ids and minted_ids <= graph_ids
+    assert any(n.get("minted_by") == "answer_audit" for n in graph["nodes"])
+
+
+@pytest.mark.asyncio
+async def test_run_sequential_execution_omits_answer_audit_when_token_absent(monkeypatch):
+    monkeypatch.delenv("LEDGER_HOST_MODULES", raising=False)
+    decisions = [
+        {"thought": "read", "action": "visit", "args": {"url": "https://example.com/a"}},
+        {"thought": "done", "action": "finish", "args": {"answer": "The chimney is 419.7 metres tall."}},
+    ]
+
+    class _FakeAgentIO:
+        def __init__(self, *a, **kw):
+            pass
+        build_llm_payload = MagicMock(return_value={"messages": []})
+        query_llm = AsyncMock(side_effect=[*(json.dumps(d) for d in decisions), "SYNTH"])
+        search = AsyncMock(return_value=[])
+        visit = AsyncMock(return_value=PAGE)
+
+    monkeypatch.setattr(seq, "AgentIO", _FakeAgentIO)
+    tm = MagicMock()
+    tm.metadata = {"test_id": "999"}
+    tm.get_task_statement.return_value = "How tall is the chimney?"
+    result = await seq.run_sequential_execution(
+        test_module=tm, model_name="m",
+        connector_llm=MagicMock(), connector_search=MagicMock(),
+        connector_http=MagicMock(), connector_chroma=MagicMock(),
+        run_stamp="r1",
+        summarize_observability_func=lambda *a, **kw: {},
+    )
+    output = result["output"]
+    assert "answer_audit" not in output
+    assert "evidence_graph" not in output

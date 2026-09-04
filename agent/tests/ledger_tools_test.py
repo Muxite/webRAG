@@ -395,3 +395,194 @@ def test_the_certify_chain_reads_quote_verified_true_off_the_serialized_artifact
     assert sources, serialized
     assert all(n["quote_verified"] is True for n in sources), sources
     assert all(n["quote_fail_reason"] is None for n in sources), sources
+
+
+# ==================================================================================================
+# audit_answer: mechanical, finish-time minting from the ANSWER text alone (W1/W1b/W2)
+# ==================================================================================================
+#
+# These tests target the two real certified-but-wrong cases named in the mechanical-minting plan:
+# a -30.55 km "height difference" (wrong operand order) and a dimensionless ratio (2.66) given
+# where a difference was asked, plus the B1 panel objection (never a bare-number page scan).
+
+
+@pytest.fixture
+def blank_kit():
+    """An empty toolkit -- `audit_answer` tests each want their own page text, unlike `kit`'s
+    fixed two-tower fixture above."""
+    return LedgerToolkit()
+
+
+def _numbers_by_text(result, text):
+    return [n for n in result["numbers"] if n["text"] == text]
+
+
+def test_a_number_on_a_visited_page_is_graded_backed(blank_kit):
+    blank_kit.register_page("https://example.com/a",
+                            "Ekibastuz GRES-2 has a chimney 419.7 metres tall.")
+
+    result = blank_kit.audit_answer("The chimney is 419.7 metres tall.")
+
+    matches = _numbers_by_text(result, "419.7")
+    assert len(matches) == 1
+    record = matches[0]
+    assert record["status"] == "backed"
+    assert record["unit_consistent"] is True
+    assert record["node_id"]
+    assert record["page_id"]
+    assert result["answer_supported"] is True
+
+
+def test_an_answer_stated_with_no_unit_still_backs_with_unit_consistent_none(blank_kit):
+    blank_kit.register_page("https://example.com/a",
+                            "Ekibastuz GRES-2 has a chimney 419.7 metres tall.")
+
+    result = blank_kit.audit_answer("The chimney is 419.7 tall.")
+
+    record = _numbers_by_text(result, "419.7")[0]
+    assert record["status"] == "backed"
+    assert record["unit_consistent"] is None
+
+
+def test_unit_mismatch_against_a_page_stating_a_different_unit_must_not_back(blank_kit):
+    """B1: 1776 ft claimed against a page that states 1776 IN METRES must not be graded backed --
+    a bare-number scan (no unit check at all) would wrongly pass this."""
+    blank_kit.register_page("https://example.com/a", "The tower height is 1776 m.")
+
+    result = blank_kit.audit_answer("The tower height is 1776 ft.")
+
+    record = _numbers_by_text(result, "1776")[0]
+    assert record["status"] != "backed"
+    assert result["answer_supported"] is False
+
+
+def test_a_year_like_number_is_trivial_and_excluded_from_answer_supported(blank_kit):
+    """A bare, unitless number that merely LOOKS like a year (and is not on any page) must not
+    sink -- or pass -- the headline predicate; it is excluded entirely."""
+    blank_kit.register_page("https://example.com/a", "Nothing relevant here at all.")
+
+    result = blank_kit.audit_answer("It was built in 1991.")
+
+    record = _numbers_by_text(result, "1991")[0]
+    assert record["trivial"] is True
+    # no NON-trivial number exists in this answer at all
+    assert result["answer_supported"] is False
+
+
+def test_a_computed_answer_is_graded_derived_over_its_two_page_bound_operands(blank_kit):
+    """The modal computed-answer cell: neither operand's arithmetic result appears on any page,
+    but both operands do, and the combination mechanically explains the third number."""
+    blank_kit.register_page(
+        "https://example.com/a",
+        "Tower A is 419.7 metres tall. Tower B is 381 metres tall.")
+
+    result = blank_kit.audit_answer("419.7 metres - 381 metres = 38.7 metres")
+
+    a = _numbers_by_text(result, "419.7")[0]
+    b = _numbers_by_text(result, "381")[0]
+    diff = _numbers_by_text(result, "38.7")[0]
+    assert a["status"] == "backed"
+    assert b["status"] == "backed"
+    assert diff["status"] == "derived"
+    assert diff["op"] == "difference"
+    assert len(diff["operand_node_ids"]) == 2
+    assert diff["ambiguity"] == 1
+    assert result["answer_supported"] is True
+
+    # the DERIVED node's arithmetic was recomputed HONESTLY by the graph itself, not merely
+    # asserted by this method -- confirm it actually landed in the artifact as valid.
+    derived_nodes = [n for n in blank_kit.artifact()["nodes"]
+                     if n["id"] == diff["node_id"] or n["id"] in diff["operand_node_ids"]]
+    arith_node = next(n for n in blank_kit.artifact()["nodes"]
+                       if n["kind"] == "derived" and n["operation"] == "difference")
+    assert arith_node["derivation_valid"] is True
+    assert arith_node["minted_by"] == "answer_audit"
+
+
+def test_ambiguous_derivations_are_counted_and_downgrade_the_headline_predicate(blank_kit):
+    """Two distinct (op, operand-pair) explanations for the same target number -- ambiguity=2 --
+    keeps the node `derived` but fails the `ambiguity<=1` clause of `answer_supported`."""
+    blank_kit.register_page(
+        "https://example.com/a",
+        "Tower A is 100 m tall. Tower B is 60 m tall. Tower C is 140 m tall.")
+
+    result = blank_kit.audit_answer("The difference is 40 m.")
+
+    record = _numbers_by_text(result, "40")[0]
+    assert record["status"] == "derived"
+    assert record["ambiguity"] >= 2
+    assert result["answer_supported"] is False
+
+
+def test_audit_answer_never_raises_on_unparseable_input(blank_kit):
+    result = blank_kit.audit_answer("")
+    assert result["numbers_total"] == 0
+    assert result["answer_supported"] is False
+    assert result["numbers"] == []
+    assert result["op_appropriateness"] == []
+
+
+def test_audit_answer_is_idempotent_and_mints_no_duplicate_nodes(blank_kit):
+    blank_kit.register_page(
+        "https://example.com/a",
+        "Tower A is 419.7 metres tall. Tower B is 381 metres tall.")
+    answer = "419.7 metres - 381 metres = 38.7 metres"
+
+    first = blank_kit.audit_answer(answer)
+    node_count_after_first = len(blank_kit.artifact()["nodes"])
+    second = blank_kit.audit_answer(answer)
+    node_count_after_second = len(blank_kit.artifact()["nodes"])
+
+    assert node_count_after_first == node_count_after_second
+    assert [n["node_id"] for n in first["numbers"]] == [n["node_id"] for n in second["numbers"]]
+
+
+def test_op_appropriateness_flags_a_negative_result_for_a_magnitude_mandate(blank_kit):
+    """The -30.55 km case: a model-driven `derive()` call (never touched by `audit_answer`
+    itself) subtracted the operands in the wrong order for a "how much taller" question."""
+    blank_kit.register_page(
+        "https://example.com/a",
+        "Peak A is 3000 m tall. Peak B is 3030.55 m tall.")
+    blank_kit.derive("difference", ["3000 m", "3030.55 m"])  # A - B, the "wrong" order
+
+    result = blank_kit.audit_answer(
+        "The height difference is -30.55 m.",
+        mandate="What is the height difference between Peak A and Peak B?")
+
+    diff_entries = [e for e in result["op_appropriateness"] if e["operation"] == "difference"]
+    assert diff_entries, result["op_appropriateness"]
+    assert diff_entries[0]["sign_plausible"] is False
+
+
+def test_op_appropriateness_flags_a_ratio_where_a_difference_was_asked(blank_kit):
+    """The 2.66 case: a dimensionless ratio handed back where the mandate asked for a
+    difference-shaped comparison."""
+    blank_kit.register_page(
+        "https://example.com/a",
+        "Building A is 100 m tall. Building B is 37.6 m tall.")
+    blank_kit.derive("quotient", ["100 m", "37.6 m"])
+
+    result = blank_kit.audit_answer(
+        "Building A is 2.66 times as tall.",
+        mandate="What is the height difference between Building A and Building B?")
+
+    quotient_entries = [e for e in result["op_appropriateness"] if e["operation"] == "quotient"]
+    assert quotient_entries, result["op_appropriateness"]
+    assert quotient_entries[0]["operation_shape_match"] is False
+
+
+def test_op_appropriateness_excludes_answer_audits_own_derived_nodes(blank_kit):
+    """`audit_answer`'s own mechanically-minted DERIVED nodes must not appear in its own
+    `op_appropriateness` list -- that section audits the MODEL's derivations, not itself."""
+    blank_kit.register_page(
+        "https://example.com/a",
+        "Tower A is 419.7 metres tall. Tower B is 381 metres tall.")
+
+    result = blank_kit.audit_answer(
+        "419.7 metres - 381 metres = 38.7 metres",
+        mandate="What is the height difference between Tower A and Tower B?")
+
+    derived_ids = {n["node_id"] for n in result["numbers"] if n["status"] == "derived"}
+    assert derived_ids
+    reported_ids = {e["node_id"] for e in result["op_appropriateness"]}
+    assert derived_ids.isdisjoint(reported_ids)

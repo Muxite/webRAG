@@ -1215,6 +1215,16 @@ class EvidenceNode:
     #: it as None via :meth:`from_dict`, and reverification fills in the real answer rather than
     #: trusting a value that was never computed.
     operand_supported: Optional[bool] = None
+    #: Which minting PATH admitted this node: ``""`` for the ordinary model-driven
+    #: ``LedgerToolkit.derive`` / ``_locate`` path (every existing call site keeps this default,
+    #: so no prior artifact or test changes shape), or a caller-supplied tag such as
+    #: ``"answer_audit"`` for :meth:`~agent.app.ledger_tools.LedgerToolkit.audit_answer`'s
+    #: mechanical, finish-time minting. Provenance only -- it gates nothing here; a consumer
+    #: (e.g. the risk-coverage certify chain) decides whether to include or exclude a tag.
+    #: Same optional-field pattern as :attr:`operand_supported`: dataclass default, an
+    #: :meth:`as_dict` key, and an :meth:`from_dict` ``.get`` default, so an artifact serialized
+    #: before this field existed deserializes it as ``""`` rather than raising.
+    minted_by: str = ""
 
     def as_dict(self) -> Dict[str, Any]:
         """This node as a JSON-serializable dict."""
@@ -1231,16 +1241,18 @@ class EvidenceNode:
             "value_kind": self.value_kind, "interval_low": self.interval_low,
             "interval_high": self.interval_high,
             "operand_supported": self.operand_supported,
+            "minted_by": self.minted_by,
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "EvidenceNode":
         """Rebuild a node from :meth:`as_dict` output.
 
-        ``operand_supported`` is read with ``.get`` and left ``None`` when absent, exactly like
-        every other optional field here -- an artifact serialized before that field existed
-        deserializes gracefully rather than raising, and :func:`reverify_graph` is what fills the
-        real value back in for such a graph.
+        ``operand_supported`` and ``minted_by`` are read with ``.get`` and left at their dataclass
+        defaults when absent, exactly like every other optional field here -- an artifact
+        serialized before either field existed deserializes gracefully rather than raising, and
+        (for ``operand_supported``) :func:`reverify_graph` is what fills the real value back in
+        for such a graph.
         """
         return cls(
             id=str(data.get("id", "")), kind=str(data.get("kind", KIND_SOURCE)),
@@ -1261,6 +1273,7 @@ class EvidenceNode:
             interval_low=data.get("interval_low"),
             interval_high=data.get("interval_high"),
             operand_supported=data.get("operand_supported"),
+            minted_by=str(data.get("minted_by", "") or ""),
         )
 
 
@@ -1356,7 +1369,7 @@ class EvidenceGraph:
 
     def add_source(self, page_id: str, value: str, quote: str = "", contract: Any = None,
                    unit: Any = None, label: Any = None,
-                   refuse_ambiguous: bool = False) -> Optional[EvidenceNode]:
+                   refuse_ambiguous: bool = False, minted_by: str = "") -> Optional[EvidenceNode]:
         """Admit a SOURCE node for ``value`` if and only if it is located in the stored page.
 
         The quote, when given, is verified INDEPENDENTLY (``verify_against_stored_page``) and
@@ -1372,6 +1385,9 @@ class EvidenceGraph:
         :param unit: an optional unit to locate together with the value, as one span.
         :param label: an optional field label used to prefer a vouched-for occurrence.
         :param refuse_ambiguous: opt-in refusal of a repeated value with no label nearby.
+        :param minted_by: provenance tag stamped onto :attr:`EvidenceNode.minted_by`. Ignored when
+            a content-identical node already exists -- dedup keeps the FIRST node's tag, same as
+            every other field :meth:`add_source` does not overwrite on a re-mint.
         :returns: the admitted (or already-present, content-identical) node, else None with an
             entry appended to :attr:`rejections`.
         :raises: nothing.
@@ -1398,7 +1414,7 @@ class EvidenceGraph:
             quote=str(quote or ""), quote_verified=quote_match.verified,
             quote_fail_reason=quote_match.fail_reason, verified=True,
             occurrences=match.occurrences, unit_bearing=match.unit_bearing,
-            label_nearby=match.label_nearby, unit=unit_text,
+            label_nearby=match.label_nearby, unit=unit_text, minted_by=str(minted_by or ""),
         )
         self._nodes[node_id] = node
         return node
@@ -1467,7 +1483,7 @@ class EvidenceGraph:
 
     def add_derived(self, value: str, operation: str, input_ids: Iterable[str], *,
                     unit: str = "", derivation_valid: Optional[bool] = None,
-                    derivation_detail: str = "") -> EvidenceNode:
+                    derivation_detail: str = "", minted_by: str = "") -> EvidenceNode:
         """Admit a DERIVED node computed from nodes already in the graph — the sibling's seam.
 
         This half builds the container: identity, edges, the input-existence check, and (via the
@@ -1481,6 +1497,8 @@ class EvidenceGraph:
         :param unit: the derived value's unit, when it has one.
         :param derivation_valid: whether the operation's postcondition held; None when unassessed.
         :param derivation_detail: human-readable detail for a not-True ``derivation_valid``.
+        :param minted_by: provenance tag stamped onto :attr:`EvidenceNode.minted_by`. Ignored
+            when a content-identical node already exists -- dedup keeps the FIRST node's tag.
         :returns: the new node, or the content-identical one already present (its ORIGINAL unit /
             validity / detail are kept, matching :meth:`add_source`'s dedup-keeps-first rule).
         :raises: ValueError: when ``input_ids`` is empty or names a node the graph does not hold —
@@ -1501,7 +1519,8 @@ class EvidenceGraph:
                             derivation_valid=derivation_valid,
                             derivation_detail=str(derivation_detail or ""),
                             operand_supported=self._operand_supported(
-                                [self._nodes[i] for i in inputs]))
+                                [self._nodes[i] for i in inputs]),
+                            minted_by=str(minted_by or ""))
         self._nodes[node_id] = node
         return node
 
@@ -1640,7 +1659,7 @@ class EvidenceGraph:
         return inputs_ok and not disagreement, "; ".join(parts)
 
     def add_arith(self, operation: str, input_ids: Iterable[str], *,
-                 proposed_value: Any = None) -> EvidenceNode:
+                 proposed_value: Any = None, minted_by: str = "") -> EvidenceNode:
         """Admit a DERIVED node whose value is RECOMPUTED in Python, never asserted by a model.
 
         Supports ``sum`` and ``product`` (any number of inputs) and ``difference`` / ``quotient`` /
@@ -1654,6 +1673,7 @@ class EvidenceGraph:
             used as the node's value — only compared against the recomputation, within
             :data:`ARITH_RELATIVE_TOLERANCE`. A disagreement marks the node invalid and is recorded
             in ``derivation_detail``; it is never silently overwritten or accepted.
+        :param minted_by: provenance tag forwarded to :meth:`add_derived`.
         :returns: the new (or content-identical existing) node, whose ``value`` is always the
             RECOMPUTED figure regardless of ``proposed_value``.
         :raises: ValueError: unknown operation or input id, a binary op given the wrong arity, a
@@ -1701,7 +1721,8 @@ class EvidenceGraph:
         if unit_note:
             detail = "; ".join(part for part in (detail, f"unit_note={unit_note}") if part)
         return self.add_derived(value_text, operation, [n.id for n in inputs], unit=unit,
-                                derivation_valid=valid, derivation_detail=detail)
+                                derivation_valid=valid, derivation_detail=detail,
+                                minted_by=minted_by)
 
     def _quotient_unit_note(self, numerator: EvidenceNode, denominator: EvidenceNode) -> str:
         """A machine-readable annotation for a ``quotient`` / ``ratio``'s dimensions.

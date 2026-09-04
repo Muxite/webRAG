@@ -290,6 +290,115 @@ def split_dev_holdout(cells: Iterable[Dict[str, Any]],
 
 
 # ==============================================================================================
+# Pure functions: the answer_audit signal (NEW, separate from the pre-registered 5-clause chain)
+# ==============================================================================================
+#
+# See mechanical_minting_plan.md REVISION 1 / "API contract". This section reads the host-stored
+# ``answer_audit`` summary (``LedgerToolkit.audit_answer`` output, stored at
+# ``execution.output.answer_audit`` by both hosts) -- a DIFFERENT, mechanically-minted signal from
+# the pre-registered certify chain above. It is reported under its own top-level "answer_audit"
+# key in the JSON summary and must never be confused with, or silently folded into, "certified".
+
+#: Sub-predicate sweep points: (label, accepted statuses, whether trivial numbers are included,
+#: max allowed ambiguity). ``"backed_or_derived"`` with ``include_trivial=False`` and
+#: ``max_ambiguity=1`` is the prereg-amendment B2 definition of ``answer_supported`` itself; the
+#: other points let the analysis compare discrimination across stricter/looser variants (does
+#: excluding "derived" hurt coverage a lot for little risk gain, does allowing ambiguity>1 hurt
+#: risk, does counting trivial numbers change anything).
+ANSWER_AUDIT_SWEEP_COMBOS: Tuple[Tuple[str, frozenset, bool, int], ...] = (
+    ("backed_only", frozenset({"backed"}), False, 1),
+    ("backed_or_derived", frozenset({"backed", "derived"}), False, 1),
+    ("backed_or_derived_incl_trivial", frozenset({"backed", "derived"}), True, 1),
+    ("backed_or_derived_any_ambiguity", frozenset({"backed", "derived"}), False, 10 ** 9),
+)
+
+
+def classify_answer_audit_summary(summary: Any) -> Dict[str, Any]:
+    """Normalize one cell's host-stored ``answer_audit`` summary (or its absence) into the shape
+    the analysis section consumes.
+
+    Absence (older host, or the ``answer_audit`` host module not enabled for that run) is counted
+    as its own ``has_audit: False`` bucket -- a DIFFERENT population from "audit ran but the
+    predicate did not fire" -- per the task's "cell counted as no_audit" handling. Anything other
+    than a dict (``None``, a stray string, ...) is treated the same as absence; this function
+    never raises on a malformed/partial summary.
+    """
+    if not isinstance(summary, dict):
+        return {
+            "has_audit": False, "numbers_total": 0, "numbers": [],
+            "answer_supported_raw": None,
+            "op_appropriateness_n": 0, "op_sign_implausible_n": 0, "op_shape_mismatch_n": 0,
+        }
+    numbers = summary.get("numbers")
+    if not isinstance(numbers, list):
+        numbers = []
+    op_list = summary.get("op_appropriateness")
+    if not isinstance(op_list, list):
+        op_list = []
+    sign_bad = sum(1 for op in op_list if isinstance(op, dict) and op.get("sign_plausible") is False)
+    shape_bad = sum(
+        1 for op in op_list if isinstance(op, dict) and op.get("operation_shape_match") is False
+    )
+    return {
+        "has_audit": True,
+        "numbers_total": int(summary.get("numbers_total") or len(numbers)),
+        "numbers": numbers,
+        "answer_supported_raw": summary.get("answer_supported"),
+        "op_appropriateness_n": len(op_list),
+        "op_sign_implausible_n": sign_bad,
+        "op_shape_mismatch_n": shape_bad,
+    }
+
+
+def answer_supported_graded(numbers: Sequence[Dict[str, Any]], statuses: frozenset,
+                             include_trivial: bool = False, max_ambiguity: int = 1) -> bool:
+    """Whether ``numbers`` (the ``answer_audit`` summary's per-number list) satisfies one point of
+    the graded sub-predicate sweep.
+
+    ``("backed_or_derived", include_trivial=False, max_ambiguity=1)`` is the prereg-amendment B2
+    definition of ``answer_supported``: >=1 non-trivial number, and every non-trivial number has
+    ``status`` in ``{"backed", "derived"}``, ``unit_consistent`` is not ``False``, and
+    ``ambiguity <= 1``. Vacuously False (not True) when there is nothing to check -- unlike
+    clause5 in the pre-registered chain, an answer with zero (non-trivial) numbers earns no
+    credit here; this is a NEW signal, not bound by the old chain's literal-as-specified gap.
+    """
+    relevant = list(numbers) if include_trivial else [n for n in numbers if not n.get("trivial")]
+    if not relevant:
+        return False
+    for n in relevant:
+        if n.get("status") not in statuses:
+            return False
+        if n.get("unit_consistent") is False:
+            return False
+        ambiguity = n.get("ambiguity")
+        if ambiguity is not None and ambiguity > max_ambiguity:
+            return False
+    return True
+
+
+def answer_audit_sweep(cells: Sequence[Dict[str, Any]], wrong_key: str = "wrong") -> List[Dict[str, Any]]:
+    """Coverage/risk, mirroring :func:`binary_operating_point`'s definitions, for every point in
+    :data:`ANSWER_AUDIT_SWEEP_COMBOS`.
+
+    ``cells`` items need an ``"answer_audit"`` key holding a :func:`classify_answer_audit_summary`
+    result, plus ``wrong_key``. A cell with ``has_audit`` False never counts as accepted at any
+    sweep point (there is no signal to accept on), but still contributes to ``n``.
+    """
+    rows: List[Dict[str, Any]] = []
+    for label, statuses, include_trivial, max_ambiguity in ANSWER_AUDIT_SWEEP_COMBOS:
+        marked = []
+        for cell in cells:
+            aa = cell.get("answer_audit") or {}
+            accepted = bool(aa.get("has_audit")) and answer_supported_graded(
+                aa.get("numbers") or [], statuses, include_trivial, max_ambiguity
+            )
+            marked.append({"certified": accepted, wrong_key: cell.get(wrong_key)})
+        point = binary_operating_point(marked, certified_key="certified", wrong_key=wrong_key)
+        rows.append({"predicate": label, **point})
+    return rows
+
+
+# ==============================================================================================
 # Filesystem / evidence-graph plumbing (not unit-tested directly; exercised by the smoke run)
 # ==============================================================================================
 
@@ -355,6 +464,7 @@ def classify_cell(path: Path, raw: Dict[str, Any]) -> Dict[str, Any]:
     deliverable = output.get("final_deliverable") or ""
     final_numbers = extract_numbers(strip_urls(deliverable))
     evidence_graph = output.get("evidence_graph")
+    answer_audit = classify_answer_audit_summary(output.get("answer_audit"))
 
     derived_nodes: List[Dict[str, Any]] = []
     source_quote_verified: Dict[str, Optional[bool]] = {}
@@ -370,6 +480,17 @@ def classify_cell(path: Path, raw: Dict[str, Any]) -> Dict[str, Any]:
             for row in reverify_result.get("nodes", []) if row.get("kind") == KIND_DERIVED
         }
         for node in graph.nodes():
+            # Old-chain integrity, LOAD-BEARING for clause5: skip any node minted by the
+            # answer_audit mechanical pass (see API contract in mechanical_minting_plan.md
+            # REVISION 1 -- "clause semantics must be stable across the minting boundary").
+            # Without this exclusion, a host-minted answer_audit SOURCE node would enter
+            # backing_values and make clause5 ("no unbacked final-answer number") circular: it
+            # would back exactly the number that was extracted FROM the deliverable to produce
+            # it. Read via getattr with a "" default so evidence-graph artifacts predating the
+            # minted_by field (which defaults to "" on deserialization) are unaffected -- every
+            # node from before answer_audit existed is treated as non-minted, same as today.
+            if (getattr(node, "minted_by", "") or "") == "answer_audit":
+                continue
             if node.kind == KIND_SOURCE:
                 source_quote_verified[node.id] = node.quote_verified
                 backing_values.extend(extract_node_numbers(node.value))
@@ -401,6 +522,7 @@ def classify_cell(path: Path, raw: Dict[str, Any]) -> Dict[str, Any]:
         "minus_operand_certified": minus_operand_certified,
         "minus_operand_passed": minus_operand_passed,
         "reverify_counts": reverify_counts,
+        "answer_audit": answer_audit,
     }
 
 
@@ -552,6 +674,40 @@ def build_report(cells: List[Dict[str, Any]]) -> Dict[str, Any]:
         "explicitly does not promote dev-split numbers to confirmation."
     )
 
+    # ==========================================================================================
+    # answer_audit: a NEW analysis section, deliberately separate from the pre-registered
+    # 5-clause certify chain above (see mechanical_minting_plan.md REVISION 1). Computed over
+    # derive-ON cells and over ALL usable cells, each split further by whether the cell has >=1
+    # non-answer_audit DERIVED node (n_derived_nodes already excludes minted_by=="answer_audit"
+    # nodes -- see classify_cell) since zero-derive cells are the population this signal exists
+    # to give a discrimination signal on. This corpus predates minting, so every cell here is
+    # expected to be "no_audit" -- that must not crash (see the smoke-run validation step).
+    # ==========================================================================================
+    def _op_appropriateness_totals(pool: List[Dict[str, Any]]) -> Dict[str, int]:
+        return {
+            "n_derived_checked": sum(c["answer_audit"]["op_appropriateness_n"] for c in pool),
+            "n_sign_implausible": sum(c["answer_audit"]["op_sign_implausible_n"] for c in pool),
+            "n_shape_mismatch": sum(c["answer_audit"]["op_shape_mismatch_n"] for c in pool),
+        }
+
+    def _answer_audit_pool_report(pool: List[Dict[str, Any]]) -> Dict[str, Any]:
+        n_no_audit = sum(1 for c in pool if not c["answer_audit"]["has_audit"])
+        zero_derive = [c for c in pool if c["n_derived_nodes"] == 0]
+        nonzero_derive = [c for c in pool if c["n_derived_nodes"] >= 1]
+        return {
+            "n": len(pool),
+            "n_no_audit": n_no_audit,
+            "sweep_all": answer_audit_sweep(pool),
+            "sweep_zero_derive_nodes": answer_audit_sweep(zero_derive),
+            "sweep_nonzero_derive_nodes": answer_audit_sweep(nonzero_derive),
+            "op_appropriateness_totals": _op_appropriateness_totals(pool),
+        }
+
+    report["answer_audit"] = {
+        "derive_on": _answer_audit_pool_report(derive_on),
+        "all_usable": _answer_audit_pool_report(usable),
+    }
+
     return report
 
 
@@ -629,6 +785,18 @@ def print_report(report: Dict[str, Any]) -> None:
     print(f"  {report['operand_supported_development_evidence_dev']}")
     print("--- operand_supported: CONFIRMATORY (holdout 213/217/221 only) ---")
     print(f"  {report['operand_supported_confirmatory_holdout']}")
+    print()
+
+    print("--- answer_audit (NEW signal, separate from the 5-clause certify chain) ---")
+    for pool_label in ("derive_on", "all_usable"):
+        pool = report["answer_audit"][pool_label]
+        print(f"  [{pool_label}] n={pool['n']} n_no_audit={pool['n_no_audit']}")
+        for sweep_label in ("sweep_all", "sweep_zero_derive_nodes", "sweep_nonzero_derive_nodes"):
+            print(f"    {sweep_label}:")
+            for row in pool[sweep_label]:
+                print(f"      {row['predicate']:32s} coverage={_fmt_pct(row['coverage'])} "
+                      f"risk={_fmt_pct(row['risk'])} n_certified={row['n_certified']}/{row['n']}")
+        print(f"    op_appropriateness_totals: {pool['op_appropriateness_totals']}")
 
 
 def main() -> int:

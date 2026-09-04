@@ -367,3 +367,182 @@ def test_a_value_past_the_models_visible_window_is_not_admissible_as_an_operand(
 
     assert "REFUSED" in out.upper()
     assert "987.6" in out
+
+
+# -- W1: `answer_audit` token -- host wiring only (LedgerToolkit.audit_answer itself is Lane A's) ---
+
+
+def test_token_parsing_derive_alone():
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini", ledger_host_modules=["derive"],
+    )
+    assert solver._ledger_derive_enabled is True
+    assert solver._ledger_answer_audit_enabled is False
+
+
+def test_token_parsing_answer_audit_alone():
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini", ledger_host_modules=["answer_audit"],
+    )
+    assert solver._ledger_derive_enabled is False
+    assert solver._ledger_answer_audit_enabled is True
+
+
+def test_token_parsing_both():
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini", ledger_host_modules=["derive", "answer_audit"],
+    )
+    assert solver._ledger_derive_enabled is True
+    assert solver._ledger_answer_audit_enabled is True
+
+
+def test_token_parsing_neither():
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini",
+    )
+    assert solver._ledger_derive_enabled is False
+    assert solver._ledger_answer_audit_enabled is False
+
+
+def test_derive_tool_stays_model_invisible_when_only_answer_audit_bound():
+    """`_make_tools(..., ledger_kit=kit, derive_enabled=False)` -- what `solve` passes when only
+    `answer_audit` is in `LEDGER_HOST_MODULES` -- must produce the SAME tool list as the flag-off
+    case: no `derive` tool at all. This is inverted from
+    `test_make_tools_appends_derive_tool_when_ledger_kit_is_bound` above, which pins the opposite
+    (derive-token) case."""
+    kit = LedgerToolkit()
+    tools = _make_tools(_FakeAgentIO(), search_k=6, page_chars=6000, ledger_kit=kit,
+                        derive_enabled=False)
+    assert [t.name for t in tools] == ["search", "visit"]
+
+
+def test_page_still_registers_when_only_answer_audit_bound():
+    """The `derive` TOOL is invisible, but the kit itself must still see every fetched page --
+    `audit_answer` needs the quantity index that only page registration builds."""
+    kit = LedgerToolkit()
+    fake_io = _FakeAgentIO(pages={"https://example.com/a": "Height\n419.7\nmetres"})
+    tools = _make_tools(fake_io, search_k=6, page_chars=6000, ledger_kit=kit, derive_enabled=False)
+    _search, visit_tool = tools
+
+    assert kit.artifact()["pages"] == []
+    asyncio.run(visit_tool.ainvoke({"url": "https://example.com/a"}))
+    assert len(kit.artifact()["pages"]) == 1
+    audit = kit.audit_answer("The height is 419.7 metres.")
+    assert audit["numbers"][0]["status"] == "backed"
+
+
+def _install_fake_ledger_kit(monkeypatch):
+    """Replaces `langgraph_solver.LedgerToolkit` with a recording stub, so `solve()`'s outer-exit
+    wiring (call order, mandate, final text) can be pinned without a real quantity index. Returns
+    the list of constructed instances (one per `solve()` call)."""
+    from agent.app import langgraph_solver
+
+    instances = []
+
+    class _FakeLedgerKit:
+        def __init__(self, max_page_chars=6000):
+            self.calls = []
+
+        def register_page(self, url, text):
+            return "p1"
+
+        def page_index_text(self, page_id, max_chars=1200):
+            return ""
+
+        def derive(self, *a, **kw):
+            return "DERIVED stub"
+
+        def audit_answer(self, answer_text, mandate=""):
+            self.calls.append(("audit_answer", answer_text, mandate))
+            return {"numbers_total": 0, "numbers": [], "answer_supported": False,
+                    "op_appropriateness": []}
+
+        def artifact(self):
+            self.calls.append(("artifact",))
+            return {"pages": [], "nodes": []}
+
+    def factory(*a, **kw):
+        inst = _FakeLedgerKit(*a, **kw)
+        instances.append(inst)
+        return inst
+
+    monkeypatch.setattr(langgraph_solver, "LedgerToolkit", factory)
+    return instances
+
+
+def test_solve_calls_audit_answer_before_artifact_with_mandate_and_final_text(monkeypatch):
+    instances = _install_fake_ledger_kit(monkeypatch)
+    result, _llm = _run_solve_with_messages(
+        monkeypatch, _natural_termination_messages(), ledger_host_modules=["answer_audit"])
+
+    kit = instances[-1]
+    assert [c[0] for c in kit.calls] == ["audit_answer", "artifact"]  # ordering
+    _, answer_text, mandate = kit.calls[0]
+    assert answer_text == "the final answer text"  # `_natural_termination_messages`' AIMessage
+    assert mandate == "the task"  # `_run_solve_with_messages` calls `solve("the task", ...)`
+    assert result["answer_audit"]["numbers_total"] == 0
+    assert "evidence_graph" in result
+
+
+def test_solve_omits_answer_audit_when_token_absent(monkeypatch):
+    result, _llm = _run_solve_with_messages(monkeypatch, _natural_termination_messages())
+    assert "answer_audit" not in result
+    assert "evidence_graph" not in result
+
+
+def test_solve_omits_answer_audit_when_only_derive_token_set(monkeypatch):
+    """`derive` alone must not turn W1 on -- the two tokens are independent."""
+    instances = _install_fake_ledger_kit(monkeypatch)
+    result, _llm = _run_solve_with_messages(
+        monkeypatch, _natural_termination_messages(), ledger_host_modules=["derive"])
+    assert "answer_audit" not in result
+    kit = instances[-1]
+    assert [c[0] for c in kit.calls] == ["artifact"]  # audit_answer never called
+
+
+def test_solve_stores_answer_audit_and_includes_minted_nodes_in_the_same_artifact(monkeypatch):
+    """Real `LedgerToolkit` (no stub): a zero-derive cell whose final answer restates a number the
+    model read off a visited page. `audit_answer` mints a SOURCE node for it, and that node must
+    show up in the SAME `evidence_graph` artifact `solve()` stores -- proving the ordering
+    (`audit_answer` before `artifact()`) actually lands, not just that both keys exist."""
+    from agent.app import langgraph_solver
+
+    class _StubGraphVisiting:
+        async def astream(self, _inputs, config=None, stream_mode=None):
+            # Simulate the model having visited a page via the bound `visit` tool before finishing,
+            # by registering it on the toolkit directly -- `solve()` binds the SAME kit instance
+            # to `_make_tools`, so this is exactly what a real visited-page run would produce.
+            kit_ref["kit"].register_page("https://example.com/a", "Height\n419.7\nmetres")
+            yield {"messages": [HumanMessage(content="the task"),
+                                AIMessage(content="The height is 419.7 metres.")]}
+
+    kit_ref = {}
+    real_ledger_toolkit = LedgerToolkit
+
+    def _capturing_factory(*a, **kw):
+        kit = real_ledger_toolkit(*a, **kw)
+        kit_ref["kit"] = kit
+        return kit
+
+    monkeypatch.setattr(langgraph_solver, "LedgerToolkit", _capturing_factory)
+    monkeypatch.setattr(langgraph_solver, "create_react_agent", lambda *a, **k: _StubGraphVisiting())
+    monkeypatch.setattr(LangGraphSolver, "_build_llm", lambda self: _StubLLM())
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini", ledger_host_modules=["answer_audit"],
+    )
+    result = asyncio.run(solver.solve("the task", max_steps=4))
+
+    audit = result["answer_audit"]
+    assert audit["numbers_total"] >= 1
+    assert any(n["status"] == "backed" for n in audit["numbers"])
+
+    graph = result["evidence_graph"]
+    minted_ids = {n["node_id"] for n in audit["numbers"] if n["node_id"]}
+    graph_ids = {n["id"] for n in graph["nodes"]}
+    assert minted_ids and minted_ids <= graph_ids
+    assert any(n.get("minted_by") == "answer_audit" for n in graph["nodes"])

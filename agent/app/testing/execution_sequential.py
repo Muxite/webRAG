@@ -77,6 +77,17 @@ def _ledger_derive_enabled() -> bool:
     return "derive" in modules
 
 
+#: W1 (mechanical answer-support minting): a SEPARATE token in the same env var. Deliberately its
+#: own tiny read (mirrors ``_ledger_derive_enabled`` exactly) rather than a shared parser -- same
+#: rationale as that function's docstring. ``answer_audit`` never touches the model: no prompt
+#: text, no tool registration, no dispatch branch. It only gates whether the host calls
+#: ``LedgerToolkit.audit_answer`` once, finish-time, in ``run_sequential_execution``.
+def _ledger_answer_audit_enabled() -> bool:
+    """True when ``answer_audit`` is present in ``LEDGER_HOST_MODULES``."""
+    modules = {m.strip().lower() for m in os.environ.get("LEDGER_HOST_MODULES", "").split(",")}
+    return "answer_audit" in modules
+
+
 #: Prompt text for the ``derive`` action, written for a WEAK model: it names the module's actual
 #: contract (operand must already be read on a page, the tool computes it, a guess is checked not
 #: trusted) rather than just listing the verb.
@@ -449,9 +460,18 @@ async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps
                      max_tokens: int, retry: Optional[ToolRetry] = None,
                      context_cap: Optional[SequentialContextCap] = None,
                      ledger_kit: Optional[LedgerToolkit] = None,
+                     derive_enabled: bool = True,
                      finish_gate: Optional[FinishGate] = None,
                      gate_telemetry: Optional[Dict[str, Any]] = None) -> str:
     """
+    :param derive_enabled: whether a bound ``ledger_kit`` also exposes the model-visible
+        ``derive`` tool (prompt text + dispatch). Defaults ``True`` so every existing caller that
+        binds a ``ledger_kit`` without passing this (all pre-W1 code and tests) is unchanged.
+        ``run_sequential_execution`` passes ``False`` here when only the ``answer_audit`` token is
+        set: the ``ledger_kit`` is still bound (pages still register, so ``audit_answer`` has an
+        index to match against) but ``has_derive`` below stays ``False`` -- W1's mechanical
+        finish-time minting must be 100% model-invisible, and page registration is a host-side
+        bookkeeping call, never something the model sees or issues.
     :param finish_gate: W2 §1-2 structural finish gate. ``None`` or disabled -> the ``finish``
         branch below is byte-identical to before the gate existed.
     :param gate_telemetry: mutated in place with the gate's per-run counters, when supplied --
@@ -461,7 +481,7 @@ async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps
     """
     retry = retry or ToolRetry()  # default: retry OFF -> unchanged behavior
     context_cap = context_cap or SequentialContextCap()  # default: uncapped -> unchanged prompt
-    has_derive = ledger_kit is not None  # default: no bound module -> unchanged prompt/dispatch
+    has_derive = ledger_kit is not None and derive_enabled  # answer_audit-only -> stays False
     finish_gate = finish_gate or FinishGate()  # default: gate OFF -> unchanged finish behavior
     gate_retries_used = 0
     derive_attempts = 0
@@ -606,7 +626,7 @@ async def _run_react(agent_io: AgentIO, mandate: str, model_name: str, max_steps
             claim = str(args.get("claim", ""))
             verdict = await _verify_claim(agent_io, claim, "\n\n".join(evidence), model_name)
             obs = f"VERIFY '{claim[:80]}': {verdict}"
-        elif action == "derive" and ledger_kit is not None:
+        elif action == "derive" and has_derive:
             derive_attempts += 1
             operation = str(args.get("operation", ""))
             operands = args.get("operands")
@@ -683,11 +703,16 @@ async def run_sequential_execution(
     max_tokens = int(os.environ.get("IDEA_TEST_BASELINE_MAX_TOKENS", "8192"))
     retry = ToolRetry.from_settings(idea_settings)
     context_cap = SequentialContextCap.from_settings(idea_settings)
-    # `LEDGER_HOST_MODULES` gates the ledger binding, default OFF. Unset (or `derive` absent from
-    # the list) means `ledger_kit` stays None, `_run_react` gets no new kwarg, and this host's
-    # behavior is unchanged byte-for-byte -- it is the BASELINE half of the host-vs-host+module
-    # comparison and must stay inert with no module bound.
-    ledger_kit = LedgerToolkit() if _ledger_derive_enabled() else None
+    # `LEDGER_HOST_MODULES` gates the ledger binding, default OFF. Unset (neither `derive` nor
+    # `answer_audit` present) means `ledger_kit` stays None, `_run_react` gets no new kwarg, and
+    # this host's behavior is unchanged byte-for-byte -- it is the BASELINE half of the
+    # host-vs-host+module comparison and must stay inert with no module bound. The kit is
+    # constructed when EITHER token is present -- `answer_audit` needs the same bound kit
+    # (page registration -> quantity index) to have anything to match the finish-time answer
+    # against, even though it exposes no tool to the model (see `derive_enabled` below).
+    derive_enabled = _ledger_derive_enabled()
+    answer_audit_enabled = _ledger_answer_audit_enabled()
+    ledger_kit = LedgerToolkit() if (derive_enabled or answer_audit_enabled) else None
     # W2 §1-2: structural finish gate, opt-in via `final_require_derivation_for_numeric`
     # (default OFF -> `FinishGate(enabled=False)`, byte-identical to before it existed).
     finish_gate = FinishGate.from_settings(idea_settings)
@@ -701,6 +726,7 @@ async def run_sequential_execution(
     }
     if ledger_kit is not None:
         react_kwargs["ledger_kit"] = ledger_kit
+        react_kwargs["derive_enabled"] = derive_enabled
     started = time.perf_counter()
     deliverable = ""
     try:
@@ -716,6 +742,12 @@ async def run_sequential_execution(
         "action_summary": "sequential_react",
     }
     if ledger_kit is not None:
+        if answer_audit_enabled:
+            # W1: mechanical, finish-time, host-side -- never a model call, never a prompt/tool
+            # change. Called BEFORE `artifact()` below so nodes it mints (tagged
+            # `ANSWER_AUDIT_TAG`) are included in the stored evidence graph. `audit_answer` never
+            # raises (its own contract), so no try/except wrapping here.
+            output["answer_audit"] = ledger_kit.audit_answer(output["final_deliverable"], mandate)
         # Same key and shape `execution_evidence_loop` already writes (`ledger.graph.to_dict()`),
         # so `evidence_graph.reverify_graph` and `claim_metrics.derivation_fabrication_rate` read
         # this host's artifact unchanged. Absent (not an empty dict) when the module is off, so a

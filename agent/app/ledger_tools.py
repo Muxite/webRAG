@@ -25,13 +25,36 @@ so a ReAct loop, a DAG engine or a plain script can bind it the same way.
 """
 from __future__ import annotations
 
+import math
 import re
 from typing import Any, Dict, List, Optional, Sequence
 
+from agent.app.answer_numbers import (extract_answer_numbers, is_trivial_number,
+                                      operation_appropriateness)
 from agent.app.quantity_index import build_index, lookup, render_index
-from agent.app.testing.evidence_graph import (DerivationError, EvidenceGraph,
+from agent.app.testing.evidence_graph import (KIND_DERIVED, DerivationError, EvidenceGraph,
                                               _numbers_agree, extract_unit, numeric_value,
                                               parse_quantity, verify_value)
+
+#: Provenance tag stamped on every node minted by :meth:`LedgerToolkit.audit_answer`, so a
+#: consumer (e.g. the risk-coverage certify chain) can include or exclude this mechanical,
+#: finish-time minting path from the model-driven ``derive`` path's own accounting.
+ANSWER_AUDIT_TAG = "answer_audit"
+
+#: Relative tolerance for matching an ANSWER's number against the run's quantity index / a
+#: mechanical derivation. Separate from ``evidence_graph.ARITH_RELATIVE_TOLERANCE`` (``1e-6``,
+#: which absorbs only Python float round-trip noise on an INTERNAL recomputation): this tolerance
+#: absorbs the answer text's own rounding (a model reporting "38.7" for a page's "38.70000...").
+#: Matches ``scripts/ledger_risk_coverage.REL_TOL`` per the prereg'd contract.
+AUDIT_REL_TOL = 0.005
+
+#: The mechanical derivation vocabulary :meth:`LedgerToolkit.audit_answer` searches, in
+#: DETERMINISTIC preference order for which explanation gets minted when more than one fits (see
+#: :meth:`LedgerToolkit._best_explanation`). A strict subset of :data:`SUPPORTED_OPERATIONS` --
+#: "ratio" is not attempted separately since it is the same division as "quotient" under a
+#: different display name (see ``add_arith``'s docstring).
+_DERIVATION_OPS = ("difference", "quotient", "sum", "product")
+_OP_PREFERENCE = {op: index for index, op in enumerate(_DERIVATION_OPS)}
 
 #: Operations the module will recompute. Deliberately the closed set ``evidence_graph.add_arith``
 #: already implements and tests -- a host cannot widen it by passing a new name.
@@ -374,6 +397,263 @@ class LedgerToolkit:
         return None
 
     # -- audit surface -------------------------------------------------------------------------
+
+    def _entry_numeric(self, entry: Any) -> Optional[float]:
+        """``entry``'s full magnitude (value AND unit/scale combined), or None when unparseable.
+
+        Combining the two into one string before parsing is required, not cosmetic: a
+        `QuantityRef` built from a scale-worded quantity (``"237.8 million"``) carries the digits
+        in ``value`` and the scale word in ``unit`` SEPARATELY, and ``numeric_value`` reads the
+        scale multiplier only when it appears in the SAME string it parses -- see
+        ``evidence_graph.numeric_value``'s own warning that its ``unit=`` kwarg is NOT used to
+        recover a dropped scale. Passing ``entry.value`` alone here would silently read
+        ``237.8`` instead of ``237,800,000``, the exact class of silent-loss bug that module's
+        docstring documents at length.
+        """
+        text = f"{entry.value} {entry.unit}".strip() if entry.unit else str(entry.value)
+        return numeric_value(text)
+
+    def _unit_consistent(self, answer_unit: str, entry_unit: str) -> Optional[bool]:
+        """Whether an answer-stated unit agrees with an index entry's unit -- the B1 gate.
+
+        Three cases, deliberately asymmetric between "the answer said nothing" and "the page said
+        nothing": an answer that states NO unit cannot be judged either way (``None``) -- it made
+        no claim to check. An answer that DOES state a unit against an entry that carries NONE is
+        graded ``False``, not ``None``: the entry offers nothing to confirm the claimed dimension,
+        and admitting it anyway is exactly the bare-number-page-scan failure this method's
+        docstring (and the B1 panel objection it answers) exists to refuse -- measured live as
+        task 221's feet-per-floor/metres-per-floor mismatch riding through on unitless operands.
+        A genuine mismatch (both present, different) is naturally ``False`` too.
+        """
+        answer_text = str(answer_unit or "").strip()
+        entry_text = str(entry_unit or "").strip()
+        if not answer_text:
+            return None
+        if not entry_text:
+            return False
+        return canonical_unit(answer_text) == canonical_unit(entry_text)
+
+    def _mint_source_from_entry(self, page_id: str, entry: Any) -> Optional[Any]:
+        """A SOURCE node for a quantity-index ``entry``, minted exactly like :meth:`_locate`'s
+        ``q``-id path (quote via :func:`_quote_for_span`, unit as the page wrote it), tagged
+        :data:`ANSWER_AUDIT_TAG`. Shared by both the direct-match and the two-operand-derivation
+        halves of :meth:`audit_answer` so a page's SOURCE node has exactly one minting recipe.
+        """
+        page = self._graph.page(page_id)
+        page_text = str((page or {}).get("text") or "")
+        quote = _quote_for_span(page_text, entry.start, entry.end)
+        return self._graph.add_source(page_id, entry.value, quote=quote, unit=entry.unit or None,
+                                      minted_by=ANSWER_AUDIT_TAG)
+
+    def _find_backed_match(self, target: float, answer_unit: str):
+        """The first index entry that numerically matches ``target`` with a NOT-``False`` unit
+        verdict, or ``None``. A numerically matching entry whose unit conflicts is skipped, not
+        returned -- per the contract, a unit-inconsistent match does not count as backed and the
+        search keeps going for a consistent one elsewhere in the index.
+
+        :returns: ``(page_id, entry, unit_consistent)`` or ``None``.
+        """
+        for page_id, entry in self._entries:
+            value = self._entry_numeric(entry)
+            if value is None or not math.isclose(value, target, rel_tol=AUDIT_REL_TOL,
+                                                  abs_tol=1e-9):
+                continue
+            consistent = self._unit_consistent(answer_unit, entry.unit)
+            if consistent is False:
+                continue
+            return page_id, entry, consistent
+        return None
+
+    #: Unit-compatibility rule per derivation op -- see :meth:`audit_answer`'s contract summary.
+    def _compat_diff_sum(self, unit_a: str, unit_b: str) -> bool:
+        return canonical_unit(unit_a) == canonical_unit(unit_b)
+
+    def _compat_quotient(self, unit_a: str, unit_b: str) -> bool:
+        return canonical_unit(unit_a) == canonical_unit(unit_b)
+
+    def _compat_product(self, unit_a: str, unit_b: str) -> bool:
+        return not canonical_unit(unit_a) or not canonical_unit(unit_b)
+
+    def _find_derivation_explanations(self, target: float) -> List[Dict[str, Any]]:
+        """Every distinct ``(operation, unordered entry pair)`` that recomputes to ``target``.
+
+        Closed, mechanical vocabulary -- :data:`_DERIVATION_OPS` -- over EVERY unordered pair of
+        index entries. ``difference`` / ``quotient`` are directional (``a OP b != b OP a`` in
+        general), so both orderings are tried, but a pair that matches in either direction is
+        still counted as ONE explanation for that op -- ambiguity counts DISTINCT explanations,
+        not directions, per the API contract.
+
+        :returns: a list of ``{"operation", "i", "j", "order"}`` dicts, ``i``/``j`` are positions
+            into ``self._entries`` (``i < j``), ``order`` is ``(i, j)`` or ``(j, i)`` -- the
+            argument order that produced the match, for :meth:`audit_answer` to mint with.
+        """
+        found: List[Dict[str, Any]] = []
+        numerics: List[Optional[float]] = [self._entry_numeric(entry) for _, entry in self._entries]
+        for i in range(len(self._entries)):
+            value_i = numerics[i]
+            if value_i is None:
+                continue
+            unit_i = self._entries[i][1].unit
+            for j in range(i + 1, len(self._entries)):
+                value_j = numerics[j]
+                if value_j is None:
+                    continue
+                unit_j = self._entries[j][1].unit
+
+                if self._compat_diff_sum(unit_i, unit_j):
+                    if math.isclose(value_i - value_j, target, rel_tol=AUDIT_REL_TOL, abs_tol=1e-9):
+                        found.append({"operation": "difference", "i": i, "j": j, "order": (i, j)})
+                    elif math.isclose(value_j - value_i, target, rel_tol=AUDIT_REL_TOL, abs_tol=1e-9):
+                        found.append({"operation": "difference", "i": i, "j": j, "order": (j, i)})
+                    if math.isclose(value_i + value_j, target, rel_tol=AUDIT_REL_TOL, abs_tol=1e-9):
+                        found.append({"operation": "sum", "i": i, "j": j, "order": (i, j)})
+
+                if self._compat_quotient(unit_i, unit_j):
+                    if value_j != 0 and math.isclose(value_i / value_j, target,
+                                                      rel_tol=AUDIT_REL_TOL, abs_tol=1e-9):
+                        found.append({"operation": "quotient", "i": i, "j": j, "order": (i, j)})
+                    elif value_i != 0 and math.isclose(value_j / value_i, target,
+                                                        rel_tol=AUDIT_REL_TOL, abs_tol=1e-9):
+                        found.append({"operation": "quotient", "i": i, "j": j, "order": (j, i)})
+
+                if self._compat_product(unit_i, unit_j):
+                    if math.isclose(value_i * value_j, target, rel_tol=AUDIT_REL_TOL, abs_tol=1e-9):
+                        found.append({"operation": "product", "i": i, "j": j, "order": (i, j)})
+        return found
+
+    @staticmethod
+    def _best_explanation(explanations: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """The explanation to actually mint, by the contract's deterministic preference order:
+        ``difference`` before ``quotient`` before ``sum`` before ``product``, ties broken by
+        first ``(i, j)`` encountered."""
+        return min(explanations, key=lambda item: (_OP_PREFERENCE[item["operation"]],
+                                                    item["i"], item["j"]))
+
+    def audit_answer(self, answer_text: str, mandate: str = "") -> Dict[str, Any]:
+        """Mechanically grade every number in ``answer_text`` against evidence, host-side, at
+        finish time -- no model call, no prompt change, runs even for a cell that never invoked
+        :meth:`derive`.
+
+        Grading, per number (see the API contract this implements):
+
+        * **backed** -- the number matches (within :data:`AUDIT_REL_TOL`) a quantity-index entry
+          this run already extracted (:meth:`register_page`'s ``self._entries``), with a
+          NOT-``False`` unit verdict (:meth:`_unit_consistent`). NEVER a bare-number page scan:
+          matching is against the index's structured entries, which carry a unit whenever the
+          page states one, so a unit mismatch cannot be silenced by omission the way a raw
+          ``verify_value(..., unit=None)`` call could be (the B1 panel objection this method
+          exists to close). The SOURCE node is minted exactly like the model-driven path mints
+          one (:meth:`_mint_source_from_entry`), tagged :data:`ANSWER_AUDIT_TAG`.
+        * **derived** -- not on any single page, but mechanically explainable as ONE of
+          ``difference`` / ``sum`` / ``quotient`` / ``product`` over TWO index entries with
+          compatible units (:meth:`_find_derivation_explanations`). The DERIVED node is minted
+          via :meth:`~agent.app.testing.evidence_graph.EvidenceGraph.add_arith`, so
+          ``derivation_valid`` is computed HONESTLY by the graph's own independent recomputation,
+          not merely asserted here; its two operands are minted as SOURCE nodes the same way.
+          ``ambiguity`` records how many DISTINCT ``(operation, entry pair)`` explanations fit --
+          when more than one, the best by the contract's deterministic preference order is the
+          one actually minted, but the count itself is what a caller weighs.
+        * **unbacked** -- neither.
+
+        Every number is graded and recorded, including a TRIVIAL one (:func:`is_trivial_number` --
+        a bare year or a small bare integer): trivial numbers are excluded only from the headline
+        ``answer_supported`` predicate, per the wildcard-suppression lesson applied at minting
+        rather than at matching (see the module-level design note this phase follows).
+
+        Idempotent in effect: calling this twice on the same toolkit mints no new nodes the
+        second time, because :meth:`~evidence_graph.EvidenceGraph.add_source` /
+        :meth:`~evidence_graph.EvidenceGraph.add_arith` already dedup a content-identical node
+        (their id is a hash of page/offsets/value or operation/inputs/value, never of
+        ``minted_by``) and return the FIRST admission unchanged.
+
+        :param answer_text: the deliverable / final answer string.
+        :param mandate: the task mandate, for :func:`operation_appropriateness`'s cue matching.
+            Optional -- an empty mandate simply means every ``op_appropriateness`` entry reports
+            ``None``/``None`` (no cue to match), never an error.
+        :returns: ``{"numbers_total", "numbers": [...], "answer_supported", "op_appropriateness"}``
+            per the API contract. Never raises.
+        """
+        numbers_out: List[Dict[str, Any]] = []
+        try:
+            extracted = extract_answer_numbers(answer_text)
+        except Exception:
+            extracted = []
+
+        for item in extracted:
+            record: Dict[str, Any] = {
+                "text": item.get("text", ""), "value": item.get("value"),
+                "unit": item.get("unit", ""), "status": "unbacked",
+                "unit_consistent": None, "trivial": False, "ambiguity": 0,
+                "page_id": "", "node_id": "", "op": "", "operand_node_ids": [],
+            }
+            try:
+                record["trivial"] = is_trivial_number(item)
+                target = float(item["value"])
+                answer_unit = str(item.get("unit") or "")
+
+                backed = self._find_backed_match(target, answer_unit)
+                if backed is not None:
+                    page_id, entry, consistent = backed
+                    node = self._mint_source_from_entry(page_id, entry)
+                    if node is not None:
+                        record.update(status="backed", unit_consistent=consistent,
+                                     page_id=page_id, node_id=node.id)
+                        numbers_out.append(record)
+                        continue
+
+                explanations = self._find_derivation_explanations(target)
+                if explanations:
+                    record["ambiguity"] = len({(exp["operation"], frozenset((exp["i"], exp["j"])))
+                                               for exp in explanations})
+                    best = self._best_explanation(explanations)
+                    first_idx, second_idx = best["order"]
+                    page_a, entry_a = self._entries[first_idx]
+                    page_b, entry_b = self._entries[second_idx]
+                    node_a = self._mint_source_from_entry(page_a, entry_a)
+                    node_b = self._mint_source_from_entry(page_b, entry_b)
+                    if node_a is not None and node_b is not None:
+                        try:
+                            derived = self._graph.add_arith(
+                                best["operation"], [node_a.id, node_b.id],
+                                minted_by=ANSWER_AUDIT_TAG)
+                        except DerivationError:
+                            derived = None
+                        if derived is not None:
+                            record.update(status="derived", op=best["operation"],
+                                         operand_node_ids=[node_a.id, node_b.id])
+            except Exception:
+                # A single number's grading must never take the whole audit down with it -- the
+                # record already defaults to "unbacked", which is the honest state for a number
+                # this method could not resolve, mechanically or otherwise.
+                pass
+            numbers_out.append(record)
+
+        non_trivial = [record for record in numbers_out if not record["trivial"]]
+        answer_supported = bool(non_trivial) and all(
+            record["status"] in ("backed", "derived")
+            and record["unit_consistent"] is not False
+            and record["ambiguity"] <= 1
+            for record in non_trivial
+        )
+
+        op_appropriateness: List[Dict[str, Any]] = []
+        try:
+            for node in self._graph.nodes():
+                if node.kind != KIND_DERIVED or node.minted_by == ANSWER_AUDIT_TAG:
+                    continue
+                verdict = operation_appropriateness(mandate, node.operation, node.value, node.unit)
+                op_appropriateness.append({
+                    "node_id": node.id, "operation": node.operation,
+                    "sign_plausible": verdict.get("sign_plausible"),
+                    "operation_shape_match": verdict.get("operation_shape_match"),
+                })
+        except Exception:
+            op_appropriateness = []
+
+        return {
+            "numbers_total": len(numbers_out), "numbers": numbers_out,
+            "answer_supported": answer_supported, "op_appropriateness": op_appropriateness,
+        }
 
     def artifact(self) -> Dict[str, Any]:
         """The re-verifiable record of everything this run derived.

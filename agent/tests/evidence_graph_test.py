@@ -1508,3 +1508,69 @@ class TestOperandSupported:
         derived_rows = [row for row in result["nodes"] if row["kind"] == KIND_DERIVED]
         assert derived_rows[0]["operand_supported"] is False
         assert result["operand_support_rate"] == 0.0
+
+
+class TestMintedBy:
+    """`minted_by` distinguishes the ordinary model-driven `derive`/`_locate` path (default `""`)
+    from a mechanical, finish-time minting path (e.g. `LedgerToolkit.audit_answer`'s
+    `"answer_audit"` tag). Same optional-field pattern as `operand_supported`: dataclass default,
+    an `as_dict` key, an `from_dict` `.get` default -- and reverify_graph is UNAFFECTED by it."""
+
+    def test_add_source_defaults_to_the_empty_tag(self):
+        graph = _arith_graph()
+        node = graph.add_source("p1", "400 goals")
+        assert node.minted_by == ""
+
+    def test_add_source_stamps_the_supplied_tag(self):
+        graph = _arith_graph()
+        node = graph.add_source("p1", "400 goals", minted_by="answer_audit")
+        assert node.minted_by == "answer_audit"
+
+    def test_add_arith_stamps_the_supplied_tag(self):
+        graph = _arith_graph()
+        a = graph.add_source("p1", "400 goals")
+        b = graph.add_source("p1", "424 goals")
+        node = graph.add_arith("sum", [a.id, b.id], minted_by="answer_audit")
+        assert node.minted_by == "answer_audit"
+
+    def test_dedup_keeps_the_first_nodes_tag(self):
+        """A content-identical re-mint under a different tag does not relabel the original node --
+        the same dedup-keeps-first rule every other field on this node already follows."""
+        graph = _arith_graph()
+        first = graph.add_source("p1", "400 goals", minted_by="")
+        second = graph.add_source("p1", "400 goals", minted_by="answer_audit")
+        assert first.id == second.id
+        assert second.minted_by == ""
+
+    def test_as_dict_round_trips_minted_by(self):
+        graph = _arith_graph()
+        node = graph.add_source("p1", "400 goals", minted_by="answer_audit")
+        restored = eg.EvidenceNode.from_dict(node.as_dict())
+        assert restored.minted_by == "answer_audit"
+
+    def test_missing_field_deserializes_to_the_empty_default(self):
+        """An artifact minted before this field existed has no `minted_by` key at all."""
+        graph = _arith_graph()
+        node = graph.add_source("p1", "400 goals")
+        data = node.as_dict()
+        del data["minted_by"]
+        restored = eg.EvidenceNode.from_dict(data)
+        assert restored.minted_by == ""
+
+    def test_reverify_graph_is_unaffected_by_minted_by(self):
+        """reverify_graph recomputes `verified` / `operand_supported`; it must neither read nor
+        clobber `minted_by` while doing so."""
+        graph = _arith_graph()
+        a = graph.add_source("p1", "400 goals", minted_by="answer_audit")
+        b = graph.add_source("p1", "424 goals", minted_by="answer_audit")
+        graph.add_arith("sum", [a.id, b.id], minted_by="answer_audit")
+        artifact = graph.to_dict()
+
+        result = reverify_graph(artifact)
+
+        assert result["counts"]["derived"] == 1
+        # reverify_graph's row shape carries no minted_by key -- it is a re-verification report,
+        # not a node dump -- but the underlying node objects must still hold their tag unchanged.
+        rebuilt = EvidenceGraph.from_dict(artifact)
+        for node in rebuilt.nodes():
+            assert node.minted_by == "answer_audit"

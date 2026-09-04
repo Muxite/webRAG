@@ -430,3 +430,255 @@ class TestLoadCell:
 
     def test_missing_file_returns_none(self, tmp_path):
         assert lrc.load_cell(tmp_path / "nope.json") is None
+
+
+# ==============================================================================================
+# answer_audit: old-chain integrity (minted-node exclusion) via classify_cell on a real graph
+# ==============================================================================================
+
+def _make_cell_raw(evidence_graph_dict, deliverable="The answer is 38.7 meters.",
+                    score=1.0, test_id="212", arm="derive"):
+    return {
+        "test_metadata": {"test_id": test_id},
+        "model": "qwen2.5:7b",
+        "execution_variant": "sequential_react",
+        "run_config": {"IDEA_TEST_RUN_ID": "camp01", "LEDGER_HOST_MODULES": arm},
+        "infra_failed": False,
+        "validation": {"overall_score": score},
+        "execution": {"output": {"final_deliverable": deliverable,
+                                  "evidence_graph": evidence_graph_dict}},
+    }
+
+
+def _build_plain_graph():
+    from agent.app.testing.evidence_graph import EvidenceGraph
+
+    graph = EvidenceGraph()
+    graph.add_page("p1", "https://example.org/a", "Mount X is 419.7 metres. Mount Y is 381 metres.")
+    graph.add_source("p1", "419.7", quote="419.7 metres")
+    graph.add_source("p1", "381", quote="381 metres")
+    graph.add_arith("difference", [
+        [n.id for n in graph.nodes() if n.value == "419.7"][0],
+        [n.id for n in graph.nodes() if n.value == "381"][0],
+    ], proposed_value="38.7")
+    return graph
+
+
+class TestMintedNodeExclusion:
+    def test_minted_answer_audit_node_excluded_from_backing_values_and_derived_count(self, tmp_path):
+        """A graph with ONLY a minted answer_audit SOURCE node (no model-driven derive at all)
+        must classify identically to a graph with zero nodes for the old 5-clause chain: clause1
+        (>=1 DERIVED node) must stay False, and the answer_audit node's own value must not enter
+        backing_values (else clause5 would be trivially satisfied by construction -- the circular
+        gap this exclusion exists to prevent)."""
+        from agent.app.testing.evidence_graph import EvidenceGraph
+
+        graph = EvidenceGraph()
+        graph.add_page("p1", "https://example.org/a", "The height is 38.7 metres.")
+        graph.add_source("p1", "38.7", quote="38.7 metres", minted_by="answer_audit")
+
+        path = tmp_path / "cell.json"
+        raw = _make_cell_raw(graph.to_dict())
+        result = lrc.classify_cell(path, raw)
+
+        assert result["n_derived_nodes"] == 0
+        assert result["clause1"] is False
+        # clause5: the deliverable's "38.7" is NOT backed, because the only node carrying it was
+        # minted by answer_audit and must be excluded -- so clause5 fails despite the number
+        # being trivially present on the very page it came from.
+        assert result["clause5"] is False
+
+    def test_old_chain_identical_with_and_without_a_coexisting_minted_node(self, tmp_path):
+        """Adding an answer_audit-minted node ALONGSIDE a normal model-driven derive chain must
+        not change any of the 5 clause outcomes versus the same chain with no minted node at all
+        -- restores identical old-chain results, per the task's exclusion requirement."""
+        from agent.app.testing.evidence_graph import EvidenceGraph
+
+        baseline = _build_plain_graph()
+        raw_baseline = _make_cell_raw(baseline.to_dict())
+        path = tmp_path / "baseline.json"
+        result_baseline = lrc.classify_cell(path, raw_baseline)
+
+        with_minted = _build_plain_graph()
+        with_minted.add_page("p2", "https://example.org/b", "A stray figure: 999 metres.")
+        with_minted.add_source("p2", "999", quote="999 metres", minted_by="answer_audit")
+        raw_with_minted = _make_cell_raw(with_minted.to_dict())
+        result_with_minted = lrc.classify_cell(path, raw_with_minted)
+
+        for clause in ("clause1", "clause2", "clause3", "clause4", "clause5", "certified",
+                       "clauses_passed", "n_derived_nodes"):
+            assert result_baseline[clause] == result_with_minted[clause], clause
+
+    def test_pre_minted_by_field_artifact_unaffected(self, tmp_path):
+        """A graph dict serialized before ``minted_by`` existed (key absent from every node dict)
+        must classify exactly like a graph where every node has ``minted_by == ""`` -- the
+        getattr/.get default keeps old artifacts on the pre-minting-boundary code path."""
+        graph = _build_plain_graph()
+        graph_dict = graph.to_dict()
+        for node in graph_dict["nodes"]:
+            node.pop("minted_by", None)
+
+        path = tmp_path / "cell.json"
+        raw = _make_cell_raw(graph_dict)
+        result = lrc.classify_cell(path, raw)
+        assert result["n_derived_nodes"] == 1
+        assert result["clause1"] is True
+
+
+# ==============================================================================================
+# answer_audit: normalizing the host-stored summary (absence handling)
+# ==============================================================================================
+
+class TestClassifyAnswerAuditSummary:
+    def test_absent_summary_is_no_audit(self):
+        result = lrc.classify_answer_audit_summary(None)
+        assert result["has_audit"] is False
+        assert result["numbers_total"] == 0
+        assert result["numbers"] == []
+
+    def test_missing_key_from_output_dict_is_no_audit(self):
+        # Simulates output.get("answer_audit") returning None because the key is absent.
+        result = lrc.classify_answer_audit_summary({}.get("answer_audit"))
+        assert result["has_audit"] is False
+
+    def test_non_dict_summary_is_no_audit(self):
+        assert lrc.classify_answer_audit_summary("garbage")["has_audit"] is False
+        assert lrc.classify_answer_audit_summary(["a", "list"])["has_audit"] is False
+
+    def test_present_summary_is_parsed(self):
+        summary = {
+            "numbers_total": 2,
+            "numbers": [
+                {"text": "38.7", "value": 38.7, "status": "backed", "trivial": False,
+                 "ambiguity": 1, "unit_consistent": True},
+                {"text": "2026", "value": 2026.0, "status": "unbacked", "trivial": True,
+                 "ambiguity": 0, "unit_consistent": None},
+            ],
+            "answer_supported": True,
+            "op_appropriateness": [
+                {"sign_plausible": False, "operation_shape_match": True},
+                {"sign_plausible": True, "operation_shape_match": False},
+                {"sign_plausible": True, "operation_shape_match": True},
+            ],
+        }
+        result = lrc.classify_answer_audit_summary(summary)
+        assert result["has_audit"] is True
+        assert result["numbers_total"] == 2
+        assert len(result["numbers"]) == 2
+        assert result["answer_supported_raw"] is True
+        assert result["op_appropriateness_n"] == 3
+        assert result["op_sign_implausible_n"] == 1
+        assert result["op_shape_mismatch_n"] == 1
+
+    def test_numbers_total_falls_back_to_len_numbers_when_absent(self):
+        summary = {"numbers": [{"status": "backed", "trivial": False}]}
+        result = lrc.classify_answer_audit_summary(summary)
+        assert result["numbers_total"] == 1
+
+    def test_malformed_numbers_field_does_not_raise(self):
+        result = lrc.classify_answer_audit_summary({"numbers": "not a list"})
+        assert result["numbers"] == []
+
+    def test_malformed_op_appropriateness_does_not_raise(self):
+        result = lrc.classify_answer_audit_summary({"op_appropriateness": "not a list"})
+        assert result["op_appropriateness_n"] == 0
+
+
+# ==============================================================================================
+# answer_audit: graded sub-predicate sweep correctness
+# ==============================================================================================
+
+class TestAnswerSupportedGraded:
+    def _num(self, status="backed", trivial=False, ambiguity=1, unit_consistent=True):
+        return {"status": status, "trivial": trivial, "ambiguity": ambiguity,
+                "unit_consistent": unit_consistent}
+
+    def test_empty_numbers_is_false(self):
+        assert lrc.answer_supported_graded([], frozenset({"backed"})) is False
+
+    def test_only_trivial_numbers_excluded_by_default_is_false(self):
+        numbers = [self._num(trivial=True)]
+        assert lrc.answer_supported_graded(numbers, frozenset({"backed"})) is False
+
+    def test_backed_status_passes_backed_only_predicate(self):
+        numbers = [self._num(status="backed")]
+        assert lrc.answer_supported_graded(numbers, frozenset({"backed"})) is True
+
+    def test_derived_status_fails_backed_only_but_passes_backed_or_derived(self):
+        numbers = [self._num(status="derived")]
+        assert lrc.answer_supported_graded(numbers, frozenset({"backed"})) is False
+        assert lrc.answer_supported_graded(numbers, frozenset({"backed", "derived"})) is True
+
+    def test_unbacked_status_always_fails(self):
+        numbers = [self._num(status="unbacked")]
+        assert lrc.answer_supported_graded(numbers, frozenset({"backed", "derived"})) is False
+
+    def test_unit_inconsistent_fails_regardless_of_status(self):
+        numbers = [self._num(status="backed", unit_consistent=False)]
+        assert lrc.answer_supported_graded(numbers, frozenset({"backed"})) is False
+
+    def test_unit_none_does_not_fail(self):
+        numbers = [self._num(status="backed", unit_consistent=None)]
+        assert lrc.answer_supported_graded(numbers, frozenset({"backed"})) is True
+
+    def test_ambiguity_over_ceiling_fails(self):
+        numbers = [self._num(status="backed", ambiguity=2)]
+        assert lrc.answer_supported_graded(numbers, frozenset({"backed"}), max_ambiguity=1) is False
+        assert lrc.answer_supported_graded(numbers, frozenset({"backed"}), max_ambiguity=2) is True
+
+    def test_ambiguity_none_does_not_fail(self):
+        numbers = [self._num(status="backed", ambiguity=None)]
+        assert lrc.answer_supported_graded(numbers, frozenset({"backed"}), max_ambiguity=1) is True
+
+    def test_include_trivial_requires_trivial_numbers_to_also_pass(self):
+        numbers = [self._num(status="backed", trivial=False),
+                   self._num(status="unbacked", trivial=True)]
+        # excluded by default -> only the non-trivial "backed" number is checked -> True
+        assert lrc.answer_supported_graded(numbers, frozenset({"backed"}),
+                                            include_trivial=False) is True
+        # included -> the trivial "unbacked" number now fails the predicate too
+        assert lrc.answer_supported_graded(numbers, frozenset({"backed"}),
+                                            include_trivial=True) is False
+
+    def test_all_must_pass_not_just_one(self):
+        numbers = [self._num(status="backed"), self._num(status="unbacked")]
+        assert lrc.answer_supported_graded(numbers, frozenset({"backed"})) is False
+
+
+class TestAnswerAuditSweep:
+    def _cell(self, has_audit, numbers, wrong=False):
+        return {"answer_audit": {"has_audit": has_audit, "numbers": numbers}, "wrong": wrong}
+
+    def test_sweep_returns_one_row_per_combo(self):
+        rows = lrc.answer_audit_sweep([])
+        labels = {r["predicate"] for r in rows}
+        assert labels == {c[0] for c in lrc.ANSWER_AUDIT_SWEEP_COMBOS}
+
+    def test_no_audit_cell_never_accepted(self):
+        cells = [self._cell(False, [{"status": "backed", "trivial": False, "ambiguity": 1,
+                                      "unit_consistent": True}])]
+        rows = lrc.answer_audit_sweep(cells)
+        for row in rows:
+            assert row["n_certified"] == 0
+        assert rows[0]["n"] == 1
+
+    def test_coverage_and_risk_mirror_binary_operating_point(self):
+        backed_num = {"status": "backed", "trivial": False, "ambiguity": 1, "unit_consistent": True}
+        cells = [
+            self._cell(True, [backed_num], wrong=False),
+            self._cell(True, [backed_num], wrong=True),
+            self._cell(True, [], wrong=True),  # empty numbers -> predicate False -> not accepted
+        ]
+        rows = lrc.answer_audit_sweep(cells)
+        backed_or_derived = next(r for r in rows if r["predicate"] == "backed_or_derived")
+        assert backed_or_derived["n"] == 3
+        assert backed_or_derived["n_certified"] == 2
+        assert backed_or_derived["coverage"] == pytest.approx(2 / 3)
+        assert backed_or_derived["risk"] == pytest.approx(0.5)
+
+    def test_stricter_predicate_never_has_higher_coverage_than_looser_one(self):
+        numbers = [{"status": "derived", "trivial": False, "ambiguity": 1, "unit_consistent": True}]
+        cells = [self._cell(True, numbers)]
+        rows = {r["predicate"]: r for r in lrc.answer_audit_sweep(cells)}
+        # "backed_only" is strictly stricter than "backed_or_derived" for a status=="derived" cell
+        assert rows["backed_only"]["coverage"] <= rows["backed_or_derived"]["coverage"]

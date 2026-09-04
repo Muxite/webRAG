@@ -466,15 +466,21 @@ _LEDGER_INDEX_MAX_CHARS = 1200
 
 def _make_tools(agent_io: AgentIO, search_k: int, page_chars: int,
                 retry: Optional[ToolRetry] = None, require_finish_tool: bool = False,
-                ledger_kit: Optional[LedgerToolkit] = None):
+                ledger_kit: Optional[LedgerToolkit] = None, derive_enabled: bool = True):
     """Build the search/visit tools bound to ``agent_io``, with native-arm retry parity.
 
     :param ledger_kit: ``None`` (default) reproduces today's behavior exactly -- no page
         registration at the ``visit`` site and no ``derive`` tool. When a :class:`LedgerToolkit`
         is passed, every successfully fetched page is registered against it so its values become
-        eligible ``derive`` operands, and a ``derive`` tool bound to it is appended to the tool
-        list. The SAME ``tools`` list is handed to both the native and emulated transports (see
-        ``LangGraphSolver._build_transport``), so this needs no per-transport wiring.
+        eligible ``derive`` operands. The SAME ``tools`` list is handed to both the native and
+        emulated transports (see ``LangGraphSolver._build_transport``), so this needs no
+        per-transport wiring.
+    :param derive_enabled: whether the model-visible ``derive`` tool is appended, independent of
+        whether ``ledger_kit`` is bound. Defaults ``True`` so every existing caller that binds a
+        ``ledger_kit`` without passing this keeps today's behavior. ``LangGraphSolver.solve``
+        passes ``False`` when only the ``answer_audit`` token is set: pages must still register
+        (so W1's finish-time mechanical audit has a quantity index to match against) but the
+        ``derive`` tool itself must stay 100% model-invisible.
     """
     retry = retry or ToolRetry()  # default: retry OFF -> unchanged behavior
     #: URLs visited by THIS tool instance. ``_make_tools`` is called once per ``solve()``, so the
@@ -553,7 +559,7 @@ def _make_tools(agent_io: AgentIO, search_k: int, page_chars: int,
             the task. The full text you pass here becomes the submitted answer."""
             return "Answer submitted."
         tools.append(finish)
-    if ledger_kit is not None:
+    if ledger_kit is not None and derive_enabled:
         @tool
         async def derive(operation: str, operands: List[str], proposed_value: Optional[str] = None) -> str:
             """Compute a derived number instead of guessing it. See `_DERIVE_TOOL_DOC` below for
@@ -1418,6 +1424,12 @@ class LangGraphSolver:
         #: (parsed in `execution_langgraph.py`) can name more than one.
         self._ledger_host_modules = {str(m).strip().lower() for m in (ledger_host_modules or ()) if str(m).strip()}
         self._ledger_derive_enabled = "derive" in self._ledger_host_modules
+        #: W1 (mechanical answer-support minting): a SEPARATE token in the same comma-separated
+        #: `LEDGER_HOST_MODULES` list. Never exposed to the model -- no tool, no prompt text -- it
+        #: only gates whether `solve()` calls `LedgerToolkit.audit_answer` once at its single exit.
+        #: See `_ledger_derive_enabled` just above for why an unrecognized token is ignored rather
+        #: than rejected.
+        self._ledger_answer_audit_enabled = "answer_audit" in self._ledger_host_modules
         #: FIX A (`docs/TINY_MODEL_INVESTIGATION.md` §3.1), env-gated by `LEDGER_CONTEXT_FIT`,
         #: default ON: size the context-trim budget to the model's REAL served window instead of
         #: the fixed 32k-shaped globals. Reachable only when `context_trim` is on, and clamped so
@@ -1606,9 +1618,14 @@ class LangGraphSolver:
         # `derive` tool, no page registration, and no artifact below.
         await self._resolve_context_budget()
         page_chars = self._context_budget.page_chars if self._context_budget else self._page_chars
-        ledger_kit = LedgerToolkit(max_page_chars=page_chars) if self._ledger_derive_enabled else None
+        # Kit is constructed when EITHER token is present -- `answer_audit` needs the same bound
+        # kit (page registration -> quantity index) even though it exposes no tool to the model
+        # (see `derive_enabled` passed to `_make_tools` below).
+        ledger_kit = (LedgerToolkit(max_page_chars=page_chars)
+                     if (self._ledger_derive_enabled or self._ledger_answer_audit_enabled) else None)
         tools = _make_tools(agent_io, self._search_k, page_chars, retry,
-                             require_finish_tool=self._require_finish_tool, ledger_kit=ledger_kit)
+                             require_finish_tool=self._require_finish_tool, ledger_kit=ledger_kit,
+                             derive_enabled=self._ledger_derive_enabled)
         llm = self._build_llm()
         system_prompt = f"{_SYSTEM}\n{_FINISH_TOOL_GUIDANCE}" if self._require_finish_tool else _SYSTEM
         transport, tool_transport = await self._build_transport(llm, tools, system_prompt, telemetry)
@@ -1783,6 +1800,12 @@ class LangGraphSolver:
         elif state.run_error is not None:
             result_out["warning"] = f"langgraph run error: {type(state.run_error).__name__}: {state.run_error}"
         if ledger_kit is not None:
+            if self._ledger_answer_audit_enabled:
+                # W1: mechanical, finish-time, host-side -- never a model call, never a
+                # prompt/tool change. Called BEFORE `artifact()` below so nodes it mints (tagged
+                # `ANSWER_AUDIT_TAG`) are included in the stored evidence graph. `audit_answer`
+                # never raises (its own contract), so no try/except wrapping here.
+                result_out["answer_audit"] = ledger_kit.audit_answer(final_text, mandate)
             # Same key and shape `execution_evidence_loop` writes to `output.evidence_graph` --
             # `evidence_graph.reverify_graph` and `claim_metrics.derivation_fabrication_rate` read
             # it with no changes. Absent (not this branch) when the module is off, so a
