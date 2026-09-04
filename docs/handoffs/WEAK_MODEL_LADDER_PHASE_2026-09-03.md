@@ -141,6 +141,35 @@ mid-flight is the error that cost an aborted round earlier this phase. `scripts/
 strips the quotes itself and refuses to launch unless the key looks like `sk-or-v1-*`. The real
 fix is one call: route `_resolve_llm_api_key`'s returns through `_clean_secret`.
 
+### `derivation_valid` checks the arithmetic, not the operands
+
+The first machine-checked derivation the ladder produced (`ladder03_gemma2_2b_derive_lg`, task
+210) is worth reading closely, because it is exactly the shape that would be misreported as a
+success:
+
+```
+source  value=381  unit=m          <- Inco Superstack height, correct
+source  value=25   unit=million    <- a different quantity entirely; "million" is a scale word
+derived operation=difference value=356 unit=m  derivation_valid=True
+```
+
+`381 - 25 = 356` is arithmetically correct, so the node is marked valid and the cell's
+**fabrication_rate reads 0.0** — a perfect score. The answer is wrong: task 210 wants
+`419.7 - 381 = 38.7 m`, and the cell scored 0.5.
+
+Two things this shows, neither of which the current KPI set can see:
+
+1. **Recomputation verifies the operation, not the operand CHOICE.** A model that lifts two
+   unrelated numbers off a page and subtracts them gets a green check. "Every derived number is
+   recomputed in Python" is true and is a weaker guarantee than it sounds.
+2. **The unit guard did not fire.** `m` minus `million` produced a node rather than a
+   UNIT_MISMATCH refusal, because "million" is a scale word rather than a unit. The documented
+   promise that incompatible units are refused does not cover scale-word-vs-unit.
+
+Consequence for reading the ladder: a low fabrication rate is NOT evidence of correct answers,
+and must always be read beside the accuracy guard. n=1, so this is a demonstrated mechanism gap,
+not a rate — but one clean example is enough to show the gap exists.
+
 ---
 
 ## 5. EXTRA THINGS TO LOOK FOR — open and unverified
