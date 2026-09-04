@@ -128,6 +128,19 @@ be complete and scientifically absent at the same time. Watch `max_infra_failed_
 here), not completion alone. Rate at 38 cells: **2.6%**, so this looks like an outlier rather than
 a systemic stall; projected wall time at that pace is ~6.7h.
 
+### Latent bug found while wiring the paid runs: LLM keys are not quote-stripped
+
+`services/keys.env` wraps every value in double quotes. `ConnectorConfig._clean_secret` strips
+surrounding quotes and exists precisely because "an unstripped key fails SILENTLY" — but
+**`_resolve_llm_api_key` does not call it.** It only does `str(value).strip()`, so a quoted LLM
+key reaches the provider verbatim and returns 401. Verified live against OpenRouter: the quoted
+key 401s, the same key stripped succeeds. Search keys are protected; LLM keys are not.
+
+Not fixed here, because `connector_config.py` is imported by the running sweep and editing it
+mid-flight is the error that cost an aborted round earlier this phase. `scripts/run_api_ladder.sh`
+strips the quotes itself and refuses to launch unless the key looks like `sk-or-v1-*`. The real
+fix is one call: route `_resolve_llm_api_key`'s returns through `_clean_secret`.
+
 ---
 
 ## 5. EXTRA THINGS TO LOOK FOR — open and unverified
