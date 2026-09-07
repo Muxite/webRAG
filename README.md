@@ -49,13 +49,16 @@ is deterministic Python keeping those calls grounded. Full internals:
 
 1. **Euglena, the product:** a hosted GoT web-research agent (frontend, gateway, quotas, auth),
    winding down and kept running on the local backend in low-maintenance mode.
-2. **The adaptive-engine research line:** an actively-developed research platform (built
-   on top of the same agent engine). It started with the compiled scaffold below, the project's
-   first big benchmark result, then pivoted to porting those lessons into the live DAG loop
-   itself as opt-in adaptive mechanisms (see Notes further down). This is where current
-   development effort goes; see `docs/handoffs/HANDOFF.md` for the latest committed session-by-session state.
-   The **Benchmark Results** section right below documents the closed-out compiled-scaffold
-   proof — not the product, and not the still-running adaptive-engine A/B.
+2. **The research line**, built on the same engine, now in its fourth generation: the
+   **Euglena Ledger**, an auditable evidence compiler for weak local models (see the section
+   below). It started with the compiled scaffold, the project's first big benchmark result,
+   then ported those lessons into the live DAG loop as opt-in adaptive mechanisms (DAG v2),
+   then narrowed to the Ledger on 2026-08-31. This is where development effort goes. The
+   current state of every claim, including what was retracted, is in
+   [`docs/STATE_OF_EVIDENCE_2026-09-07.md`](docs/STATE_OF_EVIDENCE_2026-09-07.md); the decided
+   roadmap is [`docs/handoffs/ROADMAP_2026-09-07.md`](docs/handoffs/ROADMAP_2026-09-07.md).
+   The **Benchmark Results** section documents the closed-out compiled-scaffold proof — not
+   the product, and not the Ledger.
 
 ## Versioning
 
@@ -66,11 +69,11 @@ Timeline below:
 |---|---|---|
 | **DAG v1** | 2026-02 → 03 | The original Graph-of-Thought rewrite — live LLM calls at every expand/evaluate/merge step, with no offline-authored plan. |
 | **Compiled v1** | 2026-06 | An expensive model authors a full DAG plan once, offline; a cheap model executes that fixed plan on every request (see Benchmark Results below). |
-| **DAG v2** | 2026-07 → present | The current native-DAG improvement series, built on DAG v1's base loop, porting Compiled v1's planning lessons back in as opt-in adaptive mechanisms (see Notes below). |
-| **v3** | planned | Moves past one-shot mandates toward a more continuable, chatbot-like interaction; folds in codebench and additional tool/capability work deferred out of v2. |
-| **Euglena Ledger** | 2026-08-31 → present | A scoped pivot out of DAG v2: an auditable, replayable evidence compiler that emits verified claims, deterministic derivations, and an ANSWER/PARTIAL/ABSTAIN verdict. A component other agents call, not a general agentic framework. See [docs/LEDGER.md](docs/LEDGER.md). |
+| **DAG v2** | 2026-07 → 08 | The native-DAG improvement series, built on DAG v1's base loop, porting Compiled v1's planning lessons back in as opt-in adaptive mechanisms (see Notes below). **Closed by the Ledger pivot**; its planned barrage relaunch was retired unrun. |
+| **v3** | parked | Was to move past one-shot mandates toward a continuable, chatbot-like interaction and fold in codebench. Not on any live line; kept as a future option only. |
+| **Euglena Ledger** | 2026-08-31 → present | **The live line.** A scoped pivot out of DAG v2: an auditable, replayable evidence compiler that emits claims pinned to verbatim page spans, deterministic derivations with unit refusal, and an ANSWER/PARTIAL/ABSTAIN verdict derived in code. A component other agents call, not a general agentic framework. See [docs/LEDGER.md](docs/LEDGER.md). |
 
-**Why the emphasis stays on native DAG work, not compiled:** Compiled v1 authors a plan with one
+**Why DAG v2 emphasized native over compiled (historical rationale):** Compiled v1 authors a plan with one
 expensive LLM call and reuses it, using pre-computed structure as its mechanism. Compared to DAG
 v1/v2's native reasoning, compiled trades adaptability for a narrower, harder-to-validate gain — a
 fixed plan can't react to what a step actually reveals, and testing it well means testing every
@@ -95,6 +98,50 @@ mechanisms for this — structure, memory, voting, calibration, compiled or nati
 more still being tried — and the constraint that keeps them honest is cost: whatever a mechanism
 costs to run must stay cheaper than just calling the more expensive model directly, or it hasn't
 earned its place.
+
+## Euglena Ledger — the current line (2026-08-31 → present)
+
+Give the Ledger a question and a set of sources; it returns a ledger of atomic claims, each
+pinned to a verbatim span on a fetched page, plus values derived from those claims by
+deterministic arithmetic that refuses mismatched units, plus a verdict derived in code from what
+was actually obtained. Every LLM call is addressable and every run replays at $0 from a frozen
+corpus. Entry point: `agent/app/ledger_api.py` (`run(question, sources)` → `LedgerResult`);
+CLI: `scripts/ledger_run.py`.
+
+```mermaid
+flowchart LR
+    Q[Question + sources] --> L["Evidence loop<br/>search · visit · derive · verify · finish"]
+    L --> R["Ledger rows<br/>value + verbatim quote + page offset"]
+    L --> G["Derivation graph<br/>SOURCE → DERIVED, unit-checked"]
+    R --> C["Certify chain<br/>(deterministic clauses)"]
+    G --> C
+    C --> V["ANSWER / PARTIAL / ABSTAIN<br/>+ per-claim recheck"]
+```
+
+**Why the scope narrowed.** Across 432 cells the native DAG and an off-the-shelf LangGraph agent
+were statistically indistinguishable on mean score, and closing that would need 61–111 paired
+tasks to win a contest whose prize is parity with a framework this project cannot out-resource.
+The defensible niche is what none of the general frameworks do: make a weak model's answer
+auditable, replayable, and honest about its own gaps. Mean score is a guard, never the target.
+
+**What it can claim today** (qwen2.5:7b and smaller, seeded, frozen-corpus replay, $0):
+
+| Claim | Evidence |
+|---|---|
+| Fabricated-arithmetic rate and replay fidelity went from unmeasurable to measured, on two hosts | host vs host+module 2×2 (`docs/LEDGER_MODULE_EXPERIMENT.md`) |
+| The certify chain rejects wrong answers | mint02: 192 cells, 10.4% coverage at 6.7% risk vs a 63.5% base wrong-rate; mint01: 4/144 certified at 0% risk |
+| Zero invalid derivations where arithmetic is checked | 195/197 derived nodes corpus-wide |
+| Every campaign since 2026-09-01 is byte-reproducible | preregistered, seeded, corpus replay |
+
+**What it does not claim:** any mean-score win (evidence_loop is −0.100 vs LangGraph at ~3× wall
+clock and nothing clears Holm at n=22), monotone calibration as a standing fact, or any arm ranking
+from ≤22 paired tasks. The full list, with retractions, is in
+[`docs/STATE_OF_EVIDENCE_2026-09-07.md`](docs/STATE_OF_EVIDENCE_2026-09-07.md).
+
+**The open problem.** The verifier is sound but starved: 120/144 cells mint zero derivations,
+and weak models below 7b never call the `derive` tool. The next phase mints rows mechanically
+from the per-page quantity index so auditability stops depending on the model choosing to be
+audited. Roadmap: [`docs/handoffs/ROADMAP_2026-09-07.md`](docs/handoffs/ROADMAP_2026-09-07.md).
 
 ## Benchmark Results — Compiled v1 (closed-out proof, 2026-06/07)
 
@@ -154,7 +201,7 @@ from-scratch ReAct loop on the harder tasks.
 Full package (9 charts, raw + aggregated CSVs, significance tables, honest caveats) lives in
 [`linkedin_package_38tests_2026-07-08/`](linkedin_package_38tests_2026-07-08/README_LINKEDIN.md).
 
-## Notes: DAG v2 — The Native Adaptive Engine (in progress)
+## Notes: DAG v2 — The Native Adaptive Engine (closed 2026-08-31)
 
 **Compiled v1** above proved what a good plan buys you: it authors that plan once, offline, using
 an expensive model, and executes it live with a cheap one. **DAG v2** ports those lessons into the
@@ -177,15 +224,14 @@ confidence-gated re-expansion, a follow-up detector, backtrack on dead-end chain
 discipline for reasoning models, and price-tier-aware token budgets. Architecture, flag inventory,
 and lessons learned: [`agent/app/ADAPTIVE_ENGINE.md`](agent/app/ADAPTIVE_ENGINE.md).
 
-**Status:** nothing adaptive is proven yet — that's what the current "ladder benchmark" is for: a
-paired A/B (`baseline` → `good_adaptive`) testing whether a cheap model (`gpt-5-mini`) burning more
-of its own tokens via the adaptive loop closes part of the accuracy gap to a strong reference model.
-A first full run was stopped after surfacing a ChromaDB concurrency hang plus several fairness and
-statistical-validity bugs; the fix set (32 items across driver safety, model reliability, infra
-fairness, validator correctness, and the grounding/re-expansion gate) is landed, offline-tested
-(1,951 passed / 18 skipped / 0 failed), and — as of a 2026-08-14 targeted live smoke — confirmed to
-actually resolve the deadlock in a real run. The full barrage relaunch is unblocked; running it is
-the next step, and this section gets its own results once it has.
+**Status: closed.** The planned paid barrage relaunch (`baseline → good_adaptive → max_burn`
+on `gpt-5-mini`) was retired unrun when the project pivoted to the Ledger. What DAG v2 did
+establish, on local models: fan-out *width* is parity-tied with sequential execution, but the graph
+loses −0.461 (t=−7.73, n=23) on *aggregation-shaped* tasks with a named code-level cause
+(root-ward-only branch context, lossy merge, no extraction step;
+`docs/AGGREGATION_SHAPE_FINDING_2026-08-30.md`). The engine survives inside the Ledger in a
+narrower role, as a dependency analyzer rather than a plan executor. Full mechanism inventory
+and lessons: [`agent/app/ADAPTIVE_ENGINE.md`](agent/app/ADAPTIVE_ENGINE.md).
 
 ## Features
 
@@ -197,7 +243,7 @@ the next step, and this section gets its own results once it has.
 - **Deduplication and pruning**: Candidate thoughts are deduplicated by embedding similarity. Low-scoring nodes are pruned to save budget
 - **Elastic worker fleet**: ECS autoscaling matches demand via CloudWatch queue-depth metrics, winds down when idle (legacy/secondary deploy path — see Quick Start; current production scales via `docker compose ... --scale agent=N` on the local backend)
 - **User-scoped quotas**: Supabase enforces per-user daily usage limits with JWT authentication
-- **Comprehensive test suite**: 151 priority-ordered task modules (`agent/app/idea_tests/`) with programmatic and LLM-based validation, plus a 1,951-passed/18-skipped/0-failed offline `pytest` suite (`agent/tests/`); 38 of the tasks are the curated, live-verified discriminators used in the compiled-scaffold benchmark above, and a further 24 ("adaptive-targeted", `test_122`–`test_145`) discriminate the adaptive engine across four decision archetypes
+- **Comprehensive test suite**: 208 priority-ordered task modules (`agent/app/idea_tests/`) with programmatic validation, plus a 9,388-passed/19-skipped/0-failed offline `pytest` suite (`agent/tests/`); 38 of the tasks are the curated, live-verified discriminators used in the compiled-scaffold benchmark above, 24 ("adaptive-targeted", `test_122`–`test_145`) discriminate the adaptive engine, and 22 (`test_210`–`test_231`) form the Ledger's numeric suite (sum/difference, ratio, argmax, unit-refusal, missing-operand, fabrication-bait)
 
 ## Observability
 
@@ -349,7 +395,7 @@ client (submit + poll loop, prints the answer + evidence) is in
 Everything below runs from `services/`. No host virtualenv is required.
 
 ```bash
-# Offline unit/regression suite (~5.8k tests, no API keys, no network, no spend)
+# Offline unit/regression suite (~9.4k tests, no API keys, no network, no spend)
 docker compose --profile test run --rm agent-test
 # ...or one module
 docker compose --profile test run --rm agent-test pytest -q agent/tests/got_operations_test.py
@@ -414,6 +460,10 @@ docs/             Architecture, security, benchmark plots
 
 ## Documentation
 
+- [State of Evidence](docs/STATE_OF_EVIDENCE_2026-09-07.md) - What is claimed, what is not, the retraction ledger, the roadmap. **Start here.**
+- [Euglena Ledger](docs/LEDGER.md) - The current line: product shape, design commitments, KPIs, what months of experiments ruled out
+- [Ledger KPI spec](docs/LEDGER_KPI_SPEC.md) - Frozen metric contract (risk-coverage, claim edges, fabricated arithmetic, replay fidelity)
+- [Dev cycle](docs/DEV_CYCLE.md) - The repeatable plan → review → test → benchmark → implement → analyze loop
 - [Configuration](docs/CONFIGURATION.md) - Environment variable registry (required / optional / benchmark-only)
 - [System Architecture](docs/ARCHITECTURE.md) - Overall system design and message flow
 - [Agent Architecture](agent/app/AGENT_ARCHITECTURE.md) - Graph-of-Thought engine internals
@@ -443,6 +493,19 @@ docs/             Architecture, security, benchmark plots
   per-session handoff docs. Two live cycles have run; a third pass root-caused and fixed two
   independent silent self-loop deadlocks in the adaptive engine's re-expansion/merge logic (found by
   a live confirmation smoke, not by the offline suite or adversarial review — see
-  `docs/handoffs/HANDOFF.md`). Live-verification smokes for that fix and a codebench write-protocol
-  fix are the two open threads going into the next cycle.
-- **planned — v3:** Move past one-shot mandates toward a more continuable, chatbot-like interaction — stopping mid-run and picking a task back up, rather than only submit-and-wait for a deliverable. Folds in codebench and the tools/capabilities held out of v2. Whether task continuation ships as part of finishing v2 or waits for v3 is still open, to be settled by whichever proves more practical once v2's benchmark work is underway.
+  `docs/handoffs/HANDOFF.md`). Late August: a ~525-cell capability-spectrum sweep found the
+  off-the-shelf LangGraph agent cannot run 4 of 8 cheap models at all (no tool-calling endpoint),
+  a blind shape classification found the graph's loss is concentrated on aggregation-shaped tasks
+  (−0.461, n=23), and an external literature review found no published result supporting
+  "planning helps an untuned ≤14B model" under this project's filters.
+- **2026-08-31 → present — Euglena Ledger:** scope narrowed from general agentic capability to an
+  auditable evidence compiler (`docs/LEDGER.md`). Shipped: a derivation layer with unit refusal,
+  per-call audit log with `call_id` pairing, frozen-corpus replay (`SEARCH_PROVIDER=corpus`) so
+  every campaign runs at $0, preregistration gates, a 22-task numeric suite, a frozen KPI spec with a
+  sealed holdout, the `ledger_api` component façade, quote capture and a deterministic certify
+  chain. Five preregistered campaigns (ledgernum22, ladder03, mint01, mint02 and the module 2×2)
+  established what the Ledger can and cannot claim; see the Ledger section above. Work happened on
+  `dagv2-evidence-ledger`, merged into `master` on 2026-09-07 with a consolidated
+  state-of-evidence document and roadmap.
+- **parked — v3:** The continuable, chatbot-like interaction and the codebench fold-in are not on
+  any live line. Kept as a future option, not a plan.

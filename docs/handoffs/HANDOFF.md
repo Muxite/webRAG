@@ -1,5 +1,11 @@
 # webRAG / Euglena — Session Handoff (2026-08-10)
 
+> **Start here (2026-09-07): `docs/STATE_OF_EVIDENCE_2026-09-07.md`** — what the project can
+> claim, what it cannot, the consolidated retraction ledger, and the decided roadmap
+> (`docs/handoffs/ROADMAP_2026-09-07.md`). The Ledger pivot was merged into `master` that day.
+> Latest campaign: `docs/handoffs/MINT02_RESULTS_2026-09-05.md`. Everything below this line
+> is older orientation and is accurate for its own date only.
+
 > **Latest phase (2026-09-03, later): `docs/handoffs/WEAK_MODEL_LADDER_PHASE_2026-09-03.md`**
 > — `LLM_SEED` never reached the `langgraph_react` arm until this phase, so every "seeded" A/B on
 > it was sampling. Read `docs/analysis/SEEDING_AUDIT_2026-09-03.md` before citing any

@@ -1,3 +1,8 @@
+> **SUPERSEDED (2026-09-07).** This plan's thesis (§1) is unsupported by `ledgernum22r3`
+> (`docs/LEDGER_PLAN_2026-09-01.md` §1), its build order (§3–§4) was replaced, and its Phase 0
+> ablation arms and kill gate were never run. Its non-goals (§9) and adversarial risks (§7)
+> still stand. Current state: `docs/STATE_OF_EVIDENCE_2026-09-07.md`. Kept for the reasoning trail.
+
 # DAG v3 "Ledger": Master Plan
 
 **Branch:** `dagv2-evidence-ledger` (stays unmerged — this is a falsification project, not a committed rewrite)

@@ -2,10 +2,10 @@
 
 **Codename:** `ledger` · **Status:** pivot declared 2026-08-31 · **Repo:** webRAG (unchanged)
 **Operative plan:** `docs/LEDGER_PLAN_2026-09-01.md` (supersedes the DAG v3 master plan's
-thesis, metric order and build order) · **Latest handoff:**
-`docs/handoffs/LEDGER_TINY_MODEL_PHASE_2026-09-02.md` (2026-09-03: also see
-`docs/handoffs/BUGHUNT01_RESULT_2026-09-03.md`, which answers that handoff's own open-queue
-item 1) (prior: `docs/handoffs/LEDGER_KPI_PHASE_HANDOFF_2026-09-01.md`)
+thesis, metric order and build order) · **Current state and roadmap (2026-09-07):**
+`docs/STATE_OF_EVIDENCE_2026-09-07.md` + `docs/handoffs/ROADMAP_2026-09-07.md` ·
+**Latest campaign:** `docs/handoffs/MINT02_RESULTS_2026-09-05.md` (prior:
+`MECHANICAL_ANSWER_AUDIT_2026-09-04.md`, `LEDGER_USEFULNESS_PHASE_2026-09-04.md`)
 
 ## Operative plan
 
@@ -170,7 +170,10 @@ This is the inheritance that makes a scoped project fast. Do not re-litigate the
 **Retired hypotheses**
 - "Graph collapses on fan-out" (−0.266) is retired for **fan-out width** specifically —
   the N=4→32 sweep and the literal `breadth`-labeled shape are a dead tie (−0.002 / −0.007,
-  two backends, six tasks each). This does **not** extend to **aggregation shape** (tasks
+  two backends, six tasks each). **Downgraded 2026-09-07:** the positive "parity" reading is
+  "not contradicted", not "established" — n=6, per-task reliability ~0.11, and the
+  `langgraph_react` arm was unseeded before `adeeffa5` (`docs/analysis/SEEDING_AUDIT_2026-09-03.md`).
+  The retirement of the −0.266 collapse claim is unaffected. This does **not** extend to **aggregation shape** (tasks
   whose answer requires combining evidence across branches — count/argmax/AND-filter):
   `AGGREGATION_SHAPE_FINDING_2026-08-30.md` measures graph losing those by **−0.461
   (t=−7.73, n=23)** on a blind classification of 59 tasks, with a stated mechanism
@@ -204,8 +207,10 @@ This is the inheritance that makes a scoped project fast. Do not re-litigate the
 - The benchmark agent is a singleton; launching a second kills the first's run.
 
 **Backend policy**
-SearXNG is not required and is measurably worse — 4.00 searches/cell against Serper's
-21.85, with visits/cell down 6.67 → 4.82, and the calibration ordering inverts under it.
+SearXNG is not required and is measurably worse — ~0.67 searches/cell against Serper's
+~3.64 (the originally quoted 4.00 vs 21.85 counted result *documents* at `search_k=6`, a 6×
+inflation fixed in `0fa6e733`; the ratio stands), with visits/cell down 6.67 → 4.82, and the
+calibration ordering inverts under it.
 Do not degrade retrieval to save money. Record once on Serper at full quality and replay
 from cache. Never pool results across backends.
 
@@ -242,6 +247,10 @@ provenance on operands, no abstain when an operand is missing. That is open spac
 - Training or fine-tuning. The constraint is a fixed weak model.
 
 ## Next
+
+**2026-09-07 note: the live queue is `docs/handoffs/ROADMAP_2026-09-07.md`** (mechanical row
+minting + operand-provenance filter, then component hardening). The 2026-09-03 note and the
+2026-08-31 queue below are history.
 
 **2026-09-03 note: this "Next" section is the 2026-08-31 queue, now four handoffs stale** —
 `LEDGER_HANDOFF_2026-09-01.md`, `LEDGER_KPI_PHASE_HANDOFF_2026-09-01.md`,
