@@ -241,6 +241,8 @@ Prereg via `scripts/prereg.py`, launched with `scripts/run_campaign.sh`, corpus 
 
 ## Phase 4 — DAG track, conditional on 0b/0c
 
+> **CLOSED 2026-09-08** on the 0b/0c rules — see `docs/handoffs/ENGINE_TRACK_CLOSURE_2026-09-08.md`. Nothing below is built.
+
 Do **not** build `MechanicalEvaluationPolicy`, the six `agg_*` profiles, or D1.
 - If 0c closes the track: write `docs/handoffs/ENGINE_TRACK_CLOSURE_<date>.md` from 0b/0c
   numbers; DAG v2 stays as-is; the Ledger remains bound to linear hosts. Done.
