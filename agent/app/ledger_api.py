@@ -181,6 +181,11 @@ class LedgerResult:
     #: How each search was served: ``"corpus"`` / ``"live"`` / ``"none"``, in order. Empty when
     #: the backend does not report provenance.
     search_provenance: Tuple[str, ...] = ()
+    #: ``{supplied url: the text a visit of it actually yields}``, for a run given ``sources``;
+    #: empty for a live run, where the caller supplied no text to be reshaped. Every claim's
+    #: ``quote_start`` / ``quote_end`` indexes THIS text, not the string handed to :func:`run` --
+    #: see :class:`SourceServingHttp`.
+    served_sources: Dict[str, str] = dataclass_field(default_factory=dict)
     #: The loop's step-by-step scratchpad, kept out of :meth:`to_dict` by default.
     scratchpad: Tuple[str, ...] = ()
 
@@ -194,9 +199,10 @@ class LedgerResult:
 
         :param include_scratchpad: append the loop's per-step trace. Off by default because it is
             large and is a debugging artifact, not part of the claim.
-        :param include_page_text: keep each page's stored text. Off drops only ``text``; the
-            ``content_hash`` covering the whole fetched text always survives, so a claim's offsets
-            stay checkable against a re-fetch.
+        :param include_page_text: keep each page's stored text. Off drops only ``text`` and
+            :attr:`served_sources` (the same bytes, keyed the other way); the ``content_hash``
+            covering the whole fetched text always survives, so a claim's offsets stay checkable
+            against a re-fetch.
         """
         pages: List[Dict[str, Any]] = []
         for page in self.pages:
@@ -218,6 +224,8 @@ class LedgerResult:
             "roster": dict(self.roster),
             "search_provenance": list(self.search_provenance),
         }
+        if include_page_text:
+            payload["served_sources"] = dict(self.served_sources)
         if include_scratchpad:
             payload["scratchpad"] = list(self.scratchpad)
         return payload
@@ -232,9 +240,20 @@ class SourceServingHttp(ConnectorHttp):
     reaching the open web for a source the caller did not authorize.
     """
 
+    #: What a visit of each canonical URL will actually YIELD, which is not what was passed in:
+    #: :meth:`AgentIO.visit` runs every fetched body through ``observation.clean_operation``
+    #: (BeautifulSoup + whitespace flattening), and every quote offset on a returned
+    #: :class:`Claim` indexes THAT text. A caller handed offsets into a string they never saw
+    #: cannot check a single claim, so the reshaped text is computed here -- by the same function,
+    #: from the same input, so it cannot drift from what the loop read -- and published on the
+    #: result. ``AgentIO`` exposes no "this content is already clean" flag, so pre-empting the
+    #: reshape is not available; making it visible is.
+    visible: Dict[str, str]
+
     def __init__(self, connector_config: ConnectorConfig, texts: Dict[str, str]) -> None:
         super().__init__(connector_config)
         self.texts = {_canonical(url): text for url, text in texts.items()}
+        self.visible = {url: _as_visited(text) for url, text in self.texts.items()}
 
     async def request(self, method: str, url: str, retries: int = 2,
                       suppress_timing: bool = False, **kwargs) -> RequestResult:
@@ -273,6 +292,22 @@ def _canonical(url: str) -> str:
         host, _, tail = rest.partition("/")
         text = f"{scheme.lower()}://{host.lower()}" + (f"/{tail}" if tail else "")
     return text.rstrip("/")
+
+
+def _as_visited(text: str) -> str:
+    """``text`` as :meth:`AgentIO.visit` would hand it to the loop.
+
+    Mirrors ``agent_io.visit``'s own two lines -- ``clean_operation`` and the empty-result
+    placeholder -- rather than guessing at the transformation, so what this publishes is what the
+    quote offsets were taken against.
+    """
+    from agent.app.observation import clean_operation
+
+    try:
+        cleaned = clean_operation(text if isinstance(text, str) else "")
+    except Exception:  # noqa: BLE001 -- a source we cannot reshape still has to reach the run.
+        return text if isinstance(text, str) else ""
+    return cleaned if cleaned else "[No main content found]"
 
 
 def _as_source(item: Union[Source, str, Dict[str, Any]]) -> Source:
@@ -437,6 +472,7 @@ async def run(question: str,
               model: Optional[str] = None,
               max_steps: int = DEFAULT_MAX_STEPS,
               max_tokens: int = DEFAULT_MAX_TOKENS,
+              page_chars: Optional[int] = None,
               connectors: Optional[Connectors] = None) -> LedgerResult:
     """Answer ``question``, optionally restricted to ``sources``, and return a pinned result.
 
@@ -451,6 +487,11 @@ async def run(question: str,
     :param model: executor model; defaults to ``MODEL_NAME`` from the environment.
     :param max_steps: hard step budget for the loop.
     :param max_tokens: cap on the final synthesis call.
+    :param page_chars: how much of each page the loop may read. ``None`` -- the default -- means
+        the whole of the longest SUPPLIED source when ``sources`` is given, and the loop's own
+        env-configured cap otherwise. A supplied document is one the caller chose, so truncating
+        it to a benchmark's shared 6000-char budget answered a different question than the one
+        asked; a live fetch off the open web has no such warrant and keeps the shared cap.
     :param connectors: a pre-assembled set, for a caller reusing one across questions. When given
         it is used AS IS and is not closed here, since the caller owns its lifetime.
     :returns: a :class:`LedgerResult`. A run that established nothing returns an ``ABSTAIN``
@@ -472,6 +513,8 @@ async def run(question: str,
         resolved, fetch_failures = await _resolve_sources(sources, config)
     owned = connectors is None
     connectors = connectors or build_connectors(resolved, config)
+    if page_chars is None and resolved:
+        page_chars = max((len(source.text or "") for source in resolved), default=0) or None
     model_name = (model or os.environ.get("MODEL_NAME") or config.model_name or "").strip()
     connectors.llm.set_model(model_name)
     agent_io = AgentIO(connector_llm=connectors.llm, connector_search=connectors.search,
@@ -480,7 +523,8 @@ async def run(question: str,
                        collection_name="ledger_api")
     try:
         result = await evidence_loop.run_evidence_loop(agent_io, question, model_name,
-                                                      max_steps, max_tokens)
+                                                      max_steps, max_tokens,
+                                                      page_chars=page_chars)
     finally:
         if owned:
             await _close_quietly(connectors.http)
@@ -503,8 +547,28 @@ async def run(question: str,
         roster=ledger.roster(),
         derivation_refusals=(ledger.graph.refusal_counts() if ledger.graph is not None else {}),
         search_provenance=tuple(getattr(connectors.search, "provenance", ()) or ()),
+        served_sources=_served_sources(connectors.http, resolved),
         scratchpad=tuple(result.scratchpad or ()),
     )
+
+
+def _served_sources(http: Any, sources: Optional[Sequence[Source]]) -> Dict[str, str]:
+    """``{supplied url: what a visit of it yields}``, keyed by the URL the CALLER wrote.
+
+    The connector keys canonically (so a trailing slash or a capitalised host still matches a
+    visit); the caller only knows the string they passed, so the published mapping is keyed by
+    that. Empty whenever no source set was supplied -- there is then no caller text to be
+    reshaped, and the pages the run fetched are the only text there ever was.
+    """
+    visible = getattr(http, "visible", None)
+    if not isinstance(visible, dict) or not sources:
+        return {}
+    served: Dict[str, str] = {}
+    for source in sources:
+        text = visible.get(_canonical(source.url))
+        if text is not None:
+            served[source.url] = text
+    return served
 
 
 def _page_field(page: Any, name: str) -> Any:

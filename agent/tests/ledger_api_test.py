@@ -223,7 +223,7 @@ def test_the_component_never_requires_a_live_vector_store(monkeypatch):
 # helpers
 # --------------------------------------------------------------------------------------
 
-async def _run_scripted(sources, script):
+async def _run_scripted(sources, script, page_chars=None, connectors=None):
     """Run :func:`ledger_api.run` against a scripted LLM: no network, no model, no GPU."""
     replies = [json.dumps(item) for item in script]
 
@@ -236,6 +236,89 @@ async def _run_scripted(sources, script):
     agent_io_module.AgentIO.query_llm = _fake_query_llm
     try:
         return await ledger_api.run("How tall is Mount Alpha?", sources,
-                                    model="stub-model", max_steps=len(script) + 1)
+                                    model="stub-model", max_steps=len(script) + 1,
+                                    page_chars=page_chars, connectors=connectors)
     finally:
         agent_io_module.AgentIO.query_llm = original
+
+
+# --------------------------------------------------------------------------------------
+# a supplied source arrives whole, and its offsets index a text the caller can hold
+# --------------------------------------------------------------------------------------
+#
+# Two defects sat between "give it a question and a set of sources" and a result a caller can
+# actually re-check. The loop capped every fetched page at `IDEA_TEST_EVIDENCE_LOOP_PAGE_CHARS`
+# (6000) and `ledger_api.run` exposed no override, so a supplied 40k-char document was silently
+# read down to its first 6k. And `AgentIO.visit` runs everything through `clean_operation`, so the
+# offsets on a returned Claim index the RESHAPED text, not the string the caller passed in.
+
+LONG_TAIL = "The summit of Mount Omega reaches 4321 m above sea level."
+LONG_PAGE = ("Mount Omega is a mountain in the Western Range. "
+             + "It has been surveyed many times over the last century. " * 750
+             + LONG_TAIL)
+
+MESSY_PAGE = ("Mount Alpha    is a mountain in the Northern Range.\n\n\n"
+              "   The summit of Mount Alpha reaches 3400 m above sea level.   \n")
+
+_EXTRACTION = {"extractions": [{"entity": "Mount Alpha", "field": "height", "value": "3400 m",
+                                "unit": "m", "verdict": el.STATUS_SUPPORTED,
+                                "quote": "reaches 3400 m"}]}
+
+
+@pytest.mark.asyncio
+async def test_a_supplied_source_longer_than_the_page_cap_is_read_whole():
+    assert len(LONG_PAGE) > 40000
+    result = await _run_scripted(
+        sources=[ledger_api.Source(url="https://example.org/omega", text=LONG_PAGE)],
+        script=[{"action": "visit", "args": {"url": "https://example.org/omega"}},
+                {"extractions": []},
+                {"action": "finish", "args": {"answer": "done"}}])
+    page = result.pages[0]
+    assert page["truncated"] is False
+    assert LONG_TAIL in page["text"], "the tail of a supplied source was cut off"
+
+
+@pytest.mark.asyncio
+async def test_a_caller_supplied_page_cap_still_wins_over_the_source_length():
+    result = await _run_scripted(
+        sources=[ledger_api.Source(url="https://example.org/omega", text=LONG_PAGE)],
+        script=[{"action": "visit", "args": {"url": "https://example.org/omega"}},
+                {"extractions": []},
+                {"action": "finish", "args": {"answer": "done"}}],
+        page_chars=500)
+    assert len(result.pages[0]["text"]) <= 500
+
+
+@pytest.mark.asyncio
+async def test_a_claims_offsets_index_the_text_the_result_hands_back():
+    result = await _run_scripted(
+        sources=[ledger_api.Source(url="https://example.org/alpha", text=MESSY_PAGE)],
+        script=[{"action": "visit", "args": {"url": "https://example.org/alpha"}},
+                _EXTRACTION,
+                {"action": "finish", "args": {"answer": "Mount Alpha reaches 3400 m."}}])
+    claim = next(c for c in result.claims if c.resolved)
+    served = result.served_sources[claim.source_url]
+    assert served[claim.quote_start:claim.quote_end] == claim.quote
+    # and the served text is exactly the page the offsets were taken against
+    assert served == result.pages[0]["text"]
+
+
+@pytest.mark.asyncio
+async def test_the_served_text_is_published_for_every_supplied_source_visited_or_not():
+    result = await _run_scripted(
+        sources=[ledger_api.Source(url="https://example.org/alpha", text=MESSY_PAGE),
+                 ledger_api.Source(url="https://example.org/beta", text=PAGE_B)],
+        script=[{"action": "finish", "args": {"answer": "nothing read"}}])
+    assert set(result.served_sources) == {"https://example.org/alpha", "https://example.org/beta"}
+    # it is the RESHAPED text, which is what makes it worth publishing: the caller cannot
+    # reconstruct it from the string they passed.
+    assert "\n\n\n" not in result.served_sources["https://example.org/alpha"]
+    assert "3400 m" in result.served_sources["https://example.org/alpha"]
+    assert json.dumps(result.to_dict())
+
+
+@pytest.mark.asyncio
+async def test_a_live_run_publishes_no_served_sources_because_there_are_none():
+    result = await _run_scripted(sources=None, connectors=ledger_api.build_connectors(None),
+                                 script=[{"action": "finish", "args": {"answer": "x"}}])
+    assert result.served_sources == {}

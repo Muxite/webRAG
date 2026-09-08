@@ -886,3 +886,75 @@ def test_a_rate_answer_is_graded_derived_over_a_cross_unit_quotient(blank_kit):
                        if n["kind"] == "derived" and n["operation"] == "quotient")
     assert arith_node["derivation_valid"] is True
     assert arith_node["unit"] == "km/h"
+
+
+# --------------------------------------------------------------------------------------
+# refusals are recorded, not merely returned as prose
+# --------------------------------------------------------------------------------------
+#
+# `derive` returns every refusal as an OBSERVATION so the host's loop can continue, and that is
+# right for the model -- but the observation lives only in a scratchpad nobody persists. A refused
+# derivation creates no node by design, so on the artifact "correctly refused" and "never tried"
+# were the same picture: zero derived nodes. `record_refusal` is the sibling of `rejections` for
+# the computed half, and until now `ledger_tools` never called it on ANY of its four exits.
+
+
+def _refusal_codes(kit):
+    return [row["code"] for row in kit.artifact()["derivation_refusals"]]
+
+
+def test_an_unknown_operation_is_recorded_on_the_artifact_not_only_returned(kit):
+    observation = kit.derive("multiply_by_pi", ["419.7 metres", "380.0 metres"])
+
+    assert observation.startswith("DERIVE REFUSED (UNKNOWN_OPERATION):")
+    assert _refusal_codes(kit) == ["UNKNOWN_OPERATION"]
+    assert kit.artifact()["derivation_refusals"][0]["operation"] == "multiply_by_pi"
+
+
+def test_a_wrong_arity_refusal_is_recorded_with_the_operands_it_was_given(kit):
+    observation = kit.derive("difference", ["419.7 metres"])
+
+    assert observation == "DERIVE REFUSED (WRONG_ARITY): give at least two operands."
+    row = kit.artifact()["derivation_refusals"][0]
+    assert row["code"] == "WRONG_ARITY"
+    assert row["input_ids"] == ["419.7 metres"]
+
+
+def test_an_operand_off_every_page_is_recorded_with_the_raw_operands(kit):
+    """The pre-graph exits have no node ids yet, so the raw operand strings ARE the provenance."""
+    observation = kit.derive("difference", ["419.7 metres", "999.9 metres"])
+
+    assert "OPERAND_NOT_ON_PAGE" in observation
+    row = kit.artifact()["derivation_refusals"][0]
+    assert row["code"] == "OPERAND_NOT_ON_PAGE"
+    assert row["input_ids"] == ["419.7 metres", "999.9 metres"]
+
+
+def test_a_graph_level_refusal_is_recorded_with_the_located_node_ids(kit):
+    kit.register_page("https://example.com/b", "The bridge cost 200.0 USD and spans 50.0 km.")
+
+    observation = kit.derive("sum", ["200.0 USD", "50.0 km"])
+
+    assert "REFUSED" in observation.upper()
+    row = kit.artifact()["derivation_refusals"][0]
+    assert row["code"] == "UNIT_MISMATCH"
+    assert len(row["input_ids"]) == 2
+    # located operands, so every id names a node that really is in the graph
+    node_ids = {node["id"] for node in kit.artifact()["nodes"]}
+    assert set(row["input_ids"]) <= node_ids
+
+
+def test_every_refusal_code_is_countable_by_kind(kit):
+    kit.derive("multiply_by_pi", ["419.7 metres", "380.0 metres"])
+    kit.derive("difference", ["419.7 metres"])
+    kit.derive("difference", ["419.7 metres", "999.9 metres"])
+    kit.derive("difference", ["380.0 metres", "999.9 metres"])
+
+    assert kit._graph.refusal_counts() == {
+        "UNKNOWN_OPERATION": 1, "WRONG_ARITY": 1, "OPERAND_NOT_ON_PAGE": 2}
+
+
+def test_a_derivation_that_succeeds_records_no_refusal_at_all(kit):
+    kit.derive("difference", ["419.7 metres", "380.0 metres"])
+
+    assert kit.artifact()["derivation_refusals"] == []

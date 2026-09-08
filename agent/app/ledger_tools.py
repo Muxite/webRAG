@@ -33,8 +33,22 @@ from agent.app.answer_numbers import (extract_answer_numbers, is_trivial_number,
                                       mandate_demanded_operation, operation_appropriateness)
 from agent.app.quantity_index import build_index, lookup, render_index
 from agent.app.testing.evidence_graph import (KIND_DERIVED, DerivationError, EvidenceGraph,
-                                              _numbers_agree, canonical_unit, extract_unit,
-                                              numeric_value, parse_quantity, verify_value)
+                                              UnknownOperation, WrongArity, _numbers_agree,
+                                              canonical_unit, extract_unit, numeric_value,
+                                              parse_quantity, verify_value)
+
+
+class OperandNotOnPage(DerivationError):
+    """An operand names no quantity on any page this toolkit has registered.
+
+    The graph's own :class:`~agent.app.testing.evidence_graph.MissingOperand` is the neighbouring
+    refusal -- an id naming no node -- but this one happens EARLIER and means something different:
+    the host never read a page stating the value at all, so there is no id to miss. Keeping the
+    two codes apart is the whole point of recording refusals: "the model invented a number" and
+    "the model mistyped a reference" are different failures with different fixes.
+    """
+
+    code = "OPERAND_NOT_ON_PAGE"
 
 #: Provenance tag stamped on every node minted by :meth:`LedgerToolkit.audit_answer`, so a
 #: consumer (e.g. the risk-coverage certify chain) can include or exclude this mechanical,
@@ -278,18 +292,31 @@ class LedgerToolkit:
         :returns: an observation string for the host's transcript.
         :raises: nothing.
         """
+        # Every exit below records the refusal on the graph before returning the observation. The
+        # observation alone is not a record: it goes into the host's scratchpad, which no result
+        # cell persists, and a refusal mints no node -- so without this a correct refusal and a
+        # derivation never attempted are the same artifact. The three EARLY exits happen before
+        # any operand is located, so they carry the raw operand strings as their provenance (the
+        # only thing there is), matching the evidence loop's own pre-graph refusal at
+        # ``execution_evidence_loop._handle_derive``.
         name = _ALIASES.get(str(operation or "").strip().lower(), str(operation or "").strip().lower())
+        values = [str(v) for v in (operands or [])]
         if name not in SUPPORTED_OPERATIONS:
+            message = (f"{operation!r} is not one of {', '.join(SUPPORTED_OPERATIONS)}")
+            self._graph.record_refusal(str(operation), values, UnknownOperation(message))
             return (f"DERIVE REFUSED (UNKNOWN_OPERATION): {operation!r} is not one of "
                     f"{', '.join(SUPPORTED_OPERATIONS)}.")
-        values = [str(v) for v in (operands or [])]
         if len(values) < 2:
+            self._graph.record_refusal(name, values,
+                                       WrongArity("give at least two operands"))
             return "DERIVE REFUSED (WRONG_ARITY): give at least two operands."
 
         input_ids: List[str] = []
         for value in values:
             node = self._locate(value)
             if node is None:
+                self._graph.record_refusal(name, values, OperandNotOnPage(
+                    f"{value!r} was not found on any page you have read"))
                 return (f"DERIVE REFUSED (OPERAND_NOT_ON_PAGE): {value!r} was not found on any "
                         "page you have read. Visit a page that states it, then derive again.")
             input_ids.append(node)
@@ -297,6 +324,7 @@ class LedgerToolkit:
         try:
             node = self._graph.add_arith(name, input_ids, proposed_value=proposed_value)
         except DerivationError as exc:
+            self._graph.record_refusal(name, input_ids, exc)
             return f"DERIVE REFUSED ({exc.code}): {exc}"
 
         # `add_derived` dedups on a content-identical id and KEEPS THE FIRST node, so a model that

@@ -1789,7 +1789,8 @@ def _decorate(answer: str, ledger: Ledger) -> str:
 
 
 async def run_evidence_loop(agent_io: AgentIO, mandate: str, model_name: str, max_steps: int,
-                            max_tokens: int) -> EvidenceLoopResult:
+                            max_tokens: int,
+                            page_chars: Optional[int] = None) -> EvidenceLoopResult:
     """Run the flat ReAct loop with the ledger, per-hop extraction and quote grounding.
 
     :param agent_io: the run's IO facade (search / visit / query_llm / build_llm_payload).
@@ -1797,12 +1798,18 @@ async def run_evidence_loop(agent_io: AgentIO, mandate: str, model_name: str, ma
     :param model_name: executor model.
     :param max_steps: hard step budget for the flat loop.
     :param max_tokens: cap for the final synthesis call.
+    :param page_chars: cap on how much of each fetched page the loop reads, overriding
+        ``IDEA_TEST_EVIDENCE_LOOP_PAGE_CHARS``. A benchmark cell wants the env default (a shared
+        budget across a whole matrix); a caller who SUPPLIED the document does not — the 6000-char
+        default silently read a supplied 40k source down to its first sixth, which is not the same
+        question the caller asked. ``None`` keeps today's env-driven behaviour exactly.
     :returns: an :class:`EvidenceLoopResult` carrying the deliverable, the ledger (rows and
         append-only extraction records), the full scratchpad and the derived verdict.
     :raises: nothing from the tool surface — a failed search/visit becomes an observation, and a
         malformed decision becomes an empty decision, exactly as in the sequential control.
     """
-    page_chars = int(os.environ.get("IDEA_TEST_EVIDENCE_LOOP_PAGE_CHARS", "6000"))
+    page_chars = (int(page_chars) if page_chars is not None
+                  else int(os.environ.get("IDEA_TEST_EVIDENCE_LOOP_PAGE_CHARS", "6000")))
     search_k = int(os.environ.get("IDEA_TEST_EVIDENCE_LOOP_SEARCH_K", "6"))
     step_max_tokens = int(os.environ.get("IDEA_TEST_EVIDENCE_LOOP_STEP_MAX_TOKENS", "4096"))
     final_context_chars = int(os.environ.get("IDEA_TEST_EVIDENCE_LOOP_FINAL_CHARS", "12000"))
