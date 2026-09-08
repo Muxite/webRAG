@@ -368,6 +368,49 @@ class _ForwardMatch:
     unit_fallback: str
 
 
+def _extend_unit(lines: List[Tuple[str, int, int]], next_index: int, base_text: str,
+                 parsed: _ParsedQuantity) -> Tuple[_ParsedQuantity, int, str]:
+    """Grow an already-ACCEPTED quantity ``base_text`` (parsed as ``parsed``) across the two
+    line shapes the flattener puts AFTER a unit, preferring the longer parse whenever it is also
+    accepted:
+
+    * a lone superscript line (``km<sup>2</sup>`` -> ``"km\n2"``, see :data:`_SUPERSCRIPT_LINE`)
+      -- the shorter ``km`` parse is real but wrong;
+    * a dual-unit parenthetical split across lines (``"(2,980,000\nkm\n2\n)"``) -- consumed
+      from a line starting with ``"("`` through the first line carrying ``")"`` and accepted ONLY
+      when the parsed :attr:`Quantity.restatement` carries a whitelisted unit. That guard is what
+      keeps a ``"(2015)"`` year annotation from being read as a restatement.
+
+    :returns: ``(parsed, last_consumed_index, text)`` -- unchanged inputs (``next_index - 1``)
+        when neither shape follows.
+    """
+    last = next_index - 1
+    text = base_text
+    if next_index < len(lines):
+        segment = lines[next_index][0].strip()
+        if segment and _SUPERSCRIPT_LINE.match(segment):
+            longer = _parse_candidate(f"{text} {segment[0]}")
+            if longer.ok and _accept(longer):
+                parsed, last, text = longer, next_index, f"{text} {segment[0]}"
+    paren_index = last + 1
+    if paren_index < len(lines) and lines[paren_index][0].strip().startswith("("):
+        parts: List[str] = []
+        for k in range(paren_index, len(lines)):
+            segment = lines[k][0].strip()
+            if not segment:
+                break
+            parts.append(segment)
+            if ")" not in segment:
+                continue
+            for candidate in (" ".join(parts), " ".join(parts).rstrip(":;,.")):
+                longer = _parse_candidate(f"{text} {candidate}")
+                if (longer.ok and _accept(longer) and longer.restatement is not None
+                        and _unit_allowed(longer.restatement.unit)):
+                    return longer, k, f"{text} {candidate}"
+            break
+    return parsed, last, text
+
+
 def _forward_quantity(lines: List[Tuple[str, int, int]], index: int,
                        value_text: str) -> Optional[_ForwardMatch]:
     """The accepted :class:`Quantity` for the value line at ``index``, or ``None``.
@@ -394,7 +437,6 @@ def _forward_quantity(lines: List[Tuple[str, int, int]], index: int,
     """
     parts: List[str] = []
     stop = min(len(lines), index + 1 + _FORWARD_UNIT_LINES)
-    best: Optional[_ForwardMatch] = None
     for k in range(index + 1, stop):
         segment = lines[k][0].strip()
         if not segment:
@@ -414,19 +456,13 @@ def _forward_quantity(lines: List[Tuple[str, int, int]], index: int,
             if trimmed != candidate:
                 parsed = _parse_candidate(f"{value_text} {trimmed}")
         if parsed.ok and _accept(parsed):
+            # A superscript line and/or a split parenthetical restatement may still follow the
+            # accepted unit; prefer the longer parse when it is accepted too (see _extend_unit).
+            parsed, last, grown = _extend_unit(lines, k + 1, f"{value_text} {candidate}", parsed)
             window_start = lines[index + 1][1]
-            window_end = lines[index + len(parts)][2]
-            best = _ForwardMatch(parsed, window_start, window_end, "", candidate)
-            # A whitelisted unit followed by a lone superscript digit line ("km\n2") is the
-            # flattened km<sup>2</sup>: the shorter "km" parse is real but wrong, so keep
-            # growing and prefer the longer parse when it is accepted too. Anything else on the
-            # next line (the next row's label, a parenthetical) ends the search here.
-            if k + 1 < stop and _SUPERSCRIPT_LINE.match(lines[k + 1][0].strip() or "x"):
-                continue
-            return best
-        if best is not None:
-            # The superscript growth did not parse; the shorter accepted unit stands.
-            return best
+            window_end = lines[last][2]
+            return _ForwardMatch(parsed, window_start, window_end, "",
+                                 grown[len(value_text):].strip())
         if ";" in candidate:
             head, _sep, tail_start = candidate.partition(";")
             head_parsed = _parse_candidate(f"{value_text} {head.strip()}")
@@ -448,7 +484,7 @@ def _forward_quantity(lines: List[Tuple[str, int, int]], index: int,
             tail_candidate = " ".join(p for p in tail_parts if p)
             return _ForwardMatch(head_parsed, window_start, window_end, tail_candidate,
                                   head.strip())
-    return best
+    return None
 
 
 def _raw_offset(window_raw: str, raw_start: int, value_str: str,
@@ -619,6 +655,10 @@ def _scan_infobox(text: str) -> List[QuantityRef]:
                     ))
                 continue
             value_text, parsed, matched_text = found
+            # The same superscript / split-parenthetical continuations as the split-line shape
+            # ("2,927,843 km\n2", "1,642 m\n(5,387\nft)"); the row's window then extends to
+            # the last consumed line so the restatement offsets still land in raw text.
+            parsed, last, matched_text = _extend_unit(lines, index + 1, matched_text, parsed)
             unit = _entry_unit(parsed, matched_text, matched_text[len(value_text):].strip())
             entries.append(QuantityRef(
                 label=label, value=value_text, unit=unit,
@@ -627,7 +667,7 @@ def _scan_infobox(text: str) -> List[QuantityRef]:
             ))
             line_window_start = line_value_start + len(value_text)
             entries.extend(_emit_restatement_chain(
-                parsed, text[line_window_start:line_end], line_window_start, 0, label))
+                parsed, text[line_window_start:lines[last][2]], line_window_start, 0, label))
     return entries
 
 

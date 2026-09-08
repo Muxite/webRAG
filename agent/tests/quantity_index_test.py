@@ -425,3 +425,65 @@ class TestUncappedIndex:
         rows = "\n".join(f"Row{i}\n{i}\nm" for i in range(1, 61))
         assert len(build_index(rows)) == 40
         assert len(build_index(rows, limit=None)) == 60
+
+
+class TestSuperscriptAfterOneLineValue:
+    """Live replay shape (Nile): value and unit on ONE line, superscript on the next."""
+
+    def test_nile_one_line_km_then_superscript_indexes_km2(self):
+        text = "Basin size\n2,927,843 km\n2\nDischarge\n2,830\nm\n3\n/s\n"
+        entries = build_index(text)
+        basin = next(e for e in entries if e.label == "Basin size")
+        assert basin.value == "2,927,843"
+        assert basin.unit == "km2"
+        assert text[basin.start:basin.end] == "2,927,843"
+        discharge = next(e for e in entries if e.label == "Discharge")
+        assert discharge.unit == "m3"
+
+    def test_one_line_m_then_superscript_then_per_sec(self):
+        text = "Discharge\n2,757 m\n3\n/sec\nLength\n10\nkm\n"
+        entries = build_index(text)
+        discharge = next(e for e in entries if e.label == "Discharge")
+        assert discharge.unit == "m3"
+        assert discharge.value == "2,757"
+        # The lone "3" is never a label for anything, and Length still indexes on its own.
+        assert not any(e.label == "3" for e in entries)
+        length = next(e for e in entries if e.label == "Length")
+        assert length.unit == "km"
+
+
+class TestRestatementAfterSuperscript:
+    """Live replay shape (Mississippi): a dual-unit parenthetical split across lines AFTER a
+    superscript-terminated unit; both halves must index under the same label."""
+
+    PAGE = ("Basin size\n1,151,000\nmi\n2\n(2,980,000\nkm\n2\n)\n"
+            "Mississippi with\nAtchafalaya\n1,245,000\nmi\n2\n(3,220,000\nkm\n2\n)\n")
+
+    def test_both_units_indexed_under_basin_size(self):
+        entries = build_index(self.PAGE)
+        basin = [(e.value, e.unit) for e in entries if e.label == "Basin size"]
+        assert basin == [("1,151,000", "mi2"), ("2,980,000", "km2")]
+        for e in entries:
+            assert self.PAGE[e.start:e.end] == e.value
+
+    def test_following_row_indexes_independently_with_both_units(self):
+        entries = build_index(self.PAGE)
+        following = [(e.value, e.unit) for e in entries
+                     if e.label.endswith("Atchafalaya")]
+        assert following == [("1,245,000", "mi2"), ("3,220,000", "km2")]
+        assert not any(e.label.startswith("(") or e.label == ")" for e in entries)
+
+    def test_year_parenthetical_is_not_a_restatement(self):
+        text = "Height\n1,642 m\n(2015)\nWidth\n10\nkm\n"
+        entries = build_index(text)
+        assert [(e.value, e.unit) for e in entries] == [("1,642", "m"), ("10", "km")]
+
+    def test_year_parenthetical_after_split_unit_is_not_a_restatement(self):
+        text = "Annual\ngeneration\n55.2\nTWh\n(2015)\n"
+        entries = build_index(text)
+        assert [(e.value, e.unit) for e in entries] == [("55.2", "TWh")]
+
+    def test_split_restatement_after_plain_unit_is_captured(self):
+        text = "Max.\ndepth\n1,642\nm\n(5,387\nft)\n"
+        entries = build_index(text)
+        assert [(e.value, e.unit) for e in entries] == [("1,642", "m"), ("5,387", "ft")]
