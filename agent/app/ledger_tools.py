@@ -26,9 +26,10 @@ so a ReAct loop, a DAG engine or a plain script can bind it the same way.
 from __future__ import annotations
 
 import dataclasses
+import inspect
 import math
 import re
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 from urllib.parse import unquote, urlparse
 
 from agent.app.answer_numbers import (extract_answer_numbers, is_trivial_number,
@@ -38,12 +39,19 @@ from agent.app.mandate_slots import parse_slots
 # part of the ranker's contract), but "which tokens identify an entity" must mean ONE thing across
 # the ranker and the page filter that feeds it -- a second definition here would be a second thing
 # to keep in sync. Same borrowing `mandate_slots` does from `candidate_coverage`.
-from agent.app.operand_attribution import _significant_tokens, _tokens, default_ranker
-from agent.app.quantity_index import build_index, lookup, render_index
+from agent.app.operand_attribution import (_significant_tokens, _tokens, _unit_hints,
+                                           default_ranker)
+from agent.app.quantity_index import QuantityRef, build_index, lookup, render_index
 from agent.app.testing.evidence_graph import (KIND_DERIVED, DerivationError, EvidenceGraph,
                                               UnitMismatch, UnknownOperation, WrongArity,
-                                              _numbers_agree, canonical_unit, extract_unit,
-                                              numeric_value, parse_quantity, verify_value)
+                                              _numbers_agree, canonical_unit, canonicalize_url,
+                                              extract_unit, numeric_value, parse_quantity,
+                                              verify_value)
+
+#: Whether the graph's ``add_page`` accepts a provenance ``source`` kwarg. Read ONCE from the
+#: signature rather than probed with a ``TypeError`` fallback, so a genuine TypeError inside
+#: ``add_page`` can never be mistaken for "old signature" and silently retried without the tag.
+_ADD_PAGE_TAKES_SOURCE = "source" in inspect.signature(EvidenceGraph.add_page).parameters
 
 
 class OperandNotOnPage(DerivationError):
@@ -399,7 +407,9 @@ class LedgerToolkit:
 
     # -- host hooks ---------------------------------------------------------------------------
 
-    def register_page(self, url: str, text: str) -> str:
+    def register_page(self, url: str, text: str, *, source: str = "",
+                      max_chars: Optional[int] = None,
+                      structured: Optional[List[QuantityRef]] = None) -> str:
         """Freeze a page the host just fetched, making its values eligible as operands.
 
         A host calls this from wherever it already visits pages. Until a page is registered,
@@ -408,16 +418,57 @@ class LedgerToolkit:
 
         :param url: the fetched URL.
         :param text: the fetched page text.
+        :param source: provenance tag for the page (e.g. which fetcher produced it), recorded on
+            the artifact page only when non-empty.
+        :param max_chars: cap on the stored window for THIS page; ``None`` keeps the toolkit's
+            default. A prefetcher that wants the page in full passes ``len(text)``.
+        :param structured: quantities extracted structurally (an infobox table) rather than by
+            the text scan. They are PREPENDED to this page's index, so their run-wide ``q`` ids
+            come before the text-scan entries', and a page that carries any is indexed uncapped
+            -- the structured entries already tell the reader where to look, so the text scan is
+            there for completeness, not for a prompt budget.
         :returns: the page id operands will resolve against.
         """
         self._pages += 1
         page_id = f"p{self._pages}"
-        self._graph.add_page(page_id, url, text or "", self._max_page_chars)
-        entries = build_index(text or "")
+        cap = self._max_page_chars if max_chars is None else int(max_chars)
+        if source and _ADD_PAGE_TAKES_SOURCE:
+            self._graph.add_page(page_id, url, text or "", cap, source=source)
+        else:
+            page = self._graph.add_page(page_id, url, text or "", cap)
+            if source:
+                page["source"] = str(source)
+        if structured:
+            entries = list(structured) + build_index(text or "", limit=None)
+        else:
+            entries = build_index(text or "")
         self._indexes[page_id] = entries
         self._index_start[page_id] = len(self._entries) + 1
         self._entries.extend((page_id, entry) for entry in entries)
         return page_id
+
+    def registered_urls(self) -> Set[str]:
+        """The canonical URL of every registered page, for a prefetcher deciding what to skip."""
+        return {canonicalize_url(page.get("url") or "") for page in self._graph.pages()}
+
+    def entities_without_page(self, slots: Sequence[Any]) -> List[Any]:
+        """The slots whose entity NO registered page names -- the ones a prefetcher must fetch.
+
+        Judged by exactly the page filter :meth:`host_derive` will apply
+        (:meth:`_host_derive_candidate_pages`, rivals included), so "covered" here means the same
+        thing as "resolvable" there. A slot whose entity has no identifying tokens counts as
+        covered, for the same reason that filter keeps the whole index for it: it has no claim to
+        refuse. With no page registered at all, every slot that HAS tokens is uncovered.
+        """
+        entities = [str(getattr(slot, "entity", "")) for slot in slots]
+        missing: List[Any] = []
+        for position, slot in enumerate(slots):
+            if not _significant_tokens(entities[position]):
+                continue
+            rivals = [entity for index, entity in enumerate(entities) if index != position]
+            if not self._host_derive_candidate_pages(entities[position], rivals):
+                missing.append(slot)
+        return missing
 
     def page_index_text(self, page_id: str, *, max_chars: int = 1200) -> str:
         """The rendered quantity index for ``page_id``, for a host to show the model.
@@ -1214,24 +1265,11 @@ class LedgerToolkit:
         ranked.sort(key=lambda item: (-item[0], item[1]))
         return [(score, page_id, entry) for score, _, page_id, entry in ranked]
 
-    def _host_derive_select(self, slot: Any, phrase: str, ranker: Any, min_score: float,
-                            taken: set,
-                            rivals: Sequence[str] = ()) -> Tuple[Dict[str, Any],
-                                                                 Optional[Tuple[str, Any]]]:
-        """Pick one operand for ``slot`` read under ``phrase``, honouring the exclusion set.
-
-        :param slot: a :class:`~agent.app.mandate_slots.Slot`.
-        :param phrase: the field phrase to rank under -- ``slot.field_phrase`` for a two-operand
-            mandate, or one side of an argmax formula.
-        :param ranker: any :class:`~agent.app.operand_attribution.OperandRanker`-shaped object.
-        :param min_score: the floor a candidate must reach; see :data:`_HOST_DERIVE_MIN_SCORE`.
-        :param taken: ``(page_id, start, end)`` spans already used by another slot. MUTATED on a
-            successful selection -- this is what stops two slots reading the same number twice.
-        :param rivals: the mandate's OTHER entity names; see :meth:`_host_derive_candidate_pages`.
-        :returns: ``(row, (page_id, entry) or None)``. The row always reports the best candidate's
-            page and score (so a refusal shows how close it came), but carries ``entry`` only when
-            the candidate was actually selected.
-        """
+    def _host_derive_available(self, slot: Any, phrase: str, ranker: Any, taken: set,
+                               rivals: Sequence[str] = ()) -> Tuple[Dict[str, Any], List, List]:
+        """``(row, ranked, available)`` for ``slot`` read under ``phrase`` -- the shared first
+        half of :meth:`_host_derive_select` and :meth:`_host_derive_unit_options`, so the two
+        can never disagree about which entries a slot may draw from. Mutates nothing."""
         probe = slot if phrase == getattr(slot, "field_phrase", None) else dataclasses.replace(
             slot, field_phrase=phrase)
         row: Dict[str, Any] = {
@@ -1243,10 +1281,95 @@ class LedgerToolkit:
             probe, self._host_derive_candidate_pages(row["entity"], rivals), ranker)
         available = [cand for cand in ranked
                      if (cand[1], cand[2].start, cand[2].end) not in taken]
+        return row, ranked, available
+
+    def _host_derive_unit_options(self, slot: Any, phrase: str, ranker: Any, min_score: float,
+                                  taken: set, rivals: Sequence[str] = ()) -> List[Tuple[str, float]]:
+        """``[(canonical unit, best score)]`` this slot could be read in, best-first.
+
+        A unit is an OPTION only when the slot's best available entry carrying it clears
+        ``min_score`` -- the same floor :meth:`_host_derive_select` applies -- so choosing a
+        shared unit from these can never admit an entry the floor would have refused. The list
+        keeps ranked order (first occurrence per unit), which is the tie-break
+        :meth:`_host_derive_shared_unit` falls back on.
+        """
+        _, _, available = self._host_derive_available(slot, phrase, ranker, taken, rivals)
+        options: List[Tuple[str, float]] = []
+        seen: set = set()
+        for score, _, entry in available:
+            unit = canonical_unit(entry.unit)
+            if unit in seen or float(score) < min_score:
+                continue
+            seen.add(unit)
+            options.append((unit, float(score)))
+        return options
+
+    @staticmethod
+    def _host_derive_shared_unit(options: Sequence[Sequence[Tuple[str, float]]],
+                                 hints: Any = ()) -> Optional[str]:
+        """The one canonical unit to read EVERY entity's operand in, or ``None`` when no entity
+        has an option at all.
+
+        Ordered by: the number of entities that can supply the unit at the floor (a unit every
+        entity prints beats one only most print), then whether the mandate's own field phrase
+        names it (``"in metres"``), then the best score any entity's entry in it reached, then
+        first appearance in the entities' ranked lists. Entities with NO option (nothing at the
+        floor) do not vote -- their refusal is reported by the caller on its own terms.
+
+        The result is a PREFERENCE, not a guarantee: an entity that cannot supply it falls back to
+        its own best entry in :meth:`_host_derive_select`, and the caller's existing unit
+        post-check then refuses the disagreement exactly as before. So the constraint only ever
+        narrows a choice among entries that were already available; it never widens one.
+        """
+        voters = [opts for opts in options if opts]
+        if not voters:
+            return None
+        hinted = set(hints or ())
+        coverage: Dict[str, int] = {}
+        best: Dict[str, float] = {}
+        first_seen: Dict[str, int] = {}
+        position = 0
+        for opts in voters:
+            for unit, score in opts:
+                coverage[unit] = coverage.get(unit, 0) + 1
+                best[unit] = max(best.get(unit, float("-inf")), score)
+                first_seen.setdefault(unit, position)
+                position += 1
+        return max(coverage, key=lambda unit: (coverage[unit], unit in hinted, best[unit],
+                                               -first_seen[unit]))
+
+    def _host_derive_select(self, slot: Any, phrase: str, ranker: Any, min_score: float,
+                            taken: set, rivals: Sequence[str] = (),
+                            unit: Optional[str] = None) -> Tuple[Dict[str, Any],
+                                                                 Optional[Tuple[str, Any]]]:
+        """Pick one operand for ``slot`` read under ``phrase``, honouring the exclusion set.
+
+        :param slot: a :class:`~agent.app.mandate_slots.Slot`.
+        :param phrase: the field phrase to rank under -- ``slot.field_phrase`` for a two-operand
+            mandate, or one side of an argmax formula.
+        :param ranker: any :class:`~agent.app.operand_attribution.OperandRanker`-shaped object.
+        :param min_score: the floor a candidate must reach; see :data:`_HOST_DERIVE_MIN_SCORE`.
+        :param taken: ``(page_id, start, end)`` spans already used by another slot. MUTATED on a
+            successful selection -- this is what stops two slots reading the same number twice.
+        :param rivals: the mandate's OTHER entity names; see :meth:`_host_derive_candidate_pages`.
+        :param unit: the canonical unit the whole mandate is being read in
+            (:meth:`_host_derive_shared_unit`). When given, the pick is the best available entry
+            IN that unit that clears ``min_score``; when this slot has none, the pick falls back
+            to its unconstrained best, and the caller's unit check reports the disagreement.
+        :returns: ``(row, (page_id, entry) or None)``. The row always reports the best candidate's
+            page and score (so a refusal shows how close it came), but carries ``entry`` only when
+            the candidate was actually selected.
+        """
+        row, ranked, available = self._host_derive_available(slot, phrase, ranker, taken, rivals)
         if not available:
             # "nothing to rank" and "everything was already spoken for" are different refusals.
             row["reason"] = "excluded_duplicate" if ranked else "no_candidate_page"
             return row, None
+        if unit is not None:
+            within = [cand for cand in available
+                      if canonical_unit(cand[2].unit) == unit and float(cand[0]) >= min_score]
+            if within:
+                available = within
         score, page_id, entry = available[0]
         row.update(page_id=page_id, url=self._host_derive_page(page_id)[0], score=float(score))
         if score < min_score:
@@ -1319,10 +1442,21 @@ class LedgerToolkit:
         # would have no argument position to occupy.
         same_field = self._host_derive_same_field(slots[:2])
         entities = [str(getattr(slot, "entity", "")) for slot in slots[:2]]
+        shared_unit: Optional[str] = None
+        if same_field:
+            # Two readings of ONE field must agree on their unit (checked below), and every
+            # article prints both systems, so the pair is chosen under one unit both pages can
+            # supply rather than picked independently and then refused.
+            options = [self._host_derive_unit_options(
+                slot, slot.field_phrase, ranker, min_score, taken,
+                [entity for index, entity in enumerate(entities) if index != position])
+                for position, slot in enumerate(slots[:2])]
+            shared_unit = self._host_derive_shared_unit(
+                options, _unit_hints(str(slots[0].field_phrase)))
         for position, slot in enumerate(slots[:2]):
             rivals = [entity for index, entity in enumerate(entities) if index != position]
             row, picked = self._host_derive_select(slot, slot.field_phrase, ranker, min_score,
-                                                   taken, rivals)
+                                                   taken, rivals, unit=shared_unit)
             rows.append(row)
             chosen.append(picked)
         result["slots"] = rows
@@ -1409,6 +1543,19 @@ class LedgerToolkit:
         rows: List[Dict[str, Any]] = []
         resolved: List[Tuple[Any, Tuple[str, Any], Tuple[str, Any]]] = []
         entities = [str(getattr(slot, "entity", "")) for slot in slots]
+        # Each side of the formula is read in ONE unit across the roster, chosen from what every
+        # entity can supply at the floor (task 220 lost every cell to `ft` on three pages and `m`
+        # on two when each entity picked independently -- every page printed both). Hints come
+        # from the formula side being ranked, never from the slot's whole field phrase: that
+        # phrase names BOTH sides' units, and 221's "in metres" would otherwise pull the floor
+        # count toward a height.
+        units: List[Optional[str]] = []
+        for phrase in (numerator_phrase, denominator_phrase):
+            options = [self._host_derive_unit_options(
+                slot, phrase, ranker, min_score, taken,
+                [entity for index, entity in enumerate(entities) if index != position])
+                for position, slot in enumerate(slots)]
+            units.append(self._host_derive_shared_unit(options, _unit_hints(phrase)))
         # Pass one selects only. Nothing is minted until the ROSTER is known to be whole, because
         # the two refusals below are refusals of the whole comparison, not of one entity's share
         # of it, and a half-minted roster on the artifact is exactly the partial evidence the
@@ -1416,10 +1563,11 @@ class LedgerToolkit:
         for position, slot in enumerate(slots):
             rivals = [entity for index, entity in enumerate(entities) if index != position]
             numerator_row, numerator = self._host_derive_select(slot, numerator_phrase, ranker,
-                                                                min_score, taken, rivals)
+                                                                min_score, taken, rivals,
+                                                                unit=units[0])
             denominator_row, denominator = self._host_derive_select(slot, denominator_phrase,
                                                                     ranker, min_score, taken,
-                                                                    rivals)
+                                                                    rivals, unit=units[1])
             rows.extend((numerator_row, denominator_row))
             if numerator is None or denominator is None:
                 continue  # an entity nobody read both numbers for cannot compete

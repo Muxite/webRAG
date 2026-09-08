@@ -412,8 +412,8 @@ def test_an_argmax_entity_with_no_page_of_its_own_is_skipped_not_read_off_a_neig
 
 def test_two_slots_reading_the_SAME_field_must_agree_on_their_unit(kit):
     """Task 217 asks "its surface area, in km2" of BOTH lakes, and the two articles write that one
-    field in different units (`8,372 km` -- the flattened infobox loses the exponent -- and
-    `191 sq mi`). `_compat_quotient` allows two different units on purpose, because a rate like
+    field in different units (`8,372 km2` -- the flattened infobox's split exponent is rejoined
+    by `quantity_index` -- and `191 sq mi`). `_compat_quotient` allows two different units on purpose, because a rate like
     km / min is legitimate (task 216), so the narrower rule is on the FIELD PHRASE: when both
     slots read the same field, the two operands must carry the same canonical unit. 19 of the
     replay's 50 wrong hand-rule rows minted `43.83 km/sq mi` from this pair."""
@@ -424,7 +424,7 @@ def test_two_slots_reading_the_SAME_field_must_agree_on_their_unit(kit):
 
     assert result["reason"] == "unit_mismatch"
     assert result["value"] is None and result["node_id"] is None
-    assert [row["entry"]["unit"] for row in _selected(result)] == ["km", "sq mi"]
+    assert [row["entry"]["unit"] for row in _selected(result)] == ["km2", "sq mi"]
     assert kit.artifact()["derivation_refusals"][-1]["code"] == "UNIT_MISMATCH"
 
 
@@ -561,8 +561,15 @@ def test_too_few_entities_resolve_to_report_an_extremum(kit):
 
 
 def test_the_document_order_control_ranker_plumbs_through(kit):
-    """The negative control ranks nothing: it takes each page's FIRST entry. Its constant 0.5 is
-    not on the hand rule's scale, so the replay arm passes `min_score=0.0` with it."""
+    """The negative control ranks nothing; its constant 0.5 is not on the hand rule's scale, so
+    the replay arm passes `min_score=0.0` with it.
+
+    Before joint unit selection this asserted the control took each page's FIRST entry (`Surface
+    area`, in km2) -- that was select-then-check behaviour: the mandate's own "in meters" played
+    no part in the pick. The shared-unit rule now narrows the control to the unit the field
+    phrase names, so the control's first entry IN METRES is what it reads (still document order,
+    still no feature consulted). The pick is the first `m` entry, not the best-labelled one:
+    `Max. depth` precedes `Average depth` on both fixture pages."""
     kit.register_page(BAIKAL_URL, BAIKAL_PAGE)
     kit.register_page(TANGANYIKA_URL, TANGANYIKA_PAGE)
 
@@ -570,6 +577,20 @@ def test_the_document_order_control_ranker_plumbs_through(kit):
 
     assert result["ranker"] == "document_order"
     assert result["min_score"] == 0.0
+    assert [row["entry"]["label"] for row in _selected(result)] == ["Max. depth", "Max. depth"]
+    assert [row["entry"]["unit"] for row in _selected(result)] == ["m", "m"]
+
+
+def test_the_control_without_a_unit_hint_still_reads_document_first(kit):
+    """With the hint stripped from the mandate, the control is back to pure document order: the
+    first entry on both pages is the same field in the same unit, so it reads that. The joint
+    rule only ever re-orders WITHIN what the ranker already offered."""
+    kit.register_page(BAIKAL_URL, BAIKAL_PAGE)
+    kit.register_page(TANGANYIKA_URL, TANGANYIKA_PAGE)
+
+    result = kit.host_derive(statement("211").replace(", in meters", ""),
+                             ranker=document_order_ranker(), min_score=0.0)
+
     assert [row["entry"]["label"] for row in _selected(result)] == ["Surface area", "Surface area"]
 
 
@@ -701,3 +722,148 @@ def test_a_complete_roster_is_unaffected_by_the_roster_rule(kit):
 
     assert result["reason"] == "computed"
     assert result["winner_entity"] == "Mekong"
+
+
+# --------------------------------------------------------------------------------------------
+# The prefetch coverage query: which of the mandate's entities has NO registered page.
+# --------------------------------------------------------------------------------------------
+
+
+def test_entities_without_page_names_the_four_rivers_nobody_registered(kit):
+    from agent.app.mandate_slots import parse_slots
+
+    slots = parse_slots(statement("218"))
+    assert kit.entities_without_page(slots) == slots, "an empty kit covers nobody"
+
+    name, slug, length, basin = RIVERS[0]
+    kit.register_page(_wiki(slug), _river_page(name, length, basin))
+
+    missing = kit.entities_without_page(slots)
+    assert [slot.entity for slot in missing] == ["Yangtze", "Nile", "Mississippi", "Amazon"]
+    assert all(isinstance(slot, type(slots[0])) for slot in missing)
+
+    _rivers_kit(kit)
+    assert kit.entities_without_page(slots) == []
+
+
+def test_an_entity_with_no_identifying_tokens_counts_as_covered(kit):
+    from agent.app.mandate_slots import Slot
+
+    kit.register_page(GRES2_URL, GRES2_PAGE)
+    slots = [Slot(entity="", field_phrase="its height", url=None, index=0),
+             Slot(entity="Inco Superstack", field_phrase="its height", url=None, index=1)]
+
+    assert [slot.entity for slot in kit.entities_without_page(slots)] == ["Inco Superstack"]
+
+
+# --------------------------------------------------------------------------------------------
+# Joint, mandate-guided unit selection: Wikipedia prints both systems on every page, so a unit
+# disagreement between top-1 picks is a SELECTION problem, not a page problem. The mechanism now
+# picks each entity's best entry WITHIN one unit every entity can supply -- still no conversion.
+# --------------------------------------------------------------------------------------------
+
+#: (entity, url slug, total length m, longest span m) for task 220. Humber wins on span/length.
+BRIDGES = [
+    ("Humber Bridge", "Humber_Bridge", "2,220", "1,410"),
+    ("Akashi Kaikyo Bridge", "Akashi_Kaiky%C5%8D_Bridge", "3,911", "1,991"),
+    ("Golden Gate Bridge", "Golden_Gate_Bridge", "2,737", "1,280"),
+    ("Verrazzano-Narrows Bridge", "Verrazzano-Narrows_Bridge", "4,176", "1,298"),
+    ("Mackinac Bridge", "Mackinac_Bridge", "8,038", "1,158"),
+]
+
+
+def _feet(metres: str) -> str:
+    return f"{round(float(metres.replace(',', '')) * 3.28084):,}"
+
+
+def _bridge_page(name: str, length: str, span: str, shape: str) -> str:
+    """``shape``: ``"m"`` metres only; ``"ft"`` feet only; ``"ft(m)"`` feet first with the metres
+    restatement in the same infobox cell -- the flattened-Wikipedia shape where BOTH halves are
+    indexed under the row's label and tie on the ranker's score."""
+    def cell(metres: str) -> str:
+        if shape == "m":
+            return f"{metres}\nm"
+        if shape == "ft":
+            return f"{_feet(metres)}\nft"
+        if shape == "ft(m)":
+            return f"{_feet(metres)}\nft ({metres}\nm)"
+        raise ValueError(shape)
+    return (f"{name}\nThe {name} is a suspension bridge.\nTotal length\n{cell(length)}\n"
+            f"Longest span\n{cell(span)}\nOpened\n1981\n")
+
+
+def _bridges_kit(kit, shapes):
+    for (name, slug, length, span), shape in zip(BRIDGES, shapes):
+        kit.register_page(_wiki(slug), _bridge_page(name, length, span, shape))
+    return kit
+
+
+def test_feet_first_on_three_pages_still_computes_in_the_unit_all_five_pages_print(kit):
+    """220's live loss: three articles print feet first, so top-1-per-entity read ft for them and
+    m for the other two and refused `unit_inconsistent_across_entities`. Metres is on every page,
+    so the roster is computed in metres -- each entity's best entry within that unit."""
+    result = _bridges_kit(kit, ["ft(m)", "m", "ft(m)", "m", "ft(m)"]).host_derive(statement("220"))
+
+    assert result["reason"] == "computed"
+    assert result["winner_entity"] == "Humber Bridge"
+    assert result["value"] == pytest.approx(1410 / 2220, abs=1e-6)
+    assert {row["entry"]["unit"] for row in _selected(result)} == {"m"}
+    assert len(_selected(result)) == 10
+    assert all(row["score"] >= 0.93 for row in _selected(result))
+
+
+def test_a_unit_hint_in_the_field_phrase_wins_over_document_order(kit):
+    """217 asks "its surface area, in km2" and Tahoe's article prints sq mi first. Under the
+    document-order control (constant score, no unit feature) the old rule read sq mi for Tahoe
+    and km2 for Titicaca and refused; the mandate's own unit hint now picks km2 on both."""
+    kit.register_page(TITICACA_URL, TITICACA_PAGE.replace("8,372\nkm\n2", "8,372\nkm2 (3,232\nsq mi)"))
+    kit.register_page(TAHOE_URL, TAHOE_PAGE.replace("191\nsq mi", "191\nsq mi (495\nkm2)"))
+
+    result = kit.host_derive(statement("217"), ranker=document_order_ranker(), min_score=0.0)
+
+    assert result["reason"] == "computed"
+    assert [row["entry"]["unit"] for row in _selected(result)] == ["km2", "km2"]
+    assert result["value"] == pytest.approx(8372 / 495, abs=1e-6)
+
+
+def test_one_entity_lacking_the_shared_unit_still_refuses_rather_than_converting(kit):
+    """No unit covers every bridge (one page prints ONLY feet, three ONLY metres), so the existing
+    refusal stands; the joint rule narrows selection, it never rescales."""
+    result = _bridges_kit(kit, ["m", "ft", "m", "m", "ft(m)"]).host_derive(statement("220"))
+
+    assert result["reason"] == "unit_inconsistent_across_entities"
+    assert result["value"] is None and result["winner_entity"] is None
+    assert kit.artifact()["derivation_refusals"][-1]["code"] == "UNIT_MISMATCH"
+
+
+def test_a_two_operand_same_field_pair_resolves_when_a_shared_unit_exists(kit):
+    """The two-operand analogue of the roster case, with NO unit hint to lean on (the mandate's
+    ", in meters" is stripped): Baikal's article prints feet first and the two halves tie on the
+    hand rule's score, so select-then-check read `ft` for Baikal, `m` for Tanganyika and refused
+    `unit_mismatch`. Metres is on both pages, so the pair is read in metres and computed."""
+    kit.register_page(BAIKAL_URL, BAIKAL_PAGE.replace("1,642\nm", "5,387\nft (1,642\nm)"))
+    kit.register_page(TANGANYIKA_URL, TANGANYIKA_PAGE)
+    mandate = statement("211").replace(", in meters", "")
+
+    result = kit.host_derive(mandate)
+
+    assert result["reason"] == "computed"
+    assert [row["entry"]["unit"] for row in _selected(result)] == ["m", "m"]
+    assert [row["entry"]["label"] for row in _selected(result)] == ["Max. depth", "Max. depth"]
+    assert result["value"] == pytest.approx(1642 + 1470)
+
+
+def test_the_shared_unit_never_admits_an_entry_below_the_ranker_floor(kit):
+    """A restatement written on its own line is indexed as label-less prose and scores 0.5 under
+    the hand rule. Metres is therefore NOT available on that entity at the floor, and the
+    mechanism refuses rather than reaching below `min_score` to make the units agree."""
+    pages = ["m", "m", "m", "m", "m"]
+    kit = _bridges_kit(kit, pages[:4])
+    name, slug, length, span = BRIDGES[4]
+    kit.register_page(_wiki(slug), _bridge_page(name, length, span, "ft").replace(
+        f"{_feet(span)}\nft", f"{_feet(span)}\nft\n({span} m)"))
+
+    result = kit.host_derive(statement("220"))
+
+    assert result["reason"] == "unit_inconsistent_across_entities"
+    assert all(row["score"] >= 0.93 for row in _selected(result))

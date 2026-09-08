@@ -958,3 +958,98 @@ def test_a_derivation_that_succeeds_records_no_refusal_at_all(kit):
     kit.derive("difference", ["419.7 metres", "380.0 metres"])
 
     assert kit.artifact()["derivation_refusals"] == []
+
+
+# --------------------------------------------------------------------------------------------
+# The host-prefetch contract: full-length pages, a provenance `source`, structured entries, and
+# the two coverage queries a prefetcher asks before it fetches anything.
+# --------------------------------------------------------------------------------------------
+
+from agent.app.quantity_index import QuantityRef  # noqa: E402
+from agent.app.testing.execution_evidence_loop import hash_page_text  # noqa: E402
+
+LONG_PAGE = ("Lake Baikal\nLake Baikal is a rift lake.\n" + "filler text " * 700
+             + "\nMax. depth\n1,642\nm\n")
+
+
+def _page(kit, page_id):
+    return next(page for page in kit.artifact()["pages"] if page["page_id"] == page_id)
+
+
+def test_register_page_stores_the_default_window_unless_a_cap_is_passed():
+    """The same kit, the same text: the default caller keeps the 6000-char window it always had,
+    and a caller passing ``max_chars=len(text)`` stores the page IN FULL -- untruncated, with the
+    content hash over the whole text either way."""
+    kit = LedgerToolkit()
+    assert len(LONG_PAGE) > 6000
+
+    capped = kit.register_page("https://example.com/capped", LONG_PAGE)
+    full = kit.register_page("https://example.com/full", LONG_PAGE, max_chars=len(LONG_PAGE))
+
+    assert len(_page(kit, capped)["text"]) == 6000
+    assert _page(kit, capped)["truncated"] is True
+    assert len(_page(kit, full)["text"]) == len(LONG_PAGE)
+    assert _page(kit, full)["truncated"] is False
+    assert _page(kit, full)["content_hash"] == hash_page_text(LONG_PAGE)
+    assert _page(kit, capped)["content_hash"] == _page(kit, full)["content_hash"]
+
+
+def test_a_full_length_page_indexes_the_quantity_the_window_would_have_cut():
+    kit = LedgerToolkit()
+    capped = kit.register_page("https://example.com/capped", LONG_PAGE)
+    full = kit.register_page("https://example.com/full", LONG_PAGE, max_chars=len(LONG_PAGE))
+
+    assert "1,642" not in kit.page_index_text(capped) or "1,642" in kit.page_index_text(full)
+    assert "1,642" in kit.page_index_text(full)
+
+
+def test_source_is_recorded_on_the_artifact_page_only_when_given():
+    kit = LedgerToolkit()
+    plain = kit.register_page("https://example.com/a", PAGE)
+    tagged = kit.register_page("https://example.com/b", PAGE, source="host_prefetch")
+
+    assert "source" not in _page(kit, plain)
+    assert _page(kit, tagged)["source"] == "host_prefetch"
+
+
+def test_structured_entries_come_first_in_the_pages_index_and_resolve_by_id():
+    """Entries a prefetcher extracted structurally (an infobox table) are PREPENDED to the
+    text-scan entries, and the run-wide ``q`` numbering counts them, so an id names the same
+    quantity in the rendered index, in `_resolve_id`, and in a `derive` call."""
+    kit = LedgerToolkit()
+    kit.register_page("https://example.com/first", PAGE)  # q1, q2 from the text scan
+    text = "Tower\nHeight\n12\nm\n"
+    structured = [QuantityRef(label="Floor count", value="12", unit="count",
+                              start=text.index("12"), end=text.index("12") + 2,
+                              source="structured")]
+
+    page_id = kit.register_page("https://example.com/tower", text, structured=structured)
+
+    entries = kit._indexes[page_id]
+    assert entries[0] is structured[0]
+    assert [entry.unit for entry in entries] == ["count", "m"]
+    assert kit.page_index_text(page_id).startswith("q3: Floor count = 12 count")
+    assert kit._resolve_id("q3") == (page_id, structured[0])
+    assert kit._resolve_id("q4")[1].unit == "m"
+    observation = kit.derive("sum", ["q3", "q3"])
+    assert "24" in observation and "count" in observation
+    source = next(node for node in kit.artifact()["nodes"]
+                  if node["kind"] == "source" and node.get("unit") == "count")
+    assert source["quote_verified"] is True
+
+
+def test_a_page_registered_with_no_structured_entries_indexes_exactly_as_before():
+    kit = LedgerToolkit()
+    before = kit.register_page("https://example.com/a", PAGE)
+    after = kit.register_page("https://example.com/b", PAGE, structured=None)
+    assert [e.value for e in kit._indexes[before]] == [e.value for e in kit._indexes[after]]
+
+
+def test_registered_urls_are_the_canonical_form_of_every_registered_page():
+    kit = LedgerToolkit()
+    assert kit.registered_urls() == set()
+    kit.register_page("HTTPS://En.Wikipedia.org/wiki/Lake_Baikal#Geography", PAGE)
+    kit.register_page("https://example.com/a?x=1", PAGE)
+
+    assert kit.registered_urls() == {"https://en.wikipedia.org/wiki/Lake_Baikal",
+                                     "https://example.com/a?x=1"}
