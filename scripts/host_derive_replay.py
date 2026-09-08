@@ -85,20 +85,51 @@ FORENSICS_PRINT_CAP = 40
 # Cell-level replay
 # ---------------------------------------------------------------------------------------------
 
+#: Where a cell's fetched pages can live. ``langgraph_react`` writes ``execution.output.pages``;
+#: ``sequential_react`` writes ONLY ``execution.output.evidence_graph.pages`` and leaves
+#: ``output.pages`` empty/absent. Reading just the first location silently classified every
+#: sequential_react cell as ``no_pages`` -- see the doc's "§15 Correction".
+PAGE_SOURCES: Tuple[str, ...] = ("output", "evidence_graph", "none")
+
+
+def cell_pages(raw: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], str]:
+    """``(pages, page_source)`` for one loaded cell dict.
+
+    Precedence is ``output.pages`` (non-empty), else ``evidence_graph.pages`` (non-empty), else
+    ``([], "none")``. An EMPTY ``output.pages`` list must fall through rather than shadow the
+    evidence-graph list, which is exactly the sequential_react shape on disk.
+
+    Both lists carry the same record fields -- ``page_id, url, content_hash, chars, text``
+    (plus ``stored_chars``/``truncated``) -- verified across mint01/mint02/mint03/ladder03, so
+    no key mapping is needed and the two are interchangeable inputs to ``register_page``. Where
+    both lists exist the ``output`` copy wins, which keeps every previously-replayed
+    langgraph_react cell byte-identical to the pre-correction run.
+    """
+    output = ((raw.get("execution") or {}).get("output")) or {}
+    pages = output.get("pages") or []
+    if pages:
+        return list(pages), "output"
+    graph = output.get("evidence_graph")
+    graph_pages = (graph.get("pages") or []) if isinstance(graph, dict) else []
+    if graph_pages:
+        return list(graph_pages), "evidence_graph"
+    return [], "none"
+
+
 def skip_reason(raw: Dict[str, Any]) -> Optional[str]:
     """Why this cell cannot be replayed, or ``None`` when it can.
 
     Precedence is fixed so the counters partition the skipped set: ``infra_failed`` (the run did
     not really happen), then ``no_run_config`` (arm undeterminable -- ``run_config`` is null on
     some older campaigns), then ``no_pages`` (nothing to register, so ``host_derive`` could only
-    ever return ``no_pages``).
+    ever return ``no_pages``). "Has pages" is decided by :func:`cell_pages`, i.e. across BOTH
+    storage locations.
     """
     if bool(raw.get("infra_failed")):
         return "infra_failed"
     if not (raw.get("run_config") or {}):
         return "no_run_config"
-    pages = ((raw.get("execution") or {}).get("output") or {}).get("pages") or []
-    if not pages:
+    if not cell_pages(raw)[0]:
         return "no_pages"
     return None
 
@@ -150,7 +181,7 @@ def replay_cell(path: Path, raw: Dict[str, Any], ranker_names: Sequence[str],
 
     classified = LRC.classify_cell(path, raw)
     output = ((raw.get("execution") or {}).get("output")) or {}
-    pages = output.get("pages") or []
+    pages, page_source = cell_pages(raw)
     deliverable = output.get("final_deliverable") or ""
     final_numbers = LRC.extract_numbers(
         LRC.strip_citation_markers(LRC.strip_urls(deliverable))
@@ -173,6 +204,7 @@ def replay_cell(path: Path, raw: Dict[str, Any], ranker_names: Sequence[str],
             "certified": classified["certified"],
             "ranker": ranker_name,
             "n_pages": len(pages),
+            "page_source": page_source,
         }
         if statement is None:
             rows.append({**base, "reason": "no_task_module", "value": None, "unit": "",
@@ -219,7 +251,8 @@ def replay(files: Sequence[Path], ranker_names: Sequence[str],
            prefixes: Sequence[str]) -> Tuple[List[Dict[str, Any]], Counter]:
     """Replay every file; returns ``(rows, skip_counter)``.
 
-    ``skip_counter`` also carries ``files``, ``unreadable`` and ``replayed`` so the report can
+    ``skip_counter`` also carries ``files``, ``unreadable``, ``replayed`` and one
+    ``pages_<source>`` key per :data:`PAGE_SOURCES` entry so the report can
     state its own denominator without recomputing it, plus a per-campaign copy of every one of
     those keys under ``"<prefix>|<key>"`` -- which campaign lost its cells is the first question
     a large skip count raises, and it cannot be recovered from the pooled number.
@@ -242,6 +275,9 @@ def replay(files: Sequence[Path], ranker_names: Sequence[str],
             continue
         skips["replayed"] += 1
         skips[f"{prefix}|replayed"] += 1
+        source = cell_pages(raw)[1]
+        skips[f"pages_{source}"] += 1
+        skips[f"{prefix}|pages_{source}"] += 1
         rows.extend(replay_cell(path, raw, ranker_names, prefixes))
     return rows, skips
 
@@ -349,7 +385,8 @@ def forensics(rows: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if row.get("reason") == "computed" and row.get("value_correct") is False:
             out.append({
                 "file": row["file"], "ranker": row["ranker"], "test_id": row["test_id"],
-                "model": row["model"], "host": row["host"], "value": row.get("value"),
+                "model": row["model"], "host": row["host"],
+                "page_source": row.get("page_source"), "value": row.get("value"),
                 "unit": row.get("unit"), "winner_entity": row.get("winner_entity"),
                 "slots": [
                     {"index": s.get("index"), "entity": s.get("entity"),
@@ -381,6 +418,15 @@ def build_summary(rows: Sequence[Dict[str, Any]], *, skips: Counter, prefixes: S
         per_model[name] = {model: host_vs_chain(msub)
                            for model, msub in _group(sub, "model").items()}
 
+    # Host stratification is a §15 requirement, not a nicety: before the page-source fix every
+    # replayed row was langgraph_react, so a pooled number and a langgraph number were the same
+    # number. Now that sequential_react rows exist, every headline has to be readable per host.
+    per_host = {name: {host: host_vs_chain(hsub) for host, hsub in _group(sub, "host").items()}
+                for name, sub in _by_ranker(dev_derive).items()}
+    per_host_all = {name: {host: host_vs_chain(hsub)
+                           for host, hsub in _group(sub, "host").items()}
+                    for name, sub in _by_ranker(rows).items()}
+
     return {
         "meta": {
             "prefixes": list(prefixes), "rankers": list(ranker_names),
@@ -395,10 +441,16 @@ def build_summary(rows: Sequence[Dict[str, Any]], *, skips: Counter, prefixes: S
             "rows": len(rows),
             "skipped": {k: v for k, v in sorted(skips.items())
                         if k in ("infra_failed", "no_run_config", "no_pages", "unreadable")},
+            # Which storage location each replayed cell's pages came from. Before the §15
+            # correction this was implicitly {"output": everything}: evidence_graph-only cells
+            # were counted as ``no_pages`` and never replayed at all.
+            "page_source": {source: skips.get(f"pages_{source}", 0)
+                            for source in PAGE_SOURCES if source != "none"},
             "by_prefix": {
                 prefix: {key: skips.get(f"{prefix}|{key}", 0)
                          for key in ("files", "replayed", "infra_failed", "no_run_config",
-                                     "no_pages", "unreadable")}
+                                     "no_pages", "unreadable", "pages_output",
+                                     "pages_evidence_graph")}
                 for prefix in prefixes
             },
         },
@@ -413,6 +465,12 @@ def build_summary(rows: Sequence[Dict[str, Any]], *, skips: Counter, prefixes: S
             "by_test_id": {name: {tid: availability(sub2)
                                   for tid, sub2 in _group(sub, "test_id").items()}
                            for name, sub in by_ranker.items()},
+            "by_host": {name: {host: availability(sub2)
+                               for host, sub2 in _group(sub, "host").items()}
+                        for name, sub in by_ranker.items()},
+            "by_page_source": {name: {src: availability(sub2)
+                                      for src, sub2 in _group(sub, "page_source").items()}
+                               for name, sub in by_ranker.items()},
         },
         "value_correct": {
             "pooled": {name: value_correct(sub) for name, sub in by_ranker.items()},
@@ -422,6 +480,9 @@ def build_summary(rows: Sequence[Dict[str, Any]], *, skips: Counter, prefixes: S
             "by_test_id": {name: {tid: value_correct(sub2)
                                   for tid, sub2 in _group(sub, "test_id").items()}
                            for name, sub in by_ranker.items()},
+            "by_host": {name: {host: value_correct(sub2)
+                               for host, sub2 in _group(sub, "host").items()}
+                        for name, sub in by_ranker.items()},
         },
         "operating_points": {
             "dev_derive_on": points(dev_derive),
@@ -429,6 +490,8 @@ def build_summary(rows: Sequence[Dict[str, Any]], *, skips: Counter, prefixes: S
             "holdout_derive_on": points(holdout_derive),
             "holdout_all_arms": points(holdout),
             "dev_derive_on_by_model": per_model,
+            "dev_derive_on_by_host": per_host,
+            "all_by_host": per_host_all,
         },
         "forensics": forensics(rows),
     }
@@ -473,11 +536,14 @@ def format_report(summary: Dict[str, Any]) -> str:
                f"min_score={meta['min_score']}  wall={meta['wall_seconds']}s")
     out.append(f"files={counts['files']}  replayed={counts['replayed']}  rows={counts['rows']}  "
                f"skipped={counts['skipped']}")
-    out.append(f"  {'campaign':<16}{'files':>7}{'replayed':>10}{'no_pages':>10}"
-               f"{'infra_failed':>14}{'no_run_config':>15}")
+    out.append(f"page_source={counts.get('page_source', {})}  "
+               "(evidence_graph = sequential_react cells, invisible before the §15 correction)")
+    out.append(f"  {'campaign':<16}{'files':>7}{'replayed':>10}{'src:output':>12}"
+               f"{'src:ev_graph':>14}{'no_pages':>10}{'infra_failed':>14}{'no_run_config':>15}")
     for prefix, row in counts.get("by_prefix", {}).items():
-        out.append(f"  {prefix:<16}{row['files']:>7}{row['replayed']:>10}{row['no_pages']:>10}"
-                   f"{row['infra_failed']:>14}{row['no_run_config']:>15}")
+        out.append(f"  {prefix:<16}{row['files']:>7}{row['replayed']:>10}"
+                   f"{row.get('pages_output', 0):>12}{row.get('pages_evidence_graph', 0):>14}"
+                   f"{row['no_pages']:>10}{row['infra_failed']:>14}{row['no_run_config']:>15}")
 
     out.append("")
     out.append("(a) AVAILABILITY -- denominator is every replayed cell in the stratum")
@@ -494,6 +560,10 @@ def format_report(summary: Dict[str, Any]) -> str:
                                    summary["availability"]["by_model"].get(name, {}))
         out += _availability_block(f"  availability by test_id [{name}]",
                                    summary["availability"]["by_test_id"].get(name, {}))
+        out += _availability_block(f"  availability by host [{name}]",
+                                   summary["availability"]["by_host"].get(name, {}))
+        out += _availability_block(f"  availability by page_source [{name}]",
+                                   summary["availability"]["by_page_source"].get(name, {}))
 
     out.append("")
     out.append("(b) host_value_correct AMONG COMPUTED (primary metric)")
@@ -505,7 +575,8 @@ def format_report(summary: Dict[str, Any]) -> str:
                    f"of n={pooled.get('n')}; argmax entity-correct "
                    f"{pooled.get('argmax_correct')}/{pooled.get('argmax_assessed')} "
                    f"({_pct(pooled.get('argmax_rate')).strip()})")
-        for label, key in (("by model", "by_model"), ("by test_id", "by_test_id")):
+        for label, key in (("by model", "by_model"), ("by test_id", "by_test_id"),
+                           ("by host", "by_host")):
             out.append(f"  {label} [{name}]")
             out.append(f"    {'key':<28}{'n':>6}{'computed':>10}{'assessed':>10}"
                        f"{'correct':>9}{'rate':>9}")
@@ -561,6 +632,17 @@ def format_report(summary: Dict[str, Any]) -> str:
                        f"{_pct(point['coverage']):>11}{_pct(point['risk']):>10}"
                        f"{_pct(point['risk_cp_upper']):>12}")
 
+    out.append("")
+    out.append("(g) PER-HOST operating points -- sequential_react vs langgraph_react")
+    for stratum in ("dev_derive_on_by_host", "all_by_host"):
+        for name in meta["rankers"]:
+            for host, table in summary["operating_points"].get(stratum, {}) \
+                    .get(name, {}).items():
+                out.append(f"  {host} [{stratum} | {name}]")
+                out.append(_POINT_HEAD)
+                for signal in SIGNALS:
+                    out.append(_point_line(signal, table[signal]))
+
     rows = summary["forensics"]
     out.append("")
     out.append(f"FORENSICS -- computed but value_correct=False ({len(rows)} rows; "
@@ -573,7 +655,8 @@ def format_report(summary: Dict[str, Any]) -> str:
             for s in row["slots"]
         )
         out.append(f"  {row['test_id']} {row['ranker']:<14}{row['model']:<16}"
-                   f"value={row['value']}{row['unit']} winner={row['winner_entity']} | {slots}")
+                   f"{str(row.get('host')):<18}value={row['value']}{row['unit']} "
+                   f"winner={row['winner_entity']} | {slots}")
     return "\n".join(out)
 
 

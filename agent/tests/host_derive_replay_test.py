@@ -48,7 +48,20 @@ def _page(url: str, text: str, page_id: str) -> dict:
 
 def _cell(test_id: str, pages, deliverable: str, *, model: str = "qwen2.5:7b",
           host: str = "sequential_react", arm_modules: str = "derive,answer_audit",
-          score: float = 1.0, infra_failed: bool = False, run_config: bool = True) -> dict:
+          score: float = 1.0, infra_failed: bool = False, run_config: bool = True,
+          pages_at: str = "output") -> dict:
+    """One stored cell. ``pages_at`` selects WHERE the fetched pages live:
+
+    ``"output"``          -- ``execution.output.pages[]`` (what ``langgraph_react`` writes);
+    ``"evidence_graph"``  -- ``execution.output.evidence_graph.pages[]`` (what
+                             ``sequential_react`` writes, leaving ``output.pages`` absent);
+    ``"both"``            -- both lists present, so the resolver's precedence is observable.
+    """
+    output: dict = {"final_deliverable": deliverable}
+    if pages_at in ("output", "both"):
+        output["pages"] = pages
+    if pages_at in ("evidence_graph", "both"):
+        output["evidence_graph"] = {"pages": pages, "nodes": []}
     return {
         "test_metadata": {"test_id": test_id},
         "model": model,
@@ -57,7 +70,7 @@ def _cell(test_id: str, pages, deliverable: str, *, model: str = "qwen2.5:7b",
                         "LEDGER_HOST_MODULES": arm_modules} if run_config else None),
         "infra_failed": infra_failed,
         "validation": {"overall_score": score},
-        "execution": {"output": {"pages": pages, "final_deliverable": deliverable}},
+        "execution": {"output": output},
     }
 
 
@@ -364,3 +377,142 @@ def test_main_rejects_an_unknown_ranker(results_dir: Path, tmp_path: Path):
     rc = HDR.main(["--prefixes", "synth", "--results-dir", str(results_dir),
                    "--out-dir", str(tmp_path / "x"), "--rankers", "magic"])
     assert rc == 2
+
+
+# ---------------------------------------------------------------------------------------------
+# page-source resolution (the §15 correction: sequential_react stores its pages under
+# execution.output.evidence_graph.pages[] and leaves execution.output.pages empty, so a reader
+# that only knows about output.pages classifies EVERY sequential_react cell as "no_pages")
+# ---------------------------------------------------------------------------------------------
+
+def test_cell_pages_prefers_output_pages():
+    pages = [_page("https://x/1", "t1", "p1")]
+    got, source = HDR.cell_pages(_cell("210", pages, "x", pages_at="output"))
+    assert got == pages
+    assert source == "output"
+
+
+def test_cell_pages_falls_back_to_the_evidence_graph():
+    pages = [_page("https://x/1", "t1", "p1")]
+    got, source = HDR.cell_pages(_cell("210", pages, "x", pages_at="evidence_graph"))
+    assert got == pages
+    assert source == "evidence_graph"
+
+
+def test_cell_pages_when_both_lists_exist_takes_output():
+    out_pages = [_page("https://x/out", "out", "p1")]
+    raw = _cell("210", out_pages, "x", pages_at="both")
+    raw["execution"]["output"]["evidence_graph"]["pages"] = [_page("https://x/eg", "eg", "p9")]
+    got, source = HDR.cell_pages(raw)
+    assert source == "output"
+    assert [p["url"] for p in got] == ["https://x/out"]
+
+
+def test_cell_pages_empty_output_list_still_falls_through():
+    """An empty ``output.pages`` list is the real sequential_react shape when the key is
+    present but unfilled -- it must NOT shadow the evidence-graph list."""
+    pages = [_page("https://x/1", "t1", "p1")]
+    raw = _cell("210", pages, "x", pages_at="evidence_graph")
+    raw["execution"]["output"]["pages"] = []
+    got, source = HDR.cell_pages(raw)
+    assert source == "evidence_graph" and got == pages
+
+
+def test_cell_pages_none_when_neither_list_has_anything():
+    assert HDR.cell_pages(_cell("210", [], "x")) == ([], "none")
+    assert HDR.cell_pages({}) == ([], "none")
+    raw = _cell("210", [], "x")
+    raw["execution"]["output"]["evidence_graph"] = None
+    assert HDR.cell_pages(raw) == ([], "none")
+
+
+def test_evidence_graph_and_output_pages_carry_the_same_fields():
+    """Both lists are ``{page_id, url, content_hash, chars, text}`` records, so the resolver
+    needs no key mapping; this pins that assumption in a test rather than in a comment."""
+    pages = [_page("https://x/1", "t1", "p1")]
+    out_keys = set(HDR.cell_pages(_cell("210", pages, "x", pages_at="output"))[0][0])
+    eg_keys = set(HDR.cell_pages(_cell("210", pages, "x", pages_at="evidence_graph"))[0][0])
+    assert out_keys == eg_keys
+    assert {"page_id", "url", "content_hash", "chars", "text"} <= out_keys
+
+
+def test_skip_reason_accepts_an_evidence_graph_only_cell():
+    pages = [_page("https://x/1", "t1", "p1")]
+    assert HDR.skip_reason(_cell("210", pages, "x", pages_at="evidence_graph")) is None
+    assert HDR.skip_reason(_cell("210", [], "x", pages_at="evidence_graph")) == "no_pages"
+
+
+@pytest.fixture()
+def mixed_results_dir(tmp_path: Path) -> Path:
+    """The same computable 210 cell stored three ways: langgraph-style (``output.pages``),
+    sequential-style (``evidence_graph.pages`` only) and a genuinely page-less cell."""
+    directory = tmp_path / "mixed"
+    directory.mkdir()
+    pages = [
+        _page("https://en.wikipedia.org/wiki/GRES-2_Power_Station", GRES2_PAGE, "p1"),
+        _page("https://en.wikipedia.org/wiki/Inco_Superstack", INCO_PAGE, "p2"),
+    ]
+    cells = {
+        "synth_a_210_qwen_langgraph_react_cfg1_r1.json":
+            _cell("210", pages, "38.7 m", host="langgraph_react", pages_at="output"),
+        "synth_b_210_qwen_sequential_react_cfg1_r1.json":
+            _cell("210", pages, "38.7 m", host="sequential_react", pages_at="evidence_graph"),
+        "synth_c_210_qwen_sequential_react_cfg1_r1.json":
+            _cell("210", [], "38.7 m", host="sequential_react", pages_at="output"),
+    }
+    for name, cell in cells.items():
+        (directory / name).write_text(json.dumps(cell), encoding="utf-8")
+    return directory
+
+
+def test_sequential_cell_is_replayed_not_skipped(mixed_results_dir: Path):
+    rows, skips = _replay(mixed_results_dir, rankers=("hand_rule",))
+    assert skips["replayed"] == 2
+    assert skips["no_pages"] == 1
+    by_host = {r["host"]: r for r in rows}
+    assert set(by_host) == {"langgraph_react", "sequential_react"}
+    for row in rows:
+        assert row["reason"] == "computed"
+        assert row["value"] == pytest.approx(M210.DERIVED, rel=M210.VALUE_TOL)
+        assert row["n_pages"] == 2
+
+
+def test_rows_record_the_page_source(mixed_results_dir: Path):
+    rows, _skips = _replay(mixed_results_dir, rankers=("hand_rule",))
+    assert {r["host"]: r["page_source"] for r in rows} == {
+        "langgraph_react": "output", "sequential_react": "evidence_graph"}
+
+
+def test_skip_table_counts_page_source(mixed_results_dir: Path):
+    _rows, skips = _replay(mixed_results_dir, rankers=("hand_rule",))
+    assert skips["pages_output"] == 1
+    assert skips["pages_evidence_graph"] == 1
+    assert skips["synth|pages_evidence_graph"] == 1
+
+
+def test_summary_skip_table_carries_page_source(mixed_results_dir: Path):
+    rows, skips = _replay(mixed_results_dir, rankers=("hand_rule",))
+    summary = HDR.build_summary(rows, skips=skips, prefixes=["synth"],
+                                ranker_names=["hand_rule"],
+                                results_dir=str(mixed_results_dir), out_dir="/dev/null",
+                                wall_seconds=1.0)
+    counts = summary["counts"]
+    assert counts["page_source"] == {"output": 1, "evidence_graph": 1}
+    assert counts["by_prefix"]["synth"]["pages_evidence_graph"] == 1
+    assert counts["by_prefix"]["synth"]["pages_output"] == 1
+    assert "page_source=" in HDR.format_report(summary)
+
+
+def test_summary_stratifies_by_host(mixed_results_dir: Path):
+    rows, skips = _replay(mixed_results_dir, rankers=("hand_rule",))
+    summary = HDR.build_summary(rows, skips=skips, prefixes=["synth"],
+                                ranker_names=["hand_rule"],
+                                results_dir=str(mixed_results_dir), out_dir="/dev/null",
+                                wall_seconds=1.0)
+    hosts = {"langgraph_react", "sequential_react"}
+    assert set(summary["availability"]["by_host"]["hand_rule"]) == hosts
+    assert set(summary["value_correct"]["by_host"]["hand_rule"]) == hosts
+    assert set(summary["operating_points"]["dev_derive_on_by_host"]["hand_rule"]) == hosts
+    for host in hosts:
+        assert summary["availability"]["by_host"]["hand_rule"][host]["computed"] == 1
+    assert "(g) PER-HOST" in HDR.format_report(summary)

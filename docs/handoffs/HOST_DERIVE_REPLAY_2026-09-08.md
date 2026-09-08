@@ -369,3 +369,197 @@ That is the branch §8 named in advance: with the mechanism now provably right o
 speaks about, the remaining shortfall is a page-coverage problem, and the next lever is the
 Phase-1 truncation fix (pages are stored as a 6000-char prefix) plus the availability ceilings in
 §5, rather than any further work on `host_derive`'s arithmetic.
+
+---
+
+# §15 Correction: sequential_react pages were never read — 2026-09-08
+
+## 15.1 What the earlier sections actually measured
+
+**Every number in §§1–14 is a `langgraph_react`-only number.** They were never a measurement of
+the replay corpus; they were a measurement of one of its two hosts, reported as if it were both.
+
+The cause is a single reader assumption in `scripts/host_derive_replay.py`. Cells store their
+fetched pages in one of two places:
+
+| host | `execution.output.pages[]` | `execution.output.evidence_graph.pages[]` |
+|---|---|---|
+| `langgraph_react` | populated | also populated (duplicate) |
+| `sequential_react` | **absent or empty** | populated |
+
+`skip_reason` (~:100) and `replay_cell` (~:153) read only `execution.output.pages`. Every
+`sequential_react` cell therefore fell into the `no_pages` bucket and was never replayed at all.
+It was not a silent mis-scoring — the cells were counted as skipped, and §1's headline
+"two thirds of the replay set has no pages to replay" is that bug reporting itself as a property
+of the corpus.
+
+The two page lists carry the **same record fields** — `page_id, url, content_hash, chars, text`
+(plus `stored_chars`, `truncated`) — verified across mint01/mint02/mint03/ladder03, so no key
+mapping was needed; the fix is purely a fall-through. Where both lists exist the `output` copy is
+taken, which is why every langgraph_react number below reproduces the pre-correction figure to
+the cell (see §15.4: BEFORE `dev_derive_on` n=156 ≡ AFTER `langgraph_react` n=156, accepted 8 ≡ 8).
+
+**Fix.** A `cell_pages(raw) -> (pages, source)` resolver with precedence
+`output.pages` (non-empty) → `evidence_graph.pages` (non-empty) → `([], "none")`. `page_source`
+(`"output"` | `"evidence_graph"` | `"none"`) is now recorded on every JSONL row, in the summary's
+skip table (pooled and per campaign), in the report header, and as an `availability.by_page_source`
+stratum. Host stratification (`availability.by_host`, `value_correct.by_host`,
+`operating_points.dev_derive_on_by_host` / `all_by_host`, report section `(g)`) was added at the
+same time, because before the fix "pooled" and "langgraph" were the same set of rows and the
+distinction could not be drawn.
+
+## 15.2 New denominators
+
+`--prefixes mint01,mint02,ladder03` (mint03 deliberately excluded: its campaign was still landing
+cells). 768 files either way; **replayed cells 284 → 502 (+218, +76.8%)**, rows 568 → 1004.
+
+| campaign | files | replayed before | replayed after | src `output` | src `evidence_graph` | `no_pages` before → after |
+|---|---|---|---|---|---|---|
+| mint01 | 144 | 48 | **102** | 48 | 54 | 96 → 42 |
+| mint02 | 192 | 67 | **143** | 67 | 76 | 125 → 49 |
+| ladder03 | 432 | 169 | **257** | 169 | 88 | 258 → 170 |
+| **total** | **768** | **284** | **502** | **284** | **218** | **479 → 261** |
+
+By host, after: `langgraph_react` 284 cells (all `page_source=output`), `sequential_react` 218
+cells (all `page_source=evidence_graph`). `infra_failed` 5, `no_run_config` 0, unchanged.
+Wall time 26.1s → 52.5s (the work roughly doubled with the cell count).
+
+## 15.3 Before → after on every headline
+
+Availability (`computed` / all replayed rows in the stratum):
+
+| metric | before (langgraph only) | after (both hosts) |
+|---|---|---|
+| pooled, `hand_rule` | 113/284 = 39.8% | 197/502 = **39.2%** |
+| derive-on, `hand_rule` | 80/192 = 41.7% | 164/410 = **40.0%** |
+| pooled, `document_order` | 111/284 = 39.1% | 204/502 = **40.6%** |
+| derive-on, `document_order` | 78/192 = 40.6% | 171/410 = **41.7%** |
+
+Availability, derive-on, split by host (the stratification the earlier run could not do):
+
+| ranker | host | availability | `value_correct` |
+|---|---|---|---|
+| `hand_rule` | `langgraph_react` | 80/192 = **41.7%** | 80/80 = **100.0%** |
+| `hand_rule` | `sequential_react` | 84/218 = **38.5%** | 81/84 = **96.4%** |
+| `document_order` | `langgraph_react` | 78/192 = 40.6% | 24/78 = 30.8% |
+| `document_order` | `sequential_react` | 93/218 = 42.7% | 30/93 = 32.3% |
+
+`host_value_correct` pooled (correct / assessed):
+
+| ranker | before | after | langgraph | sequential |
+|---|---|---|---|---|
+| `hand_rule` | 113/113 = 100.0% | **194/197 = 98.5%** | 113/113 = 100.0% | 81/84 = 96.4% |
+| `document_order` | 34/111 = 30.6% | **64/204 = 31.4%** | 34/111 = 30.6% | 30/93 = 32.3% |
+
+The `document_order` control still fails ~2 answers in 3 at ~the same availability, on the
+enlarged set and independently on each host: the hand rule's correctness is a property of the
+**ranking**, not of the corpus it was first measured on. That is the one §14 conclusion the
+correction strengthens rather than qualifies.
+
+`host_vs_chain`, dev split, derive-on (coverage / risk / Clopper-Pearson 95% upper):
+
+| ranker · signal | before (n=156) | after (n=335) |
+|---|---|---|
+| `hand_rule` `host_certified` | 8 · 5.1% · 0.0% / **36.9%** | 30 · **9.0%** · 0.0% / **11.6%** |
+| `hand_rule` `availability_only` | 69 · 44.2% · 43.5% / 56.0% | 141 · 42.1% · **36.9%** / 45.4% |
+| `hand_rule` `chain_certified` | 11 · 7.1% · 0.0% / 28.5% | 25 · 7.5% · **4.0%** / 20.4% |
+| `hand_rule` `union` | 19 · 12.2% · 0.0% / 17.6% | 48 · **14.3%** · **2.1%** / 11.1% |
+| `hand_rule` `intersection` | 0 · 0.0% · n/a | 7 · 2.1% · 0.0% / 41.0% |
+| `document_order` `host_certified` | 4 · 2.6% · 0.0% / 60.2% | 11 · 3.3% · 0.0% / 28.5% |
+| `document_order` `availability_only` | 67 · 42.9% · 58.2% / 70.2% | 148 · 44.2% · 50.0% / 58.3% |
+| `document_order` `union` | 15 · 9.6% · 0.0% / 21.8% | 33 · 9.9% · 3.0% / 15.8% |
+
+The **availability-only baseline** is the clearest single before→after: its measured risk moves
+36.9% (hand_rule) / 50.0% (document_order) at ~the same coverage, so the certification filter is
+still doing all of the risk work — but two "0.0% risk" claims at n=8 and n=19 have become **2.1%
+risk at n=48** for `union`. The pre-correction zeros were small-n artefacts; the CP upper bound
+was already saying so (17.6% → 11.1%), and the correction is what let it tighten.
+
+Per-host operating points, dev derive-on, `hand_rule` (the row that could not be written before):
+
+| host | signal | n | accepted | coverage | risk | CP upper |
+|---|---|---|---|---|---|---|
+| `langgraph_react` | `host_certified` | 156 | 8 | 5.1% | 0.0% | 36.9% |
+| `langgraph_react` | `union` | 156 | 19 | 12.2% | 0.0% | 17.6% |
+| `sequential_react` | `host_certified` | 179 | 22 | **12.3%** | 0.0% | **15.4%** |
+| `sequential_react` | `union` | 179 | 29 | 16.2% | 3.4% | 17.8% |
+| `sequential_react` | `chain_certified` | 179 | 14 | 7.8% | 7.1% | 33.9% |
+
+`sequential_react` is the **stronger** host for the mechanism — 12.3% certified coverage against
+langgraph's 5.1%, at a tighter bound — which is the opposite of what a reader of §§1–14 would have
+assumed, and it was invisible for as long as those cells were being skipped.
+
+Sealed holdout readout (213/217/221), reported not decided on: `hand_rule` `host_certified`
+0/36 → **6/75 (8.0%, risk 0.0%, CP ≤45.9%)**; `union` 3/36 (8.3%) → 11/75 (14.7%, risk 0.0%,
+CP ≤28.5%); `availability_only` 30.6% coverage at 9.1% risk → 30.7% at 4.3%. The holdout block
+was previously 36 rows and is now 75; its `host_certified` cell was empty before and is not now.
+
+## 15.4 Does the 2e verdict still hold?
+
+Pre-declared: **availability ≥ 40% on the derive-on stratum** and **`value_correct` ≥ 0.8**.
+
+| stratum | availability (derive-on) | `value_correct` | verdict |
+|---|---|---|---|
+| full set, `hand_rule` | 40.0% | 98.5% | **PASS** (availability on the line, as in §14) |
+| `langgraph_react` | 41.7% | 100.0% | **PASS** |
+| `sequential_react` | 38.5% | 96.4% | availability **MISS by 1.5pp**; correctness PASS |
+
+So: the verdict **holds pooled and holds on langgraph, and misses the availability threshold on
+sequential_react alone**, by 3 cells (84/218; 88/218 would clear it). Correctness is comfortably
+over the bar on both hosts and the primary claim — the hand rule computes the right number when
+it computes one — survives the ~76% enlargement of the evidence base, dropping only from 100.0%
+to 98.5%. §14's "treat 2e as passed on the derive-on stratum and proceed to mint03" is not
+overturned; it now rests on 410 derive-on rows instead of 192, and it carries an explicit caveat
+that one host sits just under the availability line.
+
+The pooled availability being *flat* across a 76% increase in cells (39.8% → 39.2%) is itself the
+useful finding: availability is a property of the mechanism's coverage ceilings (§5) and of page
+coverage, not of the host, and the earlier estimate was — by luck — not biased.
+
+## 15.5 New failure family among the newly-included rows
+
+Forensics rows 77 → 143. Restricted to the newly-visible `page_source=evidence_graph` rows under
+`hand_rule`, there are **exactly 3** computed-but-wrong rows (all listed; the cap of 40 is not
+reached), and they split into two families that the langgraph-only set contained **zero** of:
+
+| test | model | value | winner | operand slots |
+|---|---|---|---|---|
+| 211 | `openai/gpt-4.1-nano` | 2215.4 m | — | Lake Baikal ← `Average depth` = 744.4 m [selected]; Lake Tanganyika ← `and a maximum depth of` = 1,471 m [selected] |
+| 218 | `qwen2.5:1.5b` | 0.003484 | Yangtze | Mekong ← [no_candidate_page] ×2; Yangtze ← Length 6,300 km, Basin size 1,808,500 km [selected]; Nile ← [no_candidate_page] ×2; Mississippi ← [no_candidate_page] ×2; Amazon ← Length 6,575 km, Basin size 6,925,674 km [selected] |
+| 218 | `qwen2.5:7b` | 0.003484 | Yangtze | Mekong ← [no_candidate_page] ×2; Yangtze ← selected; Nile ← Length 7,088 km, Basin size 2,927,843 km [selected]; Mississippi ← [no_candidate_page] ×2; Amazon ← [no_candidate_page] ×2 |
+
+**Family A — heterogeneous field phrase across operand slots (211).** The ranker filled slot 1
+from an `Average depth` row and slot 2 from a `maximum depth` row and subtracted them. Each slot
+is individually well-supported; the *pair* is not comparable. This is a same-field consistency
+check the hand rule does not currently make, and it is distinct from the `unit_mismatch` reason
+(the units agreed — both metres). It is the arithmetic analogue of the
+`unit_inconsistent_across_entities` guard that already exists for argmax.
+
+**Family B — partial-roster argmax (218, ×2).** The mandate names five rivers; the run fetched
+pages for two or three of them, and `host_derive` computed the argmax over the entities it *could*
+resolve, returning Yangtze — a confident winner over a roster that silently excluded the true one
+(Mekong, `no_candidate_page` in both cells). The slot reasons record the omission exactly, so the
+information needed to decline is present and unused. An argmax whose roster is incomplete should
+refuse (a new `incomplete_roster` reason) rather than mint a winner; on these two cells that
+converts 2 wrong answers into 2 abstentions at zero cost to the correct ones.
+
+Both families are **argmax/consistency gaps in the mechanism, not page-source artefacts** — they
+are visible now only because these cells were previously skipped. Neither is a regression: the
+langgraph rows behave exactly as §§9–14 recorded. Under `document_order` the same newly-included
+rows produce 63 wrong values (tests 215/216/211/218), consistent with that control's ~31%
+correctness everywhere and not a separate finding.
+
+Non-`computed` reasons among the new `hand_rule` rows, for completeness: `operand_not_found` 93,
+`computed` 84, `unit_inconsistent_across_entities` 31, `unit_mismatch` 10 — the same reason
+profile §5 documented for langgraph, which is further evidence the two hosts differ in coverage,
+not in kind.
+
+## 15.6 Files
+
+- `scripts/host_derive_replay.py` — `cell_pages` resolver, `page_source` on rows/summary/report,
+  `by_host` / `by_page_source` strata, report section `(g)`.
+- `agent/tests/host_derive_replay_test.py` — 12 new tests (36 total, all passing): both resolver
+  branches, `both`-lists precedence, empty-`output.pages` fall-through, field-set equality of the
+  two lists, `skip_reason` on an evidence-graph-only cell, and the page-source / host tables.
+- `agent/idea_test_results/host_derive_replay/{rows.jsonl,summary.json,report.txt}` — overwritten
+  with the corrected run (502 cells, 1004 rows, 52.5s, $0, offline).
