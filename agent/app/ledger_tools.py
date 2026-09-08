@@ -25,17 +25,25 @@ so a ReAct loop, a DAG engine or a plain script can bind it the same way.
 """
 from __future__ import annotations
 
+import dataclasses
 import math
 import re
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+from urllib.parse import unquote, urlparse
 
 from agent.app.answer_numbers import (extract_answer_numbers, is_trivial_number,
                                       mandate_demanded_operation, operation_appropriateness)
+from agent.app.mandate_slots import parse_slots
+# `_significant_tokens` / `_tokens` are private to `operand_attribution` on purpose (they are not
+# part of the ranker's contract), but "which tokens identify an entity" must mean ONE thing across
+# the ranker and the page filter that feeds it -- a second definition here would be a second thing
+# to keep in sync. Same borrowing `mandate_slots` does from `candidate_coverage`.
+from agent.app.operand_attribution import _significant_tokens, _tokens, default_ranker
 from agent.app.quantity_index import build_index, lookup, render_index
 from agent.app.testing.evidence_graph import (KIND_DERIVED, DerivationError, EvidenceGraph,
-                                              UnknownOperation, WrongArity, _numbers_agree,
-                                              canonical_unit, extract_unit, numeric_value,
-                                              parse_quantity, verify_value)
+                                              UnitMismatch, UnknownOperation, WrongArity,
+                                              _numbers_agree, canonical_unit, extract_unit,
+                                              numeric_value, parse_quantity, verify_value)
 
 
 class OperandNotOnPage(DerivationError):
@@ -72,6 +80,63 @@ SHAPE_DERIVE_TAG = "shape_derive"
 #: keeps a large index (a model that revisited the same handful of pages many times) from turning
 #: this method into an O(n^2) scan with no shape at all to show for it.
 SHAPE_DERIVE_MAX_CANDIDATES = 40
+
+#: Provenance tag stamped on every node minted by :meth:`LedgerToolkit.host_derive`. A FOURTH tag
+#: alongside :data:`ANSWER_AUDIT_TAG` / :data:`SHAPE_DERIVE_TAG` because the question it answers is
+#: different again: those two start from what the ANSWER said and ask whether the pages back it,
+#: while ``host_derive`` never reads the answer at all -- it starts from the MANDATE and computes
+#: what the task asked for, so its nodes are the only ones on the artifact that exist independently
+#: of anything the model produced.
+HOST_DERIVE_TAG = "host_derive"
+
+#: Score an operand candidate must reach before :meth:`LedgerToolkit.host_derive` will use it.
+#:
+#: Calibrated against the shipped hand rule's own arithmetic (``agent/app/operand_attribution.py``:
+#: ``sigmoid(-2 + 4*label_token_overlap + 2*entity_in_window + 1*is_infobox + 1.5*unit_hint_match
+#: - 3*is_trivial_bare_int)``), not tuned on outcomes:
+#:
+#: * the highest score reachable with ``label_token_overlap == 0`` -- every structural feature
+#:   firing and no label evidence at all -- is ``sigmoid(2.5) = 0.9241``;
+#: * the lowest score a candidate WITH label evidence gets once any two of the three structural
+#:   features fire is ``sigmoid(3.0) = 0.9526`` (``overlap 0.5`` + window + infobox).
+#:
+#: 0.93 sits in that gap, so the rule this floor enforces is exactly "an entry whose label says
+#: nothing about the field the slot asks for is never an operand". That is deliberately biased
+#: toward refusing: the ranker's known failure shape is an UNLABELLED entry (a prose number, whose
+#: ``label`` is ``""`` by construction) winning a page on structure alone, and a wrong operand
+#: recomputes into a confidently wrong number carrying full provenance -- the one outcome this
+#: module exists to prevent -- while a refusal is merely a slot the host could not fill.
+#:
+#: It is a floor on THIS ranker's scale. :class:`~agent.app.operand_attribution.DocumentOrderRanker`
+#: scores a constant 0.5 by design, so the replay's ablation arm passes ``min_score=0.0`` with it.
+_HOST_DERIVE_MIN_SCORE = 0.93
+
+#: How much of a page's lead text is searched for the slot entity when its URL slug does not name
+#: it (the flattened corpus pages open with the article title and first sentence).
+_HOST_DERIVE_PREFIX_CHARS = 300
+
+#: The per-entity formula an argmax mandate states once in prose ("its ASPECT RATIO = height /
+#: width", "... DENSITY = length in METRES divided by basin area in km^2"). Bounded, single-line
+#: and stopping at the first "(" so the parenthetical that follows every one of these ("(convert km
+#: to m first ...)", "(no page prints this ...)") is never read as part of an operand phrase.
+_ARGMAX_FORMULA_RE = re.compile(r"=\s*(?P<body>[^=\n(]{3,160})")
+
+#: "ratio of X to Y" -- the same formula written without an "=" sign.
+_ARGMAX_RATIO_OF_RE = re.compile(r"\bratio\s+of\s+(?P<num>[^\n(]{2,80}?)\s+to\s+"
+                                 r"(?P<den>[^\n(.]{2,80}?)\s*(?:[.,(]|$)", re.IGNORECASE)
+
+#: The division the formula body spells, in priority order: the spelled-out forms are tried before
+#: the bare "/" so "length in METRES divided by basin area" splits on the phrase, not on nothing.
+_ARGMAX_DIVIDERS = (re.compile(r"\bdivided\s+by\b", re.IGNORECASE),
+                    re.compile(r"\s*/\s*"),
+                    re.compile(r"\bper\b", re.IGNORECASE))
+
+#: Which end of the computed quantity the mandate asks for. The FIRST cue in the text wins: every
+#: one of 218-221 states its own direction ("the HIGHEST ...") before the distractor sentence that
+#: names the other extreme ("nor the one with the largest drainage basin").
+_ARGMAX_DIRECTION_CUES = re.compile(
+    r"\b(?P<max>highest|largest|greatest|maximum)\b|\b(?P<min>smallest|lowest|least|minimum)\b",
+    re.IGNORECASE)
 
 #: Relative tolerance for matching an ANSWER's number against the run's quantity index / a
 #: mechanical derivation. Separate from ``evidence_graph.ARITH_RELATIVE_TOLERANCE`` (``1e-6``,
@@ -216,6 +281,61 @@ def _quote_for_span(page_text: str, start: int, end: int, *, max_chars: int = _M
     if line and len(line) <= max_chars:
         return line
     return span
+
+
+#: Cap on an operand phrase read out of an argmax formula. Wide enough for "basin area in km^2",
+#: far narrower than a whole mandate line, so a runaway regex match cannot become a "field phrase".
+_MAX_OPERAND_PHRASE_CHARS = 120
+
+
+def _clean_operand_phrase(text: Any) -> str:
+    """One side of a formula as a field phrase: whitespace collapsed, leading determiner and
+    trailing sentence punctuation dropped, length capped."""
+    phrase = re.sub(r"\s+", " ", str(text or "")).strip().strip(" .,;:")
+    phrase = re.sub(r"^(?:the|its|their|each|a|an)\s+", "", phrase, flags=re.IGNORECASE)
+    return phrase[:_MAX_OPERAND_PHRASE_CHARS].strip()
+
+
+def _parse_argmax_formula(mandate: Any) -> Optional[Tuple[str, str]]:
+    """The ``(numerator phrase, denominator phrase)`` an argmax mandate states in prose, or None.
+
+    218-221 each name the per-entity quantity once, as an equation ("its SPAN FRACTION = longest
+    span / total length") whose two sides are the two operand fields every entity is looked up for.
+    This reads that equation and nothing else: no inference from the task's title, no guess at
+    which two numbers "probably" combine. A mandate that states no formula returns ``None``, which
+    :meth:`LedgerToolkit.host_derive` reports as ``argmax_formula_unparsed`` rather than deriving
+    something nobody asked for.
+
+    :param mandate: the task statement.
+    :returns: two non-empty phrases, or ``None`` when no division is spelled out.
+    :raises: nothing.
+    """
+    text = str(mandate or "")
+    for match in _ARGMAX_FORMULA_RE.finditer(text):
+        body = match.group("body")
+        for divider in _ARGMAX_DIVIDERS:
+            parts = divider.split(body, maxsplit=1)
+            if len(parts) != 2:
+                continue
+            numerator, denominator = (_clean_operand_phrase(p) for p in parts)
+            if numerator and denominator:
+                return numerator, denominator
+    match = _ARGMAX_RATIO_OF_RE.search(text)
+    if match:
+        numerator = _clean_operand_phrase(match.group("num"))
+        denominator = _clean_operand_phrase(match.group("den"))
+        if numerator and denominator:
+            return numerator, denominator
+    return None
+
+
+def _argmax_mode(mandate: Any) -> Optional[str]:
+    """``"max"`` / ``"min"`` from the mandate's own direction cue, or ``None`` when it states
+    neither (a bare "which of these ..." selection, which names no extreme to compute)."""
+    match = _ARGMAX_DIRECTION_CUES.search(str(mandate or ""))
+    if not match:
+        return None
+    return "max" if match.group("max") else "min"
 
 
 class LedgerToolkit:
@@ -455,17 +575,19 @@ class LedgerToolkit:
             return False
         return canonical_unit(answer_text) == canonical_unit(entry_text)
 
-    def _mint_source_from_entry(self, page_id: str, entry: Any) -> Optional[Any]:
+    def _mint_source_from_entry(self, page_id: str, entry: Any, *,
+                                minted_by: str = ANSWER_AUDIT_TAG) -> Optional[Any]:
         """A SOURCE node for a quantity-index ``entry``, minted exactly like :meth:`_locate`'s
         ``q``-id path (quote via :func:`_quote_for_span`, unit as the page wrote it), tagged
-        :data:`ANSWER_AUDIT_TAG`. Shared by both the direct-match and the two-operand-derivation
-        halves of :meth:`audit_answer` so a page's SOURCE node has exactly one minting recipe.
+        ``minted_by``. Shared by both the direct-match and the two-operand-derivation halves of
+        :meth:`audit_answer` (and by :meth:`host_derive`, which passes its own tag) so a page's
+        SOURCE node has exactly one minting recipe.
         """
         page = self._graph.page(page_id)
         page_text = str((page or {}).get("text") or "")
         quote = _quote_for_span(page_text, entry.start, entry.end)
         return self._graph.add_source(page_id, entry.value, quote=quote, unit=entry.unit or None,
-                                      minted_by=ANSWER_AUDIT_TAG)
+                                      minted_by=minted_by)
 
     def _find_backed_match(self, target: float, answer_unit: str):
         """The first index entry that numerically matches ``target`` with a NOT-``False`` unit
@@ -957,6 +1079,336 @@ class LedgerToolkit:
             # (None, not a guessed False) when the failure happened before a real search ran.
             if not result["reason"]:
                 result["reason"] = "error"
+            return result
+
+    # -- host_derive: the arithmetic the MANDATE asked for, computed by the host ----------------
+
+    def _host_derive_page(self, page_id: str) -> Tuple[str, str]:
+        """``(url, stored text)`` for ``page_id``. The text is the graph's stored WINDOW, the same
+        copy :func:`_quote_for_span` quotes from, so a quote and an offset never disagree."""
+        page = self._graph.page(page_id) or {}
+        return str(page.get("url") or ""), str(page.get("text") or "")
+
+    def _host_derive_candidate_pages(self, entity: str) -> List[str]:
+        """The registered pages most likely to be ABOUT ``entity``, or all of them.
+
+        A run fetches every entity's page into ONE toolkit, so ranking a slot over the whole index
+        would let Lake Tanganyika's depth answer for Lake Baikal's. The filter is deliberately
+        soft: pages are scored by the fraction of the entity's identifying tokens their URL slug or
+        their lead text carries, and every page tied at the best NON-ZERO score is kept -- an
+        entity named on two pages (an article and a list page) keeps both and lets the ranker
+        choose. When no page names the entity at all the filter abstains and returns everything,
+        because a wrong filter that silently empties the candidate set would refuse a slot the
+        ranker could still have resolved.
+
+        :param entity: the slot's entity name.
+        :returns: page ids, in registration order; never empty when any page is registered.
+        """
+        page_ids = list(self._indexes)
+        wanted = _significant_tokens(entity)
+        if not wanted or not page_ids:
+            return page_ids
+        coverage: Dict[str, float] = {}
+        for page_id in page_ids:
+            url, text = self._host_derive_page(page_id)
+            slug = unquote(urlparse(url).path).rsplit("/", 1)[-1].replace("_", " ")
+            slug_tokens = set(_tokens(slug))
+            lead_tokens = set(_tokens(text[:_HOST_DERIVE_PREFIX_CHARS]))
+            coverage[page_id] = max(len(wanted & slug_tokens),
+                                    len(wanted & lead_tokens)) / len(wanted)
+        best = max(coverage.values())
+        if best <= 0:
+            return page_ids
+        return [page_id for page_id in page_ids if coverage[page_id] >= best]
+
+    def _host_derive_rank(self, slot: Any, page_ids: Sequence[str],
+                          ranker: Any) -> List[Tuple[float, str, Any]]:
+        """``[(score, page_id, entry)]`` best-first over every candidate page's index entries.
+
+        Ranked per page (the ranker needs that page's own URL and text for its structural
+        features) and merged; ties keep page-registration then document order, so the whole
+        selection is deterministic.
+        """
+        ranked: List[Tuple[float, Tuple[int, int], str, Any]] = []
+        for order, page_id in enumerate(page_ids):
+            url, text = self._host_derive_page(page_id)
+            entries = self._indexes.get(page_id) or []
+            scored = ranker.rank(slot, entries, page_url=url, page_text=text)
+            for position, (score, entry) in enumerate(scored):
+                ranked.append((float(score), (order, position), page_id, entry))
+        ranked.sort(key=lambda item: (-item[0], item[1]))
+        return [(score, page_id, entry) for score, _, page_id, entry in ranked]
+
+    def _host_derive_select(self, slot: Any, phrase: str, ranker: Any, min_score: float,
+                            taken: set) -> Tuple[Dict[str, Any], Optional[Tuple[str, Any]]]:
+        """Pick one operand for ``slot`` read under ``phrase``, honouring the exclusion set.
+
+        :param slot: a :class:`~agent.app.mandate_slots.Slot`.
+        :param phrase: the field phrase to rank under -- ``slot.field_phrase`` for a two-operand
+            mandate, or one side of an argmax formula.
+        :param ranker: any :class:`~agent.app.operand_attribution.OperandRanker`-shaped object.
+        :param min_score: the floor a candidate must reach; see :data:`_HOST_DERIVE_MIN_SCORE`.
+        :param taken: ``(page_id, start, end)`` spans already used by another slot. MUTATED on a
+            successful selection -- this is what stops two slots reading the same number twice.
+        :returns: ``(row, (page_id, entry) or None)``. The row always reports the best candidate's
+            page and score (so a refusal shows how close it came), but carries ``entry`` only when
+            the candidate was actually selected.
+        """
+        probe = slot if phrase == getattr(slot, "field_phrase", None) else dataclasses.replace(
+            slot, field_phrase=phrase)
+        row: Dict[str, Any] = {
+            "index": int(getattr(slot, "index", 0)), "entity": str(getattr(slot, "entity", "")),
+            "field_phrase": str(phrase), "page_id": None, "url": None, "entry": None,
+            "score": None, "reason": "no_candidate_page",
+        }
+        ranked = self._host_derive_rank(probe, self._host_derive_candidate_pages(row["entity"]),
+                                        ranker)
+        available = [cand for cand in ranked
+                     if (cand[1], cand[2].start, cand[2].end) not in taken]
+        if not available:
+            # "nothing to rank" and "everything was already spoken for" are different refusals.
+            row["reason"] = "excluded_duplicate" if ranked else "no_candidate_page"
+            return row, None
+        score, page_id, entry = available[0]
+        row.update(page_id=page_id, url=self._host_derive_page(page_id)[0], score=float(score))
+        if score < min_score:
+            row["reason"] = "below_min_score"
+            return row, None
+        row["entry"] = {"label": entry.label, "value": entry.value, "unit": entry.unit,
+                        "start": int(entry.start), "end": int(entry.end), "source": entry.source}
+        row["reason"] = "selected"
+        taken.add((page_id, entry.start, entry.end))
+        return row, (page_id, entry)
+
+    def _host_derive_compatible(self, operation: str, unit_a: str, unit_b: str) -> bool:
+        """The existing per-op unit rule :meth:`audit_answer` uses, applied to a host-picked pair."""
+        if operation in ("sum", "difference"):
+            return self._compat_diff_sum(unit_a, unit_b)
+        if operation in ("quotient", "ratio"):
+            return self._compat_quotient(unit_a, unit_b)
+        return False
+
+    def _host_derive_two_operand(self, result: Dict[str, Any], slots: List[Any], operation: str,
+                                 absolute: bool, ranker: Any, min_score: float) -> Dict[str, Any]:
+        """The 210-217 shape: two slots, one operation, one DERIVED node."""
+        taken: set = set()
+        rows: List[Dict[str, Any]] = []
+        chosen: List[Optional[Tuple[str, Any]]] = []
+        # Only the first two slots: every operation this path handles is binary, so a third slot
+        # would have no argument position to occupy.
+        for slot in slots[:2]:
+            row, picked = self._host_derive_select(slot, slot.field_phrase, ranker, min_score,
+                                                   taken)
+            rows.append(row)
+            chosen.append(picked)
+        result["slots"] = rows
+        if any(picked is None for picked in chosen):
+            result["reason"] = "operand_not_found"
+            return result
+
+        operands = [picked for picked in chosen if picked is not None]
+        if absolute and operation == "difference":
+            # Mint larger-first so the NODE ITSELF carries the absolute difference the mandate
+            # asked for, rather than a signed value this method then reports the modulus of.
+            # Same recipe `shape_derive_check` uses for its own absolute-difference candidates.
+            values = [self._entry_numeric(entry) for _, entry in operands]
+            if None not in values and values[0] < values[1]:
+                operands.reverse()
+        nodes = [self._mint_source_from_entry(page_id, entry, minted_by=HOST_DERIVE_TAG)
+                 for page_id, entry in operands]
+        if any(node is None for node in nodes):
+            result["reason"] = "operand_not_found"
+            return result
+
+        node_ids = [node.id for node in nodes]
+        units = [entry.unit for _, entry in operands]
+        if not self._host_derive_compatible(operation, units[0], units[1]):
+            self._graph.record_refusal(operation, node_ids, UnitMismatch(
+                f"incompatible units for {operation}: {units[0]!r} and {units[1]!r}"))
+            result["reason"] = "unit_mismatch"
+            return result
+        try:
+            derived = self._graph.add_arith(operation, node_ids, minted_by=HOST_DERIVE_TAG)
+        except DerivationError as exc:
+            self._graph.record_refusal(operation, node_ids, exc)
+            result["reason"] = "unit_mismatch" if isinstance(exc, UnitMismatch) else "error"
+            return result
+
+        value = numeric_value(derived.value, derived.unit)
+        result.update(reason="computed", node_id=derived.id, value_text=derived.value,
+                      unit=derived.unit or "",
+                      value=abs(value) if (absolute and value is not None) else value)
+        return result
+
+    def _host_derive_argmax(self, result: Dict[str, Any], slots: List[Any], mandate: Any,
+                            ranker: Any, min_score: float) -> Dict[str, Any]:
+        """The 218-221 shape: one ratio per entity, then a max/min over the ratios."""
+        formula = _parse_argmax_formula(mandate)
+        if formula is None:
+            result["reason"] = "argmax_formula_unparsed"
+            return result
+        mode = _argmax_mode(mandate)
+        if mode is None:
+            result["reason"] = "no_unambiguous_shape"
+            return result
+        numerator_phrase, denominator_phrase = formula
+        result["operation"] = "ratio"
+        result["mode"] = mode
+
+        taken: set = set()
+        rows: List[Dict[str, Any]] = []
+        ratios: List[Tuple[Any, Any]] = []
+        unit_pairs: set = set()
+        for slot in slots:
+            numerator_row, numerator = self._host_derive_select(slot, numerator_phrase, ranker,
+                                                                min_score, taken)
+            denominator_row, denominator = self._host_derive_select(slot, denominator_phrase,
+                                                                    ranker, min_score, taken)
+            rows.extend((numerator_row, denominator_row))
+            if numerator is None or denominator is None:
+                continue  # an entity nobody read both numbers for simply does not compete
+            nodes = [self._mint_source_from_entry(page_id, entry, minted_by=HOST_DERIVE_TAG)
+                     for page_id, entry in (numerator, denominator)]
+            if any(node is None for node in nodes):
+                continue
+            unit_pairs.add((canonical_unit(numerator[1].unit),
+                            canonical_unit(denominator[1].unit)))
+            try:
+                ratios.append((slot, self._graph.add_arith("ratio", [node.id for node in nodes],
+                                                           minted_by=HOST_DERIVE_TAG)))
+            except DerivationError as exc:
+                self._graph.record_refusal("ratio", [node.id for node in nodes], exc)
+        result["slots"] = rows
+
+        ratio_ids = [node.id for _, node in ratios]
+        if len(unit_pairs) > 1:
+            # No conversion, by design (`docs/LEDGER_PLAN_2026-09-01.md` section 7): a metres-per-
+            # floor and a feet-per-floor ratio are not comparable, and rescaling one to compare
+            # them is exactly the silent step this module refuses to take.
+            self._graph.record_refusal("ratio", ratio_ids, UnitMismatch(
+                f"per-entity ratios carry different units: {sorted(unit_pairs)}"))
+            result["reason"] = "unit_inconsistent_across_entities"
+            return result
+        if len(ratios) < 2:
+            result["reason"] = "operand_not_found"
+            return result
+
+        known_ids = {node.id for node in self._graph.nodes()}
+        try:
+            extremum = self._graph.add_extremum(ratio_ids, mode)
+        except DerivationError as exc:
+            self._graph.record_refusal(mode, ratio_ids, exc)
+            result["reason"] = ("unit_inconsistent_across_entities"
+                                if isinstance(exc, UnitMismatch) else "error")
+            return result
+        if extremum.id not in known_ids:
+            # `add_extremum` is the one minting entry point with no `minted_by=` kwarg (its
+            # `add_arith` / `add_derived` siblings have one) and `evidence_graph.py` is outside
+            # this change's scope, so the tag is stamped onto the node this call just created --
+            # guarded on the id being NEW, so a node that already existed keeps the provenance of
+            # whoever minted it first, exactly as `add_derived`'s own dedup rule promises.
+            object.__setattr__(extremum, "minted_by", HOST_DERIVE_TAG)
+
+        # `add_extremum` reports the winning VALUE, not which input won, so the entity is recovered
+        # by matching that value back to the ratio node that carries it. First match wins, which is
+        # the same tie-break `max()` / `min()` applied to pick it.
+        winner = next((slot for slot, node in ratios if node.value == extremum.value), None)
+        result.update(reason="computed", node_id=extremum.id, value_text=extremum.value,
+                      unit=extremum.unit or "",
+                      value=numeric_value(extremum.value, extremum.unit),
+                      winner_entity=getattr(winner, "entity", None))
+        return result
+
+    def host_derive(self, mandate: Any, *, ranker: Any = None,
+                    min_score: float = _HOST_DERIVE_MIN_SCORE) -> Dict[str, Any]:
+        """Compute the arithmetic ``mandate`` demands, from pages this run already registered.
+
+        The model-facing surface is untouched: no prompt line, no tool, no observation, no change
+        to :meth:`derive`. This is a finish-time HOST hook -- it reads the mandate and the pages,
+        never the answer -- so what it produces is independent of anything the model said, which is
+        what makes it usable as a check ON the model rather than a restatement of it.
+
+        Three parsers supply the shape, and each of them refuses rather than guesses:
+
+        * :func:`~agent.app.mandate_slots.parse_slots` -- the ``(entity, field phrase)`` operand
+          slots the mandate enumerates;
+        * :func:`~agent.app.answer_numbers.mandate_demanded_operation` -- which ONE two-operand
+          operation the mandate's cue phrasing names, or its deliberate ``argmax_phrasing``
+          answer for a "which of these five has the highest ..." selection;
+        * :func:`_parse_argmax_formula` -- for that argmax shape only, the per-entity division the
+          mandate spells out once in prose.
+
+        Operands are chosen by an explicit ranker (:mod:`agent.app.operand_attribution`) over the
+        quantity index of the pages that name the slot's entity, subject to two rules that make a
+        wrong operand a refusal instead of a confident number: a floor on the ranker's score
+        (:data:`_HOST_DERIVE_MIN_SCORE`), and an exclusion set of ``(page_id, start, end)`` spans
+        so two slots can never read the SAME number twice -- keyed on the span rather than the
+        entity, because 215/216 ask two different fields of ONE entity.
+
+        Everything minted is tagged :data:`HOST_DERIVE_TAG`: a SOURCE node per operand (quote and
+        page-written unit via :meth:`_mint_source_from_entry`) and a DERIVED node per operation.
+        Units are checked with the module's existing per-op rules and REFUSED, never converted.
+
+        :param mandate: the task statement.
+        :param ranker: an object with ``rank(slot, entries, page_url=, page_text=) -> [(score,
+            entry)]`` and a ``name``; defaults to the shipped hand rule. The negative control is
+            :func:`~agent.app.operand_attribution.document_order_ranker`, whose constant score is
+            not on the hand rule's scale -- pass ``min_score=0.0`` with it.
+        :param min_score: the score floor; see :data:`_HOST_DERIVE_MIN_SCORE`.
+        :returns: always the same keys, whatever the outcome::
+
+            {"reason": "computed" | "no_unambiguous_shape" | "fewer_than_two_slots" |
+                       "operand_not_found" | "unit_mismatch" |
+                       "unit_inconsistent_across_entities" | "argmax_formula_unparsed" |
+                       "no_pages" | "error",
+             "operation": str|None, "absolute": bool, "mode": "max"|"min"|None,
+             "value": float|None, "value_text": str|None, "unit": str,
+             "node_id": str|None, "winner_entity": str|None,
+             "slots": [{"index", "entity", "field_phrase", "page_id", "url", "entry", "score",
+                        "reason"}],
+             "ranker": str, "n_pages": int, "n_entries": int, "min_score": float}
+
+            ``slots`` carries ONE row per operand read, so an argmax mandate contributes two rows
+            per entity (numerator and denominator) sharing that entity's ``index``.
+        :raises: nothing, ever -- a host calls this at its single exit, and an exception here would
+            take a completed run's whole result with it.
+        """
+        result: Dict[str, Any] = {
+            "reason": "error", "operation": None, "absolute": False, "mode": None,
+            "value": None, "value_text": None, "unit": "", "node_id": None,
+            "winner_entity": None, "slots": [], "ranker": "", "n_pages": len(self._indexes),
+            "n_entries": len(self._entries), "min_score": float(min_score),
+        }
+        try:
+            ranker = ranker if ranker is not None else default_ranker()
+            result["ranker"] = str(getattr(ranker, "name", "") or "")
+            shape = mandate_demanded_operation(mandate)
+            operation = shape.get("operation")
+            absolute = bool(shape.get("absolute"))
+            argmax = shape.get("reason") == "argmax_phrasing"
+            result["operation"] = operation
+            result["absolute"] = absolute
+            if operation is None and not argmax:
+                result["reason"] = "no_unambiguous_shape"
+                return result
+            slots = parse_slots(mandate)
+            if len(slots) < 2:
+                result["reason"] = "fewer_than_two_slots"
+                return result
+            # Checked after the shape so a mandate this mechanism could never handle reads as
+            # "no shape" whether or not the host happened to fetch anything.
+            if not self._indexes:
+                result["reason"] = "no_pages"
+                return result
+            if argmax:
+                return self._host_derive_argmax(result, slots, mandate, ranker, min_score)
+            return self._host_derive_two_operand(result, slots, str(operation), absolute, ranker,
+                                                 min_score)
+        except Exception:
+            # Same never-raises contract as `audit_answer` / `shape_derive_check`. Whatever was
+            # already established (shape, slot rows) is kept; `reason` stays "error" so a replay
+            # counts this cell as a mechanism failure rather than as a silent refusal.
+            result["reason"] = "error"
             return result
 
     def artifact(self) -> Dict[str, Any]:

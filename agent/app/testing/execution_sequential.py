@@ -99,6 +99,16 @@ def _ledger_shape_derive_enabled() -> bool:
     return "shape_derive" in modules
 
 
+#: `host_derive`: a FOURTH separate token in the same env var, same tiny-read shape as the three
+#: above and the same never-touches-the-model contract. It gates one finish-time call to
+#: ``LedgerToolkit.host_derive`` -- which reads the MANDATE and the registered pages only, never
+#: the answer -- in ``run_sequential_execution``.
+def _ledger_host_derive_enabled() -> bool:
+    """True when ``host_derive`` is present in ``LEDGER_HOST_MODULES``."""
+    modules = {m.strip().lower() for m in os.environ.get("LEDGER_HOST_MODULES", "").split(",")}
+    return "host_derive" in modules
+
+
 #: Prompt text for the ``derive`` action, written for a WEAK model: it names the module's actual
 #: contract (operand must already be read on a page, the tool computes it, a guess is checked not
 #: trusted) rather than just listing the verb.
@@ -748,8 +758,10 @@ async def run_sequential_execution(
     derive_enabled = _ledger_derive_enabled()
     answer_audit_enabled = _ledger_answer_audit_enabled()
     shape_derive_enabled = _ledger_shape_derive_enabled()
+    host_derive_enabled = _ledger_host_derive_enabled()
     ledger_kit = (LedgerToolkit()
-                 if (derive_enabled or answer_audit_enabled or shape_derive_enabled) else None)
+                 if (derive_enabled or answer_audit_enabled or shape_derive_enabled
+                     or host_derive_enabled) else None)
     # W2 §1-2: structural finish gate, opt-in via `final_require_derivation_for_numeric`
     # (default OFF -> `FinishGate(enabled=False)`, byte-identical to before it existed).
     finish_gate = FinishGate.from_settings(idea_settings)
@@ -792,6 +804,13 @@ async def run_sequential_execution(
             # `shape_derive_check` never raises (its own contract), so no try/except here either.
             output["shape_derive"] = ledger_kit.shape_derive_check(
                 output["final_deliverable"], mandate)
+        if host_derive_enabled:
+            # `host_derive`: the same mechanical, finish-time, host-side contract again, and the
+            # same BEFORE-`artifact()` placement so its nodes land in the stored evidence graph.
+            # It is the only one of the three that never reads the answer -- it recomputes what
+            # the MANDATE asked for from the registered pages. `host_derive` never raises (its own
+            # contract), so no try/except here either.
+            output["host_derive"] = ledger_kit.host_derive(mandate)
         # Same key and shape `execution_evidence_loop` already writes (`ledger.graph.to_dict()`),
         # so `evidence_graph.reverify_graph` and `claim_metrics.derivation_fabrication_rate` read
         # this host's artifact unchanged. Absent (not an empty dict) when the module is off, so a

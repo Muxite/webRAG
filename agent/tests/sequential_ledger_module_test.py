@@ -451,14 +451,14 @@ def _fake_agent_io_class(decisions, page_text=PAGE):
 
 
 async def _run_with_modules(monkeypatch, modules, mandate="What is the absolute difference "
-                            "between the chimneys, in m?"):
+                            "between the chimneys, in m?", page_text=PAGE):
     monkeypatch.setenv("LEDGER_HOST_MODULES", modules)
     decisions = [
         {"thought": "read", "action": "visit", "args": {"url": "https://example.com/a"}},
         {"thought": "done", "action": "finish",
          "args": {"answer": "The absolute difference is 39.7 metres."}},
     ]
-    monkeypatch.setattr(seq, "AgentIO", _fake_agent_io_class(decisions))
+    monkeypatch.setattr(seq, "AgentIO", _fake_agent_io_class(decisions, page_text=page_text))
     tm = MagicMock()
     tm.metadata = {"test_id": "999"}
     tm.get_task_statement.return_value = mandate
@@ -529,3 +529,93 @@ async def test_shape_derive_model_invisibility_prompt_and_tools_are_byte_identic
 
     assert _system_message(io_without, 0) == _system_message(io_with, 0)
     assert _observation(io_without, 1) == _observation(io_with, 1)
+
+
+# -- `host_derive` token -- host wiring only (LedgerToolkit.host_derive itself is tested in
+# agent/tests/host_derive_test.py) ---------------------------------------------------------------
+#
+# The fourth token differs from the three above in one way that matters to the wiring: it never
+# reads the answer. It takes the MANDATE and the pages the run registered, so it produces a number
+# the model had no hand in -- which is only true if the host calls it with the task statement.
+
+#: A two-slot mandate of the 216 shape (two FIELDS of one entity), with an infobox-shaped page, so
+#: the wiring test can assert a real `computed` result rather than a refusal.
+_HOST_DERIVE_MANDATE = (
+    "You are given NO raw figures -- search to find the page(s) you need. You need TWO values:\n"
+    "  A. Open the Wikipedia page for Tokaido Shinkansen and read its route (line) length, "
+    "in km.\n"
+    "  B. Open the Wikipedia page for Tokaido Shinkansen and read its journey time, in hours.\n"
+    "\nThen COMPUTE the RATIO of the first value to the second (first value divided by the "
+    "second).\n")
+
+_HOST_DERIVE_PAGE = ("Tokaido Shinkansen\nThe Tokaido Shinkansen is a Japanese high-speed rail "
+                     "line.\nLine length\n515.4\nkm\nJourney time\n2.35\nh\nOpened\n1964\n")
+
+#: Every key `host_derive`'s contract promises, on every reason. Other lanes read these.
+_HOST_DERIVE_KEYS = {"reason", "operation", "absolute", "mode", "value", "value_text", "unit",
+                     "node_id", "winner_entity", "slots", "ranker", "n_pages", "n_entries",
+                     "min_score"}
+
+
+def test_token_parsing_host_derive_alone(monkeypatch):
+    monkeypatch.setenv("LEDGER_HOST_MODULES", "host_derive")
+    assert seq._ledger_derive_enabled() is False
+    assert seq._ledger_answer_audit_enabled() is False
+    assert seq._ledger_shape_derive_enabled() is False
+    assert seq._ledger_host_derive_enabled() is True
+
+
+def test_token_parsing_all_four(monkeypatch):
+    monkeypatch.setenv("LEDGER_HOST_MODULES", "derive,answer_audit,shape_derive,host_derive")
+    assert seq._ledger_derive_enabled() is True
+    assert seq._ledger_answer_audit_enabled() is True
+    assert seq._ledger_shape_derive_enabled() is True
+    assert seq._ledger_host_derive_enabled() is True
+
+
+def test_token_parsing_neither_includes_host_derive(monkeypatch):
+    monkeypatch.delenv("LEDGER_HOST_MODULES", raising=False)
+    assert seq._ledger_host_derive_enabled() is False
+
+
+@pytest.mark.asyncio
+async def test_run_sequential_execution_stores_host_derive_and_includes_minted_nodes(monkeypatch):
+    """`output["host_derive"]` is the dict `host_derive` returns, and the nodes it minted are in
+    the SAME `output["evidence_graph"]` artifact -- i.e. it ran BEFORE `artifact()`."""
+    output = await _run_with_modules(monkeypatch, "host_derive",
+                                     mandate=_HOST_DERIVE_MANDATE, page_text=_HOST_DERIVE_PAGE)
+
+    assert set(output["host_derive"]) == _HOST_DERIVE_KEYS
+    host = output["host_derive"]
+    assert host["reason"] == "computed"
+    assert host["operation"] == "quotient"
+    assert host["unit"] == "km/h"
+    assert host["value"] == pytest.approx(515.4 / 2.35, abs=1e-6)
+
+    graph_ids = {n["id"] for n in output["evidence_graph"]["nodes"]}
+    assert host["node_id"] in graph_ids
+    assert any(n.get("minted_by") == "host_derive" for n in output["evidence_graph"]["nodes"])
+
+
+@pytest.mark.asyncio
+async def test_run_sequential_execution_omits_host_derive_when_token_absent(monkeypatch):
+    output = await _run_with_modules(monkeypatch, "shape_derive",
+                                     mandate=_HOST_DERIVE_MANDATE, page_text=_HOST_DERIVE_PAGE)
+    assert "host_derive" not in output
+    assert "shape_derive" in output
+
+
+@pytest.mark.asyncio
+async def test_host_derive_changes_nothing_the_model_sees(monkeypatch):
+    """The token adds one output key and nothing else: same prompt, same actions, same answer.
+    `host_derive` registers no tool and writes no prompt text -- it runs finish-time, host-side."""
+    without = await _run_with_modules(monkeypatch, "derive,answer_audit,shape_derive",
+                                      mandate=_HOST_DERIVE_MANDATE, page_text=_HOST_DERIVE_PAGE)
+    with_token = await _run_with_modules(
+        monkeypatch, "derive,answer_audit,shape_derive,host_derive",
+        mandate=_HOST_DERIVE_MANDATE, page_text=_HOST_DERIVE_PAGE)
+
+    assert set(with_token) - set(without) == {"host_derive"}
+    assert with_token["final_deliverable"] == without["final_deliverable"]
+    assert with_token["shape_derive"] == without["shape_derive"]
+    assert with_token["answer_audit"] == without["answer_audit"]

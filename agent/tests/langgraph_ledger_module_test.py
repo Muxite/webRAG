@@ -467,6 +467,15 @@ def _install_fake_ledger_kit(monkeypatch):
                     "reason": "no_unambiguous_shape", "n_entries": 0, "n_pairs_considered": 0,
                     "n_candidates": 0, "n_match_ambiguity": 0, "matched": None}
 
+        def host_derive(self, mandate, ranker=None, min_score=0.93):
+            # No `answer_text` parameter, deliberately: this hook reads the mandate and the
+            # registered pages only, so the recorded call is the proof it never sees the answer.
+            self.calls.append(("host_derive", mandate))
+            return {"reason": "no_pages", "operation": None, "absolute": False, "mode": None,
+                    "value": None, "value_text": None, "unit": "", "node_id": None,
+                    "winner_entity": None, "slots": [], "ranker": "hand_rule", "n_pages": 0,
+                    "n_entries": 0, "min_score": min_score}
+
         def artifact(self):
             self.calls.append(("artifact",))
             return {"pages": [], "nodes": []}
@@ -695,6 +704,102 @@ def test_shape_derive_model_invisibility_prompt_and_tools_are_byte_identical():
                                 ledger_kit=kit_without,
                                 derive_enabled=solver_without._ledger_derive_enabled)
     tools_with = _make_tools(_FakeAgentIO(), search_k=6, page_chars=6000, ledger_kit=kit_with,
+                             derive_enabled=solver_with._ledger_derive_enabled)
+    assert [(t.name, t.description) for t in tools_without] == \
+        [(t.name, t.description) for t in tools_with]
+
+
+# -- `host_derive` token -- host wiring only (LedgerToolkit.host_derive itself is tested in
+# agent/tests/host_derive_test.py) ---------------------------------------------------------------
+
+#: Every key `host_derive`'s contract promises, on every reason. Other lanes read these.
+_HOST_DERIVE_KEYS = {"reason", "operation", "absolute", "mode", "value", "value_text", "unit",
+                     "node_id", "winner_entity", "slots", "ranker", "n_pages", "n_entries",
+                     "min_score"}
+
+
+def test_token_parsing_host_derive_alone():
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini", ledger_host_modules=["host_derive"],
+    )
+    assert solver._ledger_derive_enabled is False
+    assert solver._ledger_answer_audit_enabled is False
+    assert solver._ledger_shape_derive_enabled is False
+    assert solver._ledger_host_derive_enabled is True
+
+
+def test_token_parsing_all_four():
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini",
+        ledger_host_modules=["derive", "answer_audit", "shape_derive", "host_derive"],
+    )
+    assert solver._ledger_derive_enabled is True
+    assert solver._ledger_answer_audit_enabled is True
+    assert solver._ledger_shape_derive_enabled is True
+    assert solver._ledger_host_derive_enabled is True
+
+
+def test_token_parsing_neither_includes_host_derive():
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini",
+    )
+    assert solver._ledger_host_derive_enabled is False
+
+
+def test_solve_calls_host_derive_before_artifact_with_the_mandate_only(monkeypatch):
+    """The hook runs before `artifact()` (so its nodes are stored) and is handed the MANDATE --
+    never the answer text, which is what makes its number independent of the model's."""
+    instances = _install_fake_ledger_kit(monkeypatch)
+    result, _llm = _run_solve_with_messages(
+        monkeypatch, _natural_termination_messages(), ledger_host_modules=["host_derive"])
+
+    kit = instances[-1]
+    assert [c[0] for c in kit.calls] == ["host_derive", "artifact"]  # ordering
+    assert kit.calls[0][1] == "the task"  # `_run_solve_with_messages` calls `solve("the task")`
+    assert set(result["host_derive"]) == _HOST_DERIVE_KEYS
+    assert "evidence_graph" in result
+
+
+def test_solve_omits_host_derive_when_token_absent(monkeypatch):
+    result, _llm = _run_solve_with_messages(monkeypatch, _natural_termination_messages())
+    assert "host_derive" not in result
+
+
+def test_solve_omits_host_derive_when_only_shape_derive_token_set(monkeypatch):
+    """The tokens are independent: `shape_derive` alone must not turn `host_derive` on."""
+    instances = _install_fake_ledger_kit(monkeypatch)
+    result, _llm = _run_solve_with_messages(
+        monkeypatch, _natural_termination_messages(), ledger_host_modules=["shape_derive"])
+    assert "host_derive" not in result
+    assert "host_derive" not in [c[0] for c in instances[-1].calls]
+
+
+def test_host_derive_model_invisibility_prompt_and_tools_are_byte_identical():
+    """Adding `host_derive` to `LEDGER_HOST_MODULES` alongside the other three must not change one
+    byte of what the model sees -- no prompt text, no tool registration of its own."""
+    from agent.app import langgraph_solver
+
+    base = ["derive", "answer_audit", "shape_derive"]
+    solver_without = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini", ledger_host_modules=base,
+    )
+    solver_with = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini", ledger_host_modules=base + ["host_derive"],
+    )
+    assert solver_without._require_finish_tool == solver_with._require_finish_tool
+    assert solver_without._ledger_derive_enabled == solver_with._ledger_derive_enabled
+    assert langgraph_solver._SYSTEM == langgraph_solver._SYSTEM  # the prompt has no ledger branch
+
+    tools_without = _make_tools(_FakeAgentIO(), search_k=6, page_chars=6000,
+                                ledger_kit=LedgerToolkit(),
+                                derive_enabled=solver_without._ledger_derive_enabled)
+    tools_with = _make_tools(_FakeAgentIO(), search_k=6, page_chars=6000,
+                             ledger_kit=LedgerToolkit(),
                              derive_enabled=solver_with._ledger_derive_enabled)
     assert [(t.name, t.description) for t in tools_without] == \
         [(t.name, t.description) for t in tools_with]

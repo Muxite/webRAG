@@ -1543,6 +1543,11 @@ class LangGraphSolver:
         #: never-touches-the-model contract as `answer_audit` just above -- it only gates whether
         #: `solve()` calls `LedgerToolkit.shape_derive_check` once at its single exit.
         self._ledger_shape_derive_enabled = "shape_derive" in self._ledger_host_modules
+        #: `host_derive`: a FOURTH separate token in the same comma-separated list, same
+        #: never-touches-the-model contract as the two above -- it only gates whether `solve()`
+        #: calls `LedgerToolkit.host_derive` once at its single exit. It is the only one that never
+        #: reads the answer: it recomputes what the MANDATE asked for from the registered pages.
+        self._ledger_host_derive_enabled = "host_derive" in self._ledger_host_modules
         #: FIX A (`docs/TINY_MODEL_INVESTIGATION.md` §3.1), env-gated by `LEDGER_CONTEXT_FIT`,
         #: default ON: size the context-trim budget to the model's REAL served window instead of
         #: the fixed 32k-shaped globals. Reachable only when `context_trim` is on, and clamped so
@@ -1738,7 +1743,8 @@ class LangGraphSolver:
         # (see `derive_enabled` passed to `_make_tools` below).
         ledger_kit = (LedgerToolkit(max_page_chars=page_chars)
                      if (self._ledger_derive_enabled or self._ledger_answer_audit_enabled
-                         or self._ledger_shape_derive_enabled) else None)
+                         or self._ledger_shape_derive_enabled
+                         or self._ledger_host_derive_enabled) else None)
         tools = _make_tools(agent_io, self._search_k, page_chars, retry,
                              require_finish_tool=self._require_finish_tool, ledger_kit=ledger_kit,
                              derive_enabled=self._ledger_derive_enabled)
@@ -1927,6 +1933,11 @@ class LangGraphSolver:
                 # `answer_audit` above. Called BEFORE `artifact()` below for the same reason --
                 # a node it mints must land in the stored evidence graph.
                 result_out["shape_derive"] = ledger_kit.shape_derive_check(final_text, mandate)
+            if self._ledger_host_derive_enabled:
+                # `host_derive`: same mechanical, finish-time, host-side contract again, and the
+                # same BEFORE-`artifact()` placement so its nodes land in the stored evidence
+                # graph. The answer is not an input -- only the mandate and the pages are.
+                result_out["host_derive"] = ledger_kit.host_derive(mandate)
             # Same key and shape `execution_evidence_loop` writes to `output.evidence_graph` --
             # `evidence_graph.reverify_graph` and `claim_metrics.derivation_fabrication_rate` read
             # it with no changes. Absent (not this branch) when the module is off, so a
