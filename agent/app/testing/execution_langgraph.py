@@ -221,6 +221,12 @@ async def run_offtheshelf_execution(
     host_derive = solver_result.get("host_derive")
     if host_derive is not None:
         output["host_derive"] = host_derive
+    # `host_prefetch`: the same passthrough. Its pages already sit in `evidence_graph.pages[]`
+    # with `source="host_prefetch"`; this is the per-cell summary the risk-coverage report reads
+    # (`registered`, per-entity statuses). Absent when the token is off.
+    host_prefetch = solver_result.get("host_prefetch")
+    if host_prefetch is not None:
+        output["host_prefetch"] = host_prefetch
     telemetry.finish(success=output["success"])
     tracer.close()
 

@@ -18,7 +18,7 @@ import pytest
 from app.testing import execution_langgraph
 
 
-LEDGER_KEYS = ("evidence_graph", "answer_audit", "shape_derive", "host_derive")
+LEDGER_KEYS = ("evidence_graph", "answer_audit", "shape_derive", "host_derive", "host_prefetch")
 
 
 class _StubModule:
