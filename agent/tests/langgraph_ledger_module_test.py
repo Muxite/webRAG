@@ -803,3 +803,143 @@ def test_host_derive_model_invisibility_prompt_and_tools_are_byte_identical():
                              derive_enabled=solver_with._ledger_derive_enabled)
     assert [(t.name, t.description) for t in tools_without] == \
         [(t.name, t.description) for t in tools_with]
+
+
+# -- `host_prefetch` token -- host wiring only (the prefetcher itself is tested in
+# agent/tests/host_prefetch_test.py) ----------------------------------------------------------
+
+_PREFETCH_MANDATE = ("For EACH of the following two chimneys, read its HEIGHT in metres from the "
+                     "infobox:\n  1. GRES-2 Power Station chimney\n  2. Inco Superstack\n"
+                     "Then compute the absolute difference between the two heights, in metres.")
+
+
+def _prefetch_html(label, value, lead):
+    return (f"<html><body><table class='infobox'><tr><th>{label}</th><td>{value}</td></tr>"
+            f"</table><p>{lead}</p></body></html>")
+
+
+class _PrefetchHttp:
+    """Serves the Wikipedia search API and two articles; anything else is a 404. Carries the
+    `set_telemetry` hook `AgentIO.__init__` calls on a truthy connector."""
+
+    def __init__(self):
+        self.calls = []
+
+    def set_telemetry(self, *_a, **_k):
+        pass
+
+    async def request(self, method, url, retries=2, **kwargs):
+        self.calls.append(url)
+        if "api.php" in url:
+            query = url.split("srsearch=")[1].split("&")[0]
+            title = "Ekibastuz_GRES-2_Power_Station" if "GRES" in query else "Inco_Superstack"
+            data = {"query": {"search": [{"title": title.replace("_", " "), "snippet": ""}]}}
+            return type("R", (), {"status": 200, "error": False, "data": data})()
+        if url.endswith("Ekibastuz_GRES-2_Power_Station"):
+            return type("R", (), {"status": 200, "error": False, "data": _prefetch_html(
+                "Height", "419.7 m (1,377 ft)", "The Ekibastuz GRES-2 Power Station chimney.")})()
+        if url.endswith("Inco_Superstack"):
+            return type("R", (), {"status": 200, "error": False, "data": _prefetch_html(
+                "Height", "380 m (1,250 ft)", "The Inco Superstack is a smokestack.")})()
+        return type("R", (), {"status": 404, "error": True, "data": "nf"})()
+
+
+class _PrefetchSearch:
+    def __init__(self):
+        self.calls = []
+
+    def set_telemetry(self, *_a, **_k):
+        pass
+
+    async def query_search(self, query, count=10):
+        self.calls.append(query)
+        return []
+
+
+def _run_prefetch_solve(monkeypatch, modules):
+    """`_run_solve_with_messages` with real connectors on the solver (that helper hard-codes
+    `connector_http=None`) and the prefetch mandate."""
+    from agent.app import langgraph_solver
+
+    class _StubGraph:
+        async def astream(self, _inputs, config=None, stream_mode=None):
+            yield {"messages": [HumanMessage(content=_PREFETCH_MANDATE),
+                                AIMessage(content="The difference is 39.7 metres.")]}
+
+    monkeypatch.setattr(langgraph_solver, "create_react_agent", lambda *a, **k: _StubGraph())
+    monkeypatch.setattr(LangGraphSolver, "_build_llm", lambda self: _StubLLM())
+    http, search = _PrefetchHttp(), _PrefetchSearch()
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=search, connector_http=http, connector_chroma=None,
+        model_name="openai/gpt-5-mini", ledger_host_modules=modules,
+    )
+    return asyncio.run(solver.solve(_PREFETCH_MANDATE, max_steps=4)), http, search
+
+
+def test_token_parsing_host_prefetch_alone():
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini", ledger_host_modules=["host_prefetch"],
+    )
+    assert solver._ledger_host_prefetch_enabled is True
+    assert solver._ledger_host_derive_enabled is False
+    assert solver._ledger_derive_enabled is False
+
+
+def test_token_parsing_all_five():
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini",
+        ledger_host_modules=["derive", "answer_audit", "shape_derive", "host_derive", "host_prefetch"],
+    )
+    assert solver._ledger_host_prefetch_enabled is True
+    assert solver._ledger_host_derive_enabled is True
+
+
+def test_token_parsing_neither_includes_host_prefetch():
+    solver = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini",
+    )
+    assert solver._ledger_host_prefetch_enabled is False
+
+
+def test_solve_host_prefetch_registers_tagged_pages_and_leaves_output_pages_alone(monkeypatch):
+    with_token, http, search = _run_prefetch_solve(monkeypatch, ["host_prefetch", "host_derive"])
+    without, http_off, _ = _run_prefetch_solve(monkeypatch, ["host_derive"])
+
+    prefetch = with_token["host_prefetch"]
+    assert prefetch["error"] is None
+    assert prefetch["registered"] == 2 and prefetch["searches"] == 2 and prefetch["fetches"] == 2
+    pages = with_token["evidence_graph"]["pages"]
+    assert [p.get("source") for p in pages] == ["host_prefetch", "host_prefetch"]
+    assert all(p["truncated"] is False for p in pages)
+    assert search.calls == []
+    assert http_off.calls == []
+    # `output.pages` is rebuilt from telemetry `documents_seen` in execution_langgraph.py; the
+    # prefetch never goes through `AgentIO.visit`, so the visit count is unchanged.
+    assert with_token["observability"].get("visit") == without["observability"].get("visit")
+    assert with_token.get("visit_calls", 0) == without.get("visit_calls", 0) == 0
+    assert with_token["host_derive"]["reason"] == "computed"
+    assert abs(with_token["host_derive"]["value"] - 39.7) < 1e-6
+
+
+def test_solve_omits_host_prefetch_when_token_absent(monkeypatch):
+    result, http, _ = _run_prefetch_solve(monkeypatch, ["host_derive"])
+    assert "host_prefetch" not in result
+    assert http.calls == []
+    assert all("source" not in p for p in result["evidence_graph"]["pages"])
+
+
+def test_host_prefetch_model_invisibility_prompt_and_tools_are_byte_identical():
+    base = ["derive", "answer_audit", "shape_derive", "host_derive"]
+    solver_without = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini", ledger_host_modules=base,
+    )
+    solver_with = LangGraphSolver(
+        connector_llm=None, connector_search=None, connector_http=None, connector_chroma=None,
+        model_name="openai/gpt-5-mini", ledger_host_modules=base + ["host_prefetch"],
+    )
+    assert solver_without._require_finish_tool == solver_with._require_finish_tool
+    assert solver_without._ledger_derive_enabled == solver_with._ledger_derive_enabled

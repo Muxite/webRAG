@@ -1,0 +1,501 @@
+"""`agent/app/host_prefetch.py` -- host-side prefetch of a mandate's uncovered slot entities.
+
+Everything here is offline: `http` and `search` are fakes with the two connector methods the
+module is allowed to call (`request(method, url, **kw)` -> `.data`/`.error`; `query_search(q,
+count)`), and the mandates are the REAL task statements (via `host_derive_test.statement`) so a
+prefetch that satisfies `LedgerToolkit.host_derive` here satisfies it live.
+
+The picker cases at the bottom reproduce two LIVE Wikipedia search-API probes (2026-09-08):
+`"Mississippi basin area"` ranks the river first, but the bare entity ranks the STATE first;
+`"Amazon basin size"` ranks `Amazon` and `Amazon basin` above `Amazon River`. A title-only picker
+gets both wrong; the verification picker reads the fetched infoboxes and gets both right.
+"""
+from __future__ import annotations
+
+import asyncio
+import os
+import sys
+from urllib.parse import parse_qs, quote, urlparse
+
+import pytest
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from host_derive_test import RIVERS, _river_page, _wiki, statement  # noqa: E402
+
+from agent.app import host_prefetch as hp  # noqa: E402
+from agent.app.host_prefetch import PREFETCH_SOURCE, Resolution, host_prefetch  # noqa: E402
+from agent.app.ledger_tools import LedgerToolkit  # noqa: E402
+from agent.app.mandate_slots import parse_slots  # noqa: E402
+from agent.app.testing.execution_evidence_loop import hash_page_text  # noqa: E402
+
+
+# --------------------------------------------------------------------------------------------
+# Fakes
+# --------------------------------------------------------------------------------------------
+
+class _Result:
+    def __init__(self, status, data, error=False):
+        self.status, self.data, self.error = status, data, error
+
+
+class FakeHttp:
+    """`connector_http.request` stand-in: Wikipedia search-API JSON per query, HTML per URL."""
+
+    def __init__(self, pages=None, api=None, raise_on=()):
+        self.pages = dict(pages or {})       # url -> html
+        self.api = dict(api or {})           # srsearch query -> [(title, snippet)]
+        self.raise_on = set(raise_on)
+        self.calls = []
+
+    async def request(self, method, url, retries=2, **kwargs):
+        self.calls.append((method, url))
+        if url in self.raise_on:
+            raise RuntimeError("boom")
+        if url.startswith(hp.WIKI_API):
+            query = parse_qs(urlparse(url).query).get("srsearch", [""])[0]
+            hits = self.api.get(query, [])
+            return _Result(200, {"query": {"search": [{"title": t, "snippet": s}
+                                                      for t, s in hits]}})
+        if url in self.pages:
+            return _Result(200, self.pages[url])
+        return _Result(404, "not found", error=True)
+
+    @property
+    def api_calls(self):
+        return [u for _, u in self.calls if u.startswith(hp.WIKI_API)]
+
+    @property
+    def page_calls(self):
+        return [u for _, u in self.calls if not u.startswith(hp.WIKI_API)]
+
+
+class FakeSearch:
+    def __init__(self, results=None):
+        self.results = list(results or [])
+        self.calls = []
+
+    async def query_search(self, query, count=10):
+        self.calls.append((query, count))
+        return self.results
+
+
+def _article(title):
+    return hp.WIKI_ARTICLE + quote(title.replace(" ", "_"), safe="()_,'-.:")
+
+
+def _river_html(name, length, basin, lead=None):
+    return (f"<html><body><table class='infobox'>"
+            f"<tr><th>Length</th><td>{length} km</td></tr>"
+            f"<tr><th>Basin size</th><td>{basin} km<sup>2</sup></td></tr></table>"
+            f"<p>{lead or f'The {name} is a major river.'}</p>"
+            f"<p>It flows through several countries.</p></body></html>")
+
+
+def _infobox_html(rows, lead="Some lead paragraph."):
+    body = "".join(f"<tr><th>{label}</th><td>{value}</td></tr>" for label, value in rows)
+    return f"<html><body><table class='infobox'>{body}</table><p>{lead}</p></body></html>"
+
+
+def _run(coro):
+    return asyncio.run(coro)
+
+
+def _pages(kit):
+    return kit.artifact()["pages"]
+
+
+def _prefetched(kit):
+    return [p for p in _pages(kit) if p.get("source") == PREFETCH_SOURCE]
+
+
+# --------------------------------------------------------------------------------------------
+# Structural budget
+# --------------------------------------------------------------------------------------------
+
+def test_every_slot_entity_is_fetched_even_when_the_model_already_visited_its_page():
+    """G1 forensics: the model's registered page is the flattened window and can be missing a
+    dual-unit cell's second unit, so the host copy is registered anyway -- as a NEW page, leaving
+    the model's page byte-identical -- and the row says `model_visited`."""
+    kit = LedgerToolkit()
+    for name, slug, length, basin in RIVERS:
+        kit.register_page(_wiki(slug), _river_page(name, length, basin))
+    before = kit.artifact()["pages"]
+    api, pages = _rivers_world()
+    http, search = FakeHttp(pages=pages, api=api), FakeSearch()
+
+    out = _run(host_prefetch(kit, statement("218"), http=http, search=search))
+
+    assert out["uncovered_before"] == 0
+    assert out["searches"] == 5 and out["registered"] == 5
+    assert out["fetches"] == 7   # 3 exact-title entities x1, Mississippi/Amazon sweep both hits
+    assert search.calls == [] and out["error"] is None
+    assert [row["status"] for row in out["entities"]] == ["prefetched"] * 5
+    assert all(row["model_visited"] is True for row in out["entities"])
+    after = kit.artifact()["pages"]
+    assert after[:5] == before                      # model-read pages untouched
+    assert [p["source"] for p in after[5:]] == [PREFETCH_SOURCE] * 5
+    assert kit.host_derive(statement("218"))["winner_entity"] == "Mekong"
+
+
+def test_a_mandate_with_fewer_than_two_slots_returns_early_without_touching_anything():
+    kit = LedgerToolkit()
+    http = FakeHttp()
+    out = _run(host_prefetch(kit, "What is the height of the Eiffel Tower?", http=http,
+                             search=FakeSearch()))
+    assert out["entities"] == [] and http.calls == []
+    assert out["registered"] == 0 and out["error"] is None
+    assert _pages(kit) == []
+
+
+def _rivers_world():
+    """Fake web for 218: bare-entity API hits (the top hit IS the article, as the live probe
+    showed for Yangtze/Nile/Mekong) and one river article per entity."""
+    api, pages = {}, {}
+    for name, slug, length, basin in RIVERS:
+        title = slug.replace("_", " ")
+        api[name] = [(title, f"The {name} is a river"), (f"{title} Delta", "delta")]
+        pages[_article(title)] = _river_html(name, length, basin)
+        pages[_article(f"{title} Delta")] = _infobox_html([("Area", "40,000 km<sup>2</sup>")])
+    return api, pages
+
+
+def test_218_with_only_mekong_registered_prefetches_all_five_and_host_derive_computes():
+    kit = LedgerToolkit()
+    name, slug, length, basin = RIVERS[0]
+    kit.register_page(_wiki(slug), _river_page(name, length, basin))   # model-visited Mekong
+    api, pages = _rivers_world()
+    http, search = FakeHttp(pages=pages, api=api), FakeSearch()
+
+    out = _run(host_prefetch(kit, statement("218"), http=http, search=search))
+
+    assert out["error"] is None
+    assert out["uncovered_before"] == 4
+    assert [row["status"] for row in out["entities"]] == ["prefetched"] * 5
+    assert [row["model_visited"] for row in out["entities"]] == [True, False, False, False, False]
+    assert out["searches"] == 5 and len(http.api_calls) == 5   # exactly one resolve per entity
+    # Mekong/Yangtze/Nile: exact-title hit, one fetch each. "Mississippi" / "Amazon" are not the
+    # article titles ("Mississippi River" / "Amazon River"), so both API hits are read and the
+    # one whose infobox names the fields wins: two fetches each.
+    assert out["fetches"] == 7 and len(http.page_calls) == 7
+    assert out["registered"] == 5 and search.calls == []
+    assert [p["url"] for p in _prefetched(kit)] == [_wiki(s) for _, s, _, _ in RIVERS]
+    assert all(p["source"] == PREFETCH_SOURCE for p in _prefetched(kit))
+    assert "source" not in _pages(kit)[0]   # the model-read page is byte-identical
+
+    # Availability -- this lane's deliverable: every one of the ten operands now resolves, on the
+    # host copies for the four rivers the model never visited.
+    result = kit.host_derive(statement("218"))
+    selected = [row for row in result["slots"] if row["reason"] == "selected"]
+    assert len(selected) == 10 and len({row["entity"] for row in selected}) == 5
+    assert result["reason"] not in ("incomplete_roster", "operand_not_found", "no_pages")
+
+
+@pytest.mark.xfail(strict=True, reason=(
+    "Mixed spellings of one unit across entities: the model's flattened Mekong window indexes "
+    "its basin as `km2` while the host copies index `km²`. `_host_derive_argmax` compares them "
+    "canonically, but the per-entity RATIO nodes carry a unit string built from the raw source "
+    "units (`km/km2` vs `km/km²`) and `add_extremum` refuses them as a UnitMismatch. Fix belongs "
+    "to the ratio-unit / extremum comparison (ledger_tools / evidence_graph), not this lane; "
+    "flip this test to a plain assertion when it lands."))
+def test_218_mixed_model_window_and_host_copies_computes_the_right_winner():
+    kit = LedgerToolkit()
+    name, slug, length, basin = RIVERS[0]
+    kit.register_page(_wiki(slug), _river_page(name, length, basin))
+    api, pages = _rivers_world()
+    _run(host_prefetch(kit, statement("218"), http=FakeHttp(pages=pages, api=api),
+                       search=FakeSearch()))
+
+    result = kit.host_derive(statement("218"))
+    assert result["reason"] == "computed"
+    assert result["winner_entity"] == "Mekong"
+    assert result["value"] == pytest.approx(4909 * 1000 / 795_000, rel=1e-6)
+
+
+def test_the_stored_page_is_the_full_text_and_its_hash_matches():
+    kit = LedgerToolkit(max_page_chars=50)   # a tiny default window must not clip a prefetch
+    api, pages = _rivers_world()
+    long_lead = "The Yangtze is the longest river in Asia. " * 40
+    pages[_article("Yangtze")] = _river_html("Yangtze", "6,300", "1,800,000", lead=long_lead)
+    http = FakeHttp(pages=pages, api=api)
+
+    out = _run(host_prefetch(kit, statement("218"), http=http, search=FakeSearch()))
+
+    page = next(p for p in _pages(kit) if p["url"].endswith("/Yangtze"))
+    row = next(r for r in out["entities"] if r["entity"] == "Yangtze")
+    assert page["truncated"] is False
+    assert page["stored_chars"] == page["chars"] == len(page["text"]) == row["chars"]
+    assert page["chars"] > 50
+    assert page["content_hash"] == hash_page_text(page["text"])
+    assert page["text"].startswith("Length: 6,300 km\nBasin size: 1,800,000 km²\n")
+
+
+def test_infobox_entries_are_first_in_the_page_index_and_their_offsets_resolve():
+    kit = LedgerToolkit()
+    api, pages = _rivers_world()
+    http = FakeHttp(pages=pages, api=api)
+    _run(host_prefetch(kit, statement("218"), http=http, search=FakeSearch()))
+
+    page_id, page = next((pid, p) for pid, p in
+                         ((f"p{i + 1}", p) for i, p in enumerate(_pages(kit)))
+                         if p["url"].endswith("/Nile"))
+    rendered = kit.page_index_text(page_id)
+    first_two = rendered.split("\n")[:2]
+    assert first_two[0].endswith("Length = 6,650 km")
+    assert first_two[1].endswith("Basin size = 3,254,555 km²")
+    entries = kit._indexes[page_id]
+    assert entries[0].source == "infobox" and entries[0].label == "Length"
+    assert page["text"][entries[0].start:entries[0].end] == "6,650"
+    assert page["text"][entries[1].start:entries[1].end] == "3,254,555"
+
+
+def test_two_slots_of_one_entity_cost_one_resolve_and_one_fetch():
+    """216 asks two fields of the Tōkaidō Shinkansen: one entity, one row, one page."""
+    kit = LedgerToolkit()
+    slots = parse_slots(statement("216"))
+    assert len(slots) == 2 and len({s.entity for s in slots}) == 1
+    entity = slots[0].entity
+    html = _infobox_html([("Line length", "515.4 km"), ("Journey time", "2.35 h")],
+                         lead=f"The {entity} is a high-speed rail line.")
+    http = FakeHttp(pages={_article(entity): html}, api={entity: [(entity, "rail line")]})
+
+    out = _run(host_prefetch(kit, statement("216"), http=http, search=FakeSearch()))
+
+    assert len(out["entities"]) == 1 and out["entities"][0]["status"] == "prefetched"
+    assert out["searches"] == 1 and out["fetches"] == 1 and out["registered"] == 1
+
+
+# --------------------------------------------------------------------------------------------
+# Failure modes -- rows, never exceptions
+# --------------------------------------------------------------------------------------------
+
+def test_no_acceptable_page_anywhere_is_a_no_hit_row_after_the_web_fallback():
+    kit = LedgerToolkit()
+    http, search = FakeHttp(), FakeSearch(results=[{"url": "https://example.com/x"}])
+
+    out = _run(host_prefetch(kit, statement("210"), http=http, search=search))
+
+    assert [r["status"] for r in out["entities"]] == ["no_hit", "no_hit"]
+    assert out["searches"] == 4   # API + web fallback, per entity
+    assert out["fetches"] == 0 and out["registered"] == 0 and out["error"] is None
+    assert len(search.calls) == 2 and all(q.endswith(" wikipedia") for q, _ in search.calls)
+
+
+def test_http_raising_never_raises_and_error_is_not_set_for_a_per_entity_failure():
+    kit = LedgerToolkit()
+
+    class Boom:
+        async def request(self, *a, **kw):
+            raise RuntimeError("network down")
+
+    out = _run(host_prefetch(kit, statement("210"), http=Boom(), search=FakeSearch()))
+
+    assert out["error"] is None
+    assert [r["status"] for r in out["entities"]] == ["no_hit", "no_hit"]
+    assert out["registered"] == 0
+
+
+def test_a_failure_inside_the_kits_own_hook_is_the_outer_error():
+    class BrokenKit(LedgerToolkit):
+        def entities_without_page(self, slots):
+            raise ValueError("kit broke")
+
+    out = _run(host_prefetch(BrokenKit(), statement("210"), http=FakeHttp(), search=FakeSearch()))
+    assert out["error"].startswith("ValueError: kit broke")
+    assert out["registered"] == 0
+
+
+def test_a_resolver_url_that_fails_to_fetch_is_a_fetch_failed_row():
+    kit = LedgerToolkit()
+
+    async def resolver(entity, phrase, *, http, search):
+        return "https://en.wikipedia.org/wiki/Missing_Page"
+
+    out = _run(host_prefetch(kit, statement("210"), http=FakeHttp(), search=FakeSearch(),
+                             resolver=resolver))
+    assert [r["status"] for r in out["entities"]] == ["fetch_failed", "fetch_failed"]
+    assert out["fetches"] == 2 and out["registered"] == 0
+
+
+def test_a_fetched_page_with_neither_infobox_nor_the_entity_in_its_lead_is_rejected():
+    kit = LedgerToolkit()
+    url = "https://en.wikipedia.org/wiki/Something_Else"
+
+    async def resolver(entity, phrase, *, http, search):
+        return url
+
+    http = FakeHttp(pages={url: "<html><body><p>An unrelated error page.</p></body></html>"})
+    out = _run(host_prefetch(kit, statement("210"), http=http, search=FakeSearch(),
+                             resolver=resolver))
+    assert [r["status"] for r in out["entities"]] == ["fetch_failed", "fetch_failed"]
+    assert _pages(kit) == []
+
+
+def test_two_entities_resolving_to_the_same_url_register_one_page():
+    kit = LedgerToolkit()
+    url = "https://en.wikipedia.org/wiki/Shared_Article"
+    html = _infobox_html([("Height", "419.7 m")], lead="Inco Superstack and GRES-2 chimney.")
+
+    async def resolver(entity, phrase, *, http, search):
+        return Resolution(url=url, html=html, searches=1, fetches=1)
+
+    out = _run(host_prefetch(kit, statement("210"), http=FakeHttp(), search=FakeSearch(),
+                             resolver=resolver))
+    statuses = [r["status"] for r in out["entities"]]
+    assert statuses == ["prefetched", "duplicate_url"]
+    assert out["registered"] == 1 and len(_pages(kit)) == 1
+
+
+def test_a_slot_that_names_a_wikipedia_url_is_fetched_directly_without_a_search():
+    kit = LedgerToolkit()
+    mandate = ("Read two pages and compute the absolute difference in HEIGHT, in metres:\n"
+               "  1. GRES-2 Power Station chimney (https://en.wikipedia.org/wiki/Ekibastuz_GRES-2_Power_Station)\n"
+               "  2. Inco Superstack (https://en.wikipedia.org/wiki/Inco_Superstack)\n")
+    slots = parse_slots(mandate)
+    assert [s.url for s in slots] == ["https://en.wikipedia.org/wiki/Ekibastuz_GRES-2_Power_Station",
+                                      "https://en.wikipedia.org/wiki/Inco_Superstack"]
+    pages = {slots[0].url: _infobox_html([("Height", "419.7 m")], lead="GRES-2 Power Station."),
+             slots[1].url: _infobox_html([("Height", "380 m")], lead="Inco Superstack.")}
+    http = FakeHttp(pages=pages)
+
+    out = _run(host_prefetch(kit, mandate, http=http, search=FakeSearch()))
+
+    assert [r["status"] for r in out["entities"]] == ["prefetched", "prefetched"]
+    assert out["searches"] == 0 and http.api_calls == [] and out["fetches"] == 2
+
+
+# --------------------------------------------------------------------------------------------
+# The resolver's picker -- verification, not titles
+# --------------------------------------------------------------------------------------------
+
+STATE_HTML = _infobox_html([("• Total", "48,430 sq mi (125,443 km<sup>2</sup>)"),
+                            ("Population", "2,961,279")], lead="Mississippi is a state.")
+MS_RIVER_HTML = _infobox_html([("Length", "2,340 mi (3,766 km)"),
+                               ("Basin size", "1,151,000 sq mi (2,980,000 km<sup>2</sup>)")],
+                              lead="The Mississippi River is the primary river of the largest "
+                                   "drainage basin in the United States.")
+MS_SYSTEM_HTML = _infobox_html([("Length", "3,766 km")], lead="The Mississippi River System.")
+AMAZON_HTML = "<html><body><p>Amazon most often refers to: the Amazon River; the Amazon rainforest; Amazon (company).</p></body></html>"
+AMAZON_BASIN_HTML = _infobox_html([("Area", "7,000,000 km<sup>2</sup>")], lead="The Amazon basin.")
+RAINFOREST_HTML = _infobox_html([("Area", "5,500,000 km<sup>2</sup>")], lead="The Amazon rainforest.")
+AMAZON_RIVER_HTML = _infobox_html([("Length", "6,400 km"), ("Basin size", "7,000,000 km<sup>2</sup>")],
+                                  lead="The Amazon River in South America.")
+CONGO_HTML = _infobox_html([("Area", "4,000,000 km<sup>2</sup>")], lead="The Congo Basin.")
+
+
+def _resolve(entity, phrase, http, search=None):
+    return _run(hp.resolve_entity_page(entity, phrase, http=http, search=search or FakeSearch()))
+
+
+def test_live_probe_mississippi_basin_area_picks_the_river_not_a_basin_or_list_page():
+    """`srsearch="Mississippi basin area"` -> River, River System, Atchafalaya Basin, Nitrate...,
+    List of drainage basins by area (live, 2026-09-08)."""
+    hits = [("Mississippi River", "primary river of the largest drainage basin"),
+            ("Mississippi River System", "system"), ("Atchafalaya Basin", "basin"),
+            ("Nitrate in the Mississippi River Basin", "nitrate"),
+            ("List of drainage basins by area", "list")]
+    http = FakeHttp(api={"Mississippi": hits},
+                    pages={_article("Mississippi River"): MS_RIVER_HTML,
+                           _article("Mississippi River System"): MS_SYSTEM_HTML})
+    resolved = _resolve("Mississippi", "basin area", http)
+    assert resolved.url == _article("Mississippi River")
+    assert not any("List_of" in u or "Atchafalaya" in u for u in http.page_calls)
+
+
+def test_bare_entity_ranking_the_state_first_still_resolves_to_the_river_by_reading_infoboxes():
+    """The bare-name API order (live): Mississippi (state), Mississippi River, (disambiguation),
+    Jackson, Mississippi, ... The state's infobox has no row naming the field, so it is skipped."""
+    hits = [("Mississippi", "state"), ("Mississippi River", "river"),
+            ("Mississippi (disambiguation)", "may refer to"), ("Jackson, Mississippi", "city")]
+    http = FakeHttp(api={"Mississippi": hits},
+                    pages={_article("Mississippi"): STATE_HTML,
+                           _article("Mississippi River"): MS_RIVER_HTML,
+                           _article("Jackson, Mississippi"): _infobox_html([("Area", "113 sq mi")])})
+    resolved = _resolve("Mississippi", "basin area", http)
+    assert resolved.url == _article("Mississippi River")
+    # The state is exact-title but has no matching row, so the sweep continues through every
+    # acceptable candidate (the disambiguation page is never fetched) and the best wins.
+    assert resolved.fetches == 3 and resolved.searches == 1
+    assert http.page_calls == [_article("Mississippi"), _article("Mississippi River"),
+                               _article("Jackson, Mississippi")]
+
+
+def test_live_probe_amazon_basin_size_picks_amazon_river_over_amazon_and_amazon_basin():
+    """`srsearch="Amazon basin size"` -> Amazon, Congo Basin, Amazon basin, Amazon rainforest,
+    Amazon River (live, 2026-09-08). Title-only picking takes `Amazon`; verification does not."""
+    hits = [("Amazon", "may refer to"), ("Congo Basin", "congo"), ("Amazon basin", "basin"),
+            ("Amazon rainforest", "forest"), ("Amazon River", "river")]
+    http = FakeHttp(api={"Amazon": hits},
+                    pages={_article("Amazon"): AMAZON_HTML, _article("Congo Basin"): CONGO_HTML,
+                           _article("Amazon basin"): AMAZON_BASIN_HTML,
+                           _article("Amazon rainforest"): RAINFOREST_HTML,
+                           _article("Amazon River"): AMAZON_RIVER_HTML})
+    resolved = _resolve("Amazon", "basin size", http)
+    assert resolved.url == _article("Amazon River")
+    assert _article("Congo_Basin".replace("_", " ")) not in http.page_calls  # no entity token
+
+
+def test_a_rival_page_sharing_one_field_token_loses_to_the_page_covering_more():
+    """With the real 218 phrase ("... LENGTH ... DRAINAGE BASIN SIZE / basin area ...") the
+    rainforest's `Area` row shares a token, but the river covers length + basin + size."""
+    phrase = parse_slots(statement("218"))[4].field_phrase
+    hits = [("Amazon rainforest", "forest"), ("Amazon River", "river")]
+    http = FakeHttp(api={"Amazon": hits},
+                    pages={_article("Amazon rainforest"): RAINFOREST_HTML,
+                           _article("Amazon River"): AMAZON_RIVER_HTML})
+    resolved = _resolve("Amazon", phrase, http)
+    assert resolved.url == _article("Amazon River")
+    assert resolved.fetches == 2   # both were read; the better one won, not the first one
+
+
+def test_an_exact_title_with_a_matching_row_is_accepted_without_sweeping_the_rest():
+    hits = [("Nile", "river"), ("Nile Delta", "delta"), ("Nile crocodile", "croc")]
+    http = FakeHttp(api={"Nile": hits},
+                    pages={_article("Nile"): _river_html("Nile", "6,650", "3,254,555"),
+                           _article("Nile Delta"): _infobox_html([("Area", "240 km")])})
+    resolved = _resolve("Nile", "basin area", http)
+    assert resolved.url == _article("Nile") and resolved.fetches == 1
+
+
+def test_disambiguation_list_and_namespace_titles_are_never_fetched():
+    hits = [("Nile (disambiguation)", "may refer to"), ("List of rivers by length", "list"),
+            ("Category:Nile", "cat"), ("File:Nile.jpg", "file"), ("Nile", "river")]
+    http = FakeHttp(api={"Nile": hits},
+                    pages={_article("Nile"): _river_html("Nile", "6,650", "3,254,555")})
+    resolved = _resolve("Nile", "basin area", http)
+    assert resolved.url == _article("Nile")
+    assert http.page_calls == [_article("Nile")]
+
+
+def test_web_search_fallback_applies_the_same_picker_to_en_wikipedia_urls():
+    http = FakeHttp(api={"Amazon": []},
+                    pages={_article("Amazon River"): AMAZON_RIVER_HTML,
+                           _article("Amazon rainforest"): RAINFOREST_HTML})
+    search = FakeSearch(results=[
+        {"url": "https://www.britannica.com/place/Amazon-River", "description": "x"},
+        {"url": "https://en.wikipedia.org/wiki/Amazon_rainforest", "description": "forest"},
+        {"url": "https://en.wikipedia.org/wiki/Amazon_River", "description": "river"},
+    ])
+    resolved = _resolve("Amazon", "basin size", http, search)
+    assert resolved.url == _article("Amazon River")
+    assert resolved.searches == 2
+    assert search.calls == [("Amazon basin size wikipedia", 5)]
+
+
+def test_resolver_is_deterministic_for_identical_inputs():
+    hits = [("Amazon rainforest", "forest"), ("Amazon River", "river")]
+    pages = {_article("Amazon rainforest"): RAINFOREST_HTML,
+             _article("Amazon River"): AMAZON_RIVER_HTML}
+    first = _resolve("Amazon", "basin size", FakeHttp(api={"Amazon": hits}, pages=pages))
+    second = _resolve("Amazon", "basin size", FakeHttp(api={"Amazon": hits}, pages=pages))
+    assert first == second
+    api_url = FakeHttp(api={"Amazon": hits}, pages=pages)
+    _resolve("Amazon", "basin size", api_url)
+    assert api_url.api_calls[0] == (
+        hp.WIKI_API + "?action=query&list=search&srsearch=Amazon&format=json&srlimit=10")
+
+
+def test_resolver_reports_a_miss_as_an_empty_url_with_its_cost_counted():
+    miss = _resolve("Amazon", "basin size", FakeHttp(api={"Amazon": []}))
+    assert miss.url == "" and miss.html == ""
+    assert miss.searches == 2 and miss.fetches == 0   # API, then the web fallback
+    assert _resolve("Amazon", "basin size", None).url == ""

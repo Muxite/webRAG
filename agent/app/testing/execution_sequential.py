@@ -19,6 +19,7 @@ import time
 from pathlib import Path
 from typing import Dict, Any, List, NamedTuple, Optional, Tuple
 
+from agent.app.host_prefetch import host_prefetch
 from agent.app.ledger_tools import LedgerToolkit
 from agent.app.connector_llm import ConnectorLLM
 from agent.app.connector_search import ConnectorSearch
@@ -107,6 +108,17 @@ def _ledger_host_derive_enabled() -> bool:
     """True when ``host_derive`` is present in ``LEDGER_HOST_MODULES``."""
     modules = {m.strip().lower() for m in os.environ.get("LEDGER_HOST_MODULES", "").split(",")}
     return "host_derive" in modules
+
+
+#: `host_prefetch`: a FIFTH separate token in the same env var, same tiny-read shape and the same
+#: never-touches-the-model contract. It gates one finish-time call to
+#: ``agent.app.host_prefetch.host_prefetch`` -- which resolves and fetches, HOST-side and outside
+#: ``AgentIO.visit``/``search``, the Wikipedia page of every mandate slot entity no registered page
+#: names, so the ``host_derive`` call that follows it has a complete roster to compute over.
+def _ledger_host_prefetch_enabled() -> bool:
+    """True when ``host_prefetch`` is present in ``LEDGER_HOST_MODULES``."""
+    modules = {m.strip().lower() for m in os.environ.get("LEDGER_HOST_MODULES", "").split(",")}
+    return "host_prefetch" in modules
 
 
 #: Prompt text for the ``derive`` action, written for a WEAK model: it names the module's actual
@@ -759,9 +771,10 @@ async def run_sequential_execution(
     answer_audit_enabled = _ledger_answer_audit_enabled()
     shape_derive_enabled = _ledger_shape_derive_enabled()
     host_derive_enabled = _ledger_host_derive_enabled()
+    host_prefetch_enabled = _ledger_host_prefetch_enabled()
     ledger_kit = (LedgerToolkit()
                  if (derive_enabled or answer_audit_enabled or shape_derive_enabled
-                     or host_derive_enabled) else None)
+                     or host_derive_enabled or host_prefetch_enabled) else None)
     # W2 §1-2: structural finish gate, opt-in via `final_require_derivation_for_numeric`
     # (default OFF -> `FinishGate(enabled=False)`, byte-identical to before it existed).
     finish_gate = FinishGate.from_settings(idea_settings)
@@ -804,6 +817,15 @@ async def run_sequential_execution(
             # `shape_derive_check` never raises (its own contract), so no try/except here either.
             output["shape_derive"] = ledger_kit.shape_derive_check(
                 output["final_deliverable"], mandate)
+        if host_prefetch_enabled:
+            # `host_prefetch`: host-side, finish-time, BEFORE `host_derive` so the pages it
+            # registers are on the roster `host_derive` computes over. It goes through
+            # `connector_http` / `connector_search` directly -- never `AgentIO.visit`/`search` --
+            # so `output.pages` and the visit telemetry the validator grounds against are
+            # untouched. `host_prefetch` never raises (its own contract).
+            output["host_prefetch"] = await host_prefetch(
+                ledger_kit, mandate, http=agent_io.connector_http,
+                search=agent_io.connector_search)
         if host_derive_enabled:
             # `host_derive`: the same mechanical, finish-time, host-side contract again, and the
             # same BEFORE-`artifact()` placement so its nodes land in the stored evidence graph.

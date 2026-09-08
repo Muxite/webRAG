@@ -1355,7 +1355,7 @@ class EvidenceGraph:
         return counts
 
     def add_page(self, page_id: str, url: str, text: str,
-                 max_chars: int = DEFAULT_STORE_CHARS) -> Dict[str, Any]:
+                 max_chars: int = DEFAULT_STORE_CHARS, source: str = "") -> Dict[str, Any]:
         """Freeze one fetched page into the graph.
 
         :param page_id: the id SOURCE nodes point back to.
@@ -1363,10 +1363,16 @@ class EvidenceGraph:
             dropped, query KEPT) so it stays a fetchable address of the same page.
         :param text: the fetched page text.
         :param max_chars: cap on the stored window; the hash still covers the whole text.
+        :param source: who fetched the page (``"host_prefetch"`` for a page the host registered
+            on its own). Written as ``page["source"]`` ONLY when non-empty, so a page the model
+            read stays byte-identical to what every stored cell already carries; the dict is
+            copied wholesale by :meth:`to_dict` / :meth:`from_dict`, so the tag round-trips.
         :returns: the stored page dict.
         :raises: nothing — re-adding a page id overwrites it.
         """
         page = store_page(page_id, canonicalize_url(url), text, max_chars)
+        if source:
+            page["source"] = str(source)
         self._pages[str(page_id)] = page
         return page
 

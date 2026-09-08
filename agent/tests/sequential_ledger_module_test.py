@@ -619,3 +619,138 @@ async def test_host_derive_changes_nothing_the_model_sees(monkeypatch):
     assert with_token["final_deliverable"] == without["final_deliverable"]
     assert with_token["shape_derive"] == without["shape_derive"]
     assert with_token["answer_audit"] == without["answer_audit"]
+
+
+# -- `host_prefetch` token -- host wiring only (the prefetcher itself is tested in
+# agent/tests/host_prefetch_test.py) ----------------------------------------------------------
+
+_PREFETCH_MANDATE = ("For EACH of the following two chimneys, read its HEIGHT in metres from the "
+                     "infobox:\n  1. GRES-2 Power Station chimney\n  2. Inco Superstack\n"
+                     "Then compute the absolute difference between the two heights, in metres.")
+
+
+def _prefetch_html(label, value, lead):
+    return (f"<html><body><table class='infobox'><tr><th>{label}</th><td>{value}</td></tr>"
+            f"</table><p>{lead}</p></body></html>")
+
+
+class _PrefetchHttp:
+    """Serves the Wikipedia search API and two articles; anything else is a 404."""
+
+    def __init__(self):
+        self.calls = []
+
+    def set_telemetry(self, *_a, **_k):
+        pass
+
+    async def request(self, method, url, retries=2, **kwargs):
+        self.calls.append(url)
+        if "api.php" in url:
+            query = url.split("srsearch=")[1].split("&")[0]
+            title = "Ekibastuz_GRES-2_Power_Station" if "GRES" in query else "Inco_Superstack"
+            data = {"query": {"search": [{"title": title.replace("_", " "), "snippet": ""}]}}
+            return type("R", (), {"status": 200, "error": False, "data": data})()
+        if url.endswith("Ekibastuz_GRES-2_Power_Station"):
+            return type("R", (), {"status": 200, "error": False, "data": _prefetch_html(
+                "Height", "419.7 m (1,377 ft)", "The Ekibastuz GRES-2 Power Station chimney.")})()
+        if url.endswith("Inco_Superstack"):
+            return type("R", (), {"status": 200, "error": False, "data": _prefetch_html(
+                "Height", "380 m (1,250 ft)", "The Inco Superstack is a smokestack.")})()
+        return type("R", (), {"status": 404, "error": True, "data": "nf"})()
+
+
+def _prefetch_agent_io_class(decisions, http, search):
+    class _FakeAgentIO:
+        def __init__(self, *a, **kw):
+            self.connector_http = http
+            self.connector_search = search
+        build_llm_payload = MagicMock(return_value={"messages": []})
+        query_llm = AsyncMock(side_effect=[*(json.dumps(d) for d in decisions), "SYNTH"])
+        search = AsyncMock(return_value=[])
+        visit = AsyncMock(return_value=PAGE)
+    return _FakeAgentIO
+
+
+async def _run_prefetch_cell(monkeypatch, modules):
+    if modules:
+        monkeypatch.setenv("LEDGER_HOST_MODULES", modules)
+    else:
+        monkeypatch.delenv("LEDGER_HOST_MODULES", raising=False)
+    http = _PrefetchHttp()
+    search = MagicMock()
+    search.query_search = AsyncMock(return_value=[])
+    decisions = [
+        {"thought": "read", "action": "visit", "args": {"url": "https://example.com/a"}},
+        {"thought": "done", "action": "finish", "args": {"answer": "39.7 metres."}},
+    ]
+    monkeypatch.setattr(seq, "AgentIO", _prefetch_agent_io_class(decisions, http, search))
+    tm = MagicMock()
+    tm.metadata = {"test_id": "999"}
+    tm.get_task_statement.return_value = _PREFETCH_MANDATE
+    result = await seq.run_sequential_execution(
+        test_module=tm, model_name="m",
+        connector_llm=MagicMock(), connector_search=MagicMock(),
+        connector_http=MagicMock(), connector_chroma=MagicMock(),
+        run_stamp="r1",
+        summarize_observability_func=lambda *a, **kw: {},
+    )
+    return result, http, search
+
+
+def test_token_parsing_host_prefetch_alone(monkeypatch):
+    monkeypatch.setenv("LEDGER_HOST_MODULES", "host_prefetch")
+    assert seq._ledger_host_prefetch_enabled() is True
+    assert seq._ledger_host_derive_enabled() is False
+    assert seq._ledger_derive_enabled() is False
+
+
+def test_token_parsing_all_five(monkeypatch):
+    monkeypatch.setenv("LEDGER_HOST_MODULES", "derive,answer_audit,shape_derive,host_derive,host_prefetch")
+    assert seq._ledger_host_prefetch_enabled() is True
+    assert seq._ledger_host_derive_enabled() is True
+
+
+def test_token_parsing_neither_includes_host_prefetch(monkeypatch):
+    monkeypatch.delenv("LEDGER_HOST_MODULES", raising=False)
+    assert seq._ledger_host_prefetch_enabled() is False
+
+
+@pytest.mark.asyncio
+async def test_host_prefetch_registers_tagged_pages_without_touching_what_the_model_saw(monkeypatch):
+    """With the token, the host registers one full-text page per slot entity, tagged
+    `source == "host_prefetch"`, via `connector_http` directly -- and `output.pages` / the
+    visit count are exactly what they are without the token."""
+    with_token, http, search = await _run_prefetch_cell(monkeypatch, "host_prefetch,host_derive")
+    without, http_off, _ = await _run_prefetch_cell(monkeypatch, "host_derive")
+
+    prefetch = with_token["output"]["host_prefetch"]
+    assert prefetch["error"] is None
+    assert prefetch["registered"] == 2 and prefetch["searches"] == 2 and prefetch["fetches"] == 2
+    assert [row["status"] for row in prefetch["entities"]] == ["prefetched", "prefetched"]
+    pages = with_token["output"]["evidence_graph"]["pages"]
+    tagged = [p for p in pages if p.get("source") == "host_prefetch"]
+    assert len(tagged) == 2 and all(p["truncated"] is False for p in tagged)
+    assert search.query_search.await_count == 0          # API sufficed; no web search
+    assert http_off.calls == []                          # token absent: connector untouched
+    # Nothing the validator grounds against moved: same `output.pages`, same visit telemetry.
+    assert with_token["output"].get("pages") == without["output"].get("pages")
+    assert with_token.get("visits") == without.get("visits")
+    # And the roster is now complete enough for `host_derive` to compute from the host copies.
+    assert with_token["output"]["host_derive"]["reason"] == "computed"
+    assert with_token["output"]["host_derive"]["value"] == pytest.approx(39.7)
+
+
+@pytest.mark.asyncio
+async def test_host_prefetch_absent_leaves_the_artifact_byte_identical(monkeypatch):
+    result, http, _ = await _run_prefetch_cell(monkeypatch, "host_derive")
+    assert "host_prefetch" not in result["output"]
+    assert http.calls == []
+    assert all("source" not in p for p in result["output"]["evidence_graph"]["pages"])
+
+
+@pytest.mark.asyncio
+async def test_host_prefetch_alone_still_constructs_the_kit_and_persists_the_graph(monkeypatch):
+    result, _http, _ = await _run_prefetch_cell(monkeypatch, "host_prefetch")
+    assert "evidence_graph" in result["output"]
+    assert result["output"]["host_prefetch"]["registered"] == 2
+    assert "host_derive" not in result["output"]
