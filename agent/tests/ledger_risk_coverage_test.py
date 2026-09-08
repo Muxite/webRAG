@@ -1104,3 +1104,511 @@ class TestStrataByModelTask:
         report = lrc.build_report(self._pool())
         assert report["strata_by_model_dev_derive_on"]["m1"]["n"] == 8
         assert report["strata_by_host_dev_derive_on"]["sequential_react"]["n"] == 8
+
+
+# ==============================================================================================
+# host_derive (lane 2d): the final-answer-number rule, unit-aware agreement, ground-truth
+# correctness, the exact-binomial bound, and the exclusion of host-minted nodes from the
+# pre-registered chain.
+# ==============================================================================================
+
+def _host(reason="computed", value=38.7, unit="m", **extra):
+    """A `execution.output.host_derive` dict following the Phase-2 contract."""
+    payload = {
+        "reason": reason, "operation": "difference", "absolute": True, "mode": None,
+        "value": value, "value_text": None if value is None else str(value), "unit": unit,
+        "node_id": "n1", "winner_entity": None, "slots": [], "ranker": "hand_rule",
+        "n_pages": 2, "n_entries": 40, "min_score": 0.0,
+    }
+    payload.update(extra)
+    return payload
+
+
+class TestFinalAnswerNumber:
+    def test_last_number_of_the_last_numeric_line(self):
+        text = "A is 419.7 m.\nB is 381 m.\nThe difference is 38.7 m."
+        assert lrc.final_answer_number(text)["value"] == pytest.approx(38.7)
+
+    def test_trailing_non_numeric_lines_are_skipped(self):
+        text = "The difference is 38.7 m.\nSources:\n- https://en.wikipedia.org/wiki/X"
+        assert lrc.final_answer_number(text)["value"] == pytest.approx(38.7)
+
+    def test_citation_marker_footnote_does_not_become_the_answer(self):
+        text = "The difference is 38.7 m.\n[1] https://en.wikipedia.org/wiki/X"
+        assert lrc.final_answer_number(text)["value"] == pytest.approx(38.7)
+
+    def test_last_number_on_a_multi_number_answer_line(self):
+        text = "419.7 minus 381 equals 38.7"
+        assert lrc.final_answer_number(text)["value"] == pytest.approx(38.7)
+
+    def test_no_number_at_all_returns_none(self):
+        assert lrc.final_answer_number("Cannot be determined.") is None
+        assert lrc.final_answer_number("") is None
+
+    def test_single_line_answer(self):
+        entry = lrc.final_answer_number("38.7")
+        assert entry["value"] == pytest.approx(38.7)
+        assert entry["cleaned"][entry["start"]:entry["end"]] == "38.7"
+
+    def test_cleaning_matches_the_composition_classify_cell_uses(self):
+        """`final_answer_number` must see the same string classify_cell extracts numbers from,
+        else the 'final' number could be one clause5 never saw."""
+        text = "GRES-2 answer: 38.7 m [1] https://example.org/x"
+        spans = lrc.numbers_with_spans(lrc.clean_deliverable_text(text))
+        assert (lrc.extract_numbers(lrc.strip_citation_markers(lrc.strip_urls(text)))
+                == [value for value, _start, _end in spans])
+
+
+class TestDeliverableUnitAt:
+    def _unit(self, text):
+        entry = lrc.final_answer_number(text)
+        return lrc.deliverable_unit_at(entry["cleaned"], entry["start"], entry["end"])
+
+    def test_plain_unit(self):
+        assert self._unit("The difference is 38.7 m.") == "m"
+
+    def test_spelled_out_unit_is_canonicalised_by_the_caller(self):
+        assert lrc.canonical_compound_unit(self._unit("The difference is 38.7 metres.")) == "m"
+
+    def test_compound_rate_unit_survives_the_slash(self):
+        assert self._unit("Average speed: 219.32 km/h") == "km/h"
+
+    def test_bare_number_has_no_unit(self):
+        assert self._unit("The ratio is 2.1569") == ""
+
+    def test_non_unit_word_is_not_read_as_a_unit(self):
+        assert self._unit("Floors 104") == ""
+
+
+class TestCanonicalCompoundUnit:
+    def test_component_wise(self):
+        assert lrc.canonical_compound_unit("metres/hour") == "m/h"
+
+    def test_empty(self):
+        assert lrc.canonical_compound_unit("") == ""
+        assert lrc.canonical_compound_unit(None) == ""
+
+
+class TestHostAgreesAvailability:
+    def test_absent_key_is_unavailable_and_never_raises(self):
+        out = lrc.host_agrees(None, "The answer is 38.7 m.", [38.7])
+        assert out["available"] is False
+        assert out["agrees_final"] is False and out["agrees_any"] is False
+        assert out["reason"] is None
+
+    def test_non_dict_is_unavailable(self):
+        assert lrc.host_agrees("nope", "38.7", [38.7])["available"] is False
+
+    @pytest.mark.parametrize("reason", [
+        "no_unambiguous_shape", "fewer_than_two_slots", "operand_not_found", "unit_mismatch",
+        "unit_inconsistent_across_entities", "argmax_formula_unparsed", "no_pages", "error",
+    ])
+    def test_every_refusal_reason_is_unavailable_but_recorded(self, reason):
+        out = lrc.host_agrees(_host(reason=reason, value=None), "The answer is 38.7 m.", [38.7])
+        assert out["available"] is False
+        assert out["reason"] == reason
+        assert out["agrees_final"] is False
+
+    def test_computed_with_a_null_value_is_unavailable(self):
+        out = lrc.host_agrees(_host(value=None), "38.7 m", [38.7])
+        assert out["available"] is False
+
+    def test_computed_is_available(self):
+        assert lrc.host_agrees(_host(), "38.7 m", [38.7])["available"] is True
+
+
+class TestHostAgreesUnits:
+    def test_matching_unit(self):
+        out = lrc.host_agrees(_host(unit="m"), "The difference is 38.7 metres.", [38.7])
+        assert out["unit_status"] == "match"
+        assert out["agrees_final"] is True
+        assert out["wrong_by_unit"] is False
+
+    def test_mismatched_unit_blocks_agreement_but_not_magnitude(self):
+        out = lrc.host_agrees(_host(unit="m"), "The difference is 38.7 ft.", [38.7])
+        assert out["unit_status"] == "mismatch"
+        assert out["agrees_final_magnitude_only"] is True
+        assert out["agrees_final"] is False
+        assert out["wrong_by_unit"] is True
+
+    def test_deliverable_without_a_unit_is_unassessed_and_still_agrees(self):
+        out = lrc.host_agrees(_host(unit="m"), "The difference is 38.7", [38.7])
+        assert out["unit_status"] == "unassessed"
+        assert out["agrees_final"] is True
+
+    def test_host_without_a_unit_is_unassessed(self):
+        out = lrc.host_agrees(_host(unit=""), "The difference is 38.7 m", [38.7])
+        assert out["unit_status"] == "unassessed"
+        assert out["agrees_final"] is True
+
+    def test_compound_rate_unit_matches(self):
+        out = lrc.host_agrees(_host(unit="km/h", value=219.32),
+                              "Average speed: 219.32 km/h", [219.32])
+        assert out["unit_status"] == "match"
+        assert out["agrees_final"] is True
+
+
+class TestHostAgreesFinalVersusAny:
+    DELIVERABLE = "A is 419.7 m.\nB is 381 m.\nThe difference is 38.7 m."
+    NUMBERS = [419.7, 381.0, 38.7]
+
+    def test_operand_match_counts_as_any_but_not_as_final(self):
+        """The divergence that motivates the rule: the host value equals an INTERMEDIATE figure
+        in the working, which the old 'any number' semantics would score as agreement."""
+        out = lrc.host_agrees(_host(value=419.7), self.DELIVERABLE, self.NUMBERS)
+        assert out["agrees_any"] is True
+        assert out["agrees_final"] is False
+        assert out["final_answer_number"] == pytest.approx(38.7)
+
+    def test_answer_match_counts_as_both(self):
+        out = lrc.host_agrees(_host(value=38.7), self.DELIVERABLE, self.NUMBERS)
+        assert out["agrees_any"] is True and out["agrees_final"] is True
+
+    def test_value_absent_from_the_answer_agrees_with_neither(self):
+        out = lrc.host_agrees(_host(value=1234.0), self.DELIVERABLE, self.NUMBERS)
+        assert out["agrees_any"] is False and out["agrees_final"] is False
+
+
+class TestHostAgreesEntity:
+    def _argmax(self, **extra):
+        return _host(operation="ratio", mode="max", winner_entity="Multnomah Falls",
+                     value=63.0, unit="", **extra)
+
+    def test_deliverable_naming_the_winner_agrees(self):
+        out = lrc.host_agrees(self._argmax(),
+                              "The highest aspect ratio is Multnomah Falls at 63.0.", [63.0])
+        assert out["agrees_entity"] is True
+
+    def test_deliverable_naming_a_decoy_disagrees(self):
+        out = lrc.host_agrees(self._argmax(),
+                              "The highest aspect ratio is Kaieteur Falls.", [])
+        assert out["agrees_entity"] is False
+
+    def test_entity_match_is_token_based_not_substring(self):
+        out = lrc.host_agrees(_host(mode="max", winner_entity="Ob"),
+                              "Obvious answer: 1", [1.0])
+        assert out["agrees_entity"] is False
+
+    def test_non_argmax_cells_report_none(self):
+        assert lrc.host_agrees(_host(), "38.7 m", [38.7])["agrees_entity"] is None
+
+    def test_module_name_rx_is_used_when_the_module_loads(self, stub_argmax_module):
+        """Case/spacing variants the plain token match would reject are accepted via the task
+        module's own `name_rx` -- the same pattern the task's validator uses."""
+        out = lrc.host_agrees(self._argmax(), "the winner is multnomah  falls", [],
+                              test_id="9219")
+        assert out["agrees_entity"] is True
+
+
+@pytest.fixture
+def stub_arith_module():
+    """A stand-in 210-217 task module injected straight into the module-load cache."""
+    import types
+
+    module = types.SimpleNamespace(DERIVED=38.7, DERIVED_UNIT="m", VALUE_TOL=0.02)
+    lrc._TASK_MODULE_CACHE["9210"] = module
+    try:
+        yield module
+    finally:
+        lrc._TASK_MODULE_CACHE.pop("9210", None)
+
+
+@pytest.fixture
+def stub_argmax_module():
+    """A stand-in 218-221 task module (WINNER + a ratio ground truth) in the load cache."""
+    import types
+
+    entities = [
+        {"name": "Multnomah Falls", "name_rx": r"multnomah", "winner": True},
+        {"name": "Kaieteur Falls", "name_rx": r"kaieteur", "winner": False},
+    ]
+    module = types.SimpleNamespace(ENTITIES=entities, WINNER=entities[0],
+                                   WINNER_RATIO=63.0, RATIO_TOL=0.03)
+    lrc._TASK_MODULE_CACHE["9219"] = module
+    try:
+        yield module
+    finally:
+        lrc._TASK_MODULE_CACHE.pop("9219", None)
+
+
+class TestHostValueCorrect:
+    def test_arith_within_relative_tolerance(self, stub_arith_module):
+        assert lrc.host_value_correct(_host(value=38.7), "9210") is True
+        assert lrc.host_value_correct(_host(value=39.0), "9210") is True   # 0.8% < VALUE_TOL
+
+    def test_arith_outside_relative_tolerance(self, stub_arith_module):
+        assert lrc.host_value_correct(_host(value=45.0), "9210") is False
+
+    def test_arith_detail_names_the_ground_truth_used(self, stub_arith_module):
+        detail = lrc.host_value_correct_detail(_host(value=38.7), "9210")
+        assert detail["kind"] == "arith" and detail["reason"] == "arith_vs_DERIVED"
+
+    def test_argmax_winner_name(self, stub_argmax_module):
+        hd = _host(mode="max", winner_entity="Multnomah Falls", value=63.0, unit="")
+        assert lrc.host_value_correct(hd, "9219") is True
+
+    def test_argmax_wrong_winner(self, stub_argmax_module):
+        hd = _host(mode="max", winner_entity="Kaieteur Falls", value=170.0, unit="")
+        assert lrc.host_value_correct(hd, "9219") is False
+
+    def test_argmax_ratio_closeness_is_reported_beside_correctness(self, stub_argmax_module):
+        hd = _host(mode="max", winner_entity="Multnomah Falls", value=63.0, unit="")
+        detail = lrc.host_value_correct_detail(hd, "9219")
+        assert detail["correct"] is True and detail["close"] is True
+        far = lrc.host_value_correct_detail(
+            _host(mode="max", winner_entity="Multnomah Falls", value=10.0, unit=""), "9219")
+        assert far["correct"] is True and far["close"] is False
+
+    def test_unavailable_host_result_is_none(self, stub_arith_module):
+        assert lrc.host_value_correct(_host(reason="no_pages", value=None), "9210") is None
+        assert lrc.host_value_correct(None, "9210") is None
+
+    def test_unloadable_module_is_none(self):
+        assert lrc.host_value_correct(_host(), "9999") is None
+        assert lrc.host_value_correct_detail(_host(), "9999")["reason"] == "no_module"
+
+    def test_module_without_ground_truth_constants_is_none(self):
+        import types
+
+        lrc._TASK_MODULE_CACHE["9998"] = types.SimpleNamespace()
+        try:
+            detail = lrc.host_value_correct_detail(_host(), "9998")
+            assert detail["correct"] is None
+            assert detail["reason"] == "no_ground_truth_constants"
+        finally:
+            lrc._TASK_MODULE_CACHE.pop("9998", None)
+
+    def test_module_load_is_cached(self):
+        lrc._TASK_MODULE_CACHE.pop("9997", None)
+        assert lrc._load_task_module("9997") is None
+        assert "9997" in lrc._TASK_MODULE_CACHE
+        lrc._TASK_MODULE_CACHE.pop("9997", None)
+
+
+class TestClopperPearsonUpper:
+    def test_zero_hits_is_not_a_zero_upper_bound(self):
+        """The whole point: 0 wrong out of 10 accepted is NOT '0% risk, certainly'."""
+        upper = lrc.clopper_pearson_upper(0, 10)
+        assert upper == pytest.approx(0.3085, abs=1e-3)
+
+    def test_known_value(self):
+        assert lrc.clopper_pearson_upper(2, 20) == pytest.approx(0.3170, abs=1e-3)
+
+    def test_all_hits_is_one(self):
+        assert lrc.clopper_pearson_upper(5, 5) == 1.0
+
+    def test_empty_denominator_is_none(self):
+        assert lrc.clopper_pearson_upper(0, 0) is None
+
+    def test_bound_is_above_the_point_estimate(self):
+        for hits, n in ((1, 8), (3, 9), (7, 59)):
+            assert lrc.clopper_pearson_upper(hits, n) > hits / n
+
+
+class TestHostDeriveMintedNodeExclusion:
+    def test_host_minted_derive_does_not_flip_clause5_or_certified(self, tmp_path):
+        """A host-minted DERIVED node holding exactly the deliverable's number must NOT satisfy
+        clause1/clause5: the host computed that number from the mandate, so admitting it would
+        certify the cell on the strength of the auditor's own arithmetic."""
+        from agent.app.testing.evidence_graph import EvidenceGraph
+
+        graph = EvidenceGraph()
+        graph.add_page("p1", "https://example.org/a",
+                       "Mount X is 419.7 metres. Mount Y is 381 metres.")
+        a = graph.add_source("p1", "419.7", quote="419.7 metres", minted_by="host_derive")
+        b = graph.add_source("p1", "381", quote="381 metres", minted_by="host_derive")
+        graph.add_arith("difference", [a.id, b.id], proposed_value="38.7",
+                        minted_by="host_derive")
+
+        result = lrc.classify_cell(tmp_path / "cell.json",
+                                   _make_cell_raw(graph.to_dict(),
+                                                   deliverable="The answer is 38.7 metres."))
+        assert result["n_derived_nodes"] == 0
+        assert result["clause1"] is False
+        assert result["clause5"] is False
+        assert result["certified"] is False
+
+    def test_old_chain_identical_with_and_without_a_coexisting_host_minted_node(self, tmp_path):
+        baseline = _build_plain_graph()
+        result_baseline = lrc.classify_cell(
+            tmp_path / "baseline.json", _make_cell_raw(baseline.to_dict()))
+
+        with_host = _build_plain_graph()
+        with_host.add_page("p2", "https://example.org/b", "A stray figure: 999 metres.")
+        stray = with_host.add_source("p2", "999", quote="999 metres", minted_by="host_derive")
+        with_host.add_arith("sum", [stray.id, stray.id], proposed_value="1998",
+                            minted_by="host_derive")
+        result_with_host = lrc.classify_cell(
+            tmp_path / "with_host.json", _make_cell_raw(with_host.to_dict()))
+
+        for clause in ("clause1", "clause2", "clause3", "clause4", "clause5", "certified",
+                       "clauses_passed", "n_derived_nodes"):
+            assert result_baseline[clause] == result_with_host[clause], clause
+
+    def test_host_derive_is_on_the_exclusion_tuple(self):
+        assert "host_derive" in lrc.MECHANICALLY_MINTED_BY
+        assert "answer_audit" in lrc.MECHANICALLY_MINTED_BY
+        assert "shape_derive" in lrc.MECHANICALLY_MINTED_BY
+
+
+class TestClassifyCellHostFields:
+    def test_absent_host_derive_gives_none_false_row_fields(self, tmp_path):
+        result = lrc.classify_cell(tmp_path / "cell.json",
+                                   _make_cell_raw(_build_plain_graph().to_dict()))
+        assert result["host_derive_reason"] is None
+        assert result["host_available"] is False
+        assert result["host_agrees_final"] is False
+        assert result["host_agrees_any"] is False
+        assert result["host_unit_status"] == "unassessed"
+        assert result["host_value_correct"] is None
+        assert result["host_certified"] is False
+
+    def test_present_host_derive_populates_the_row(self, tmp_path):
+        raw = _make_cell_raw(_build_plain_graph().to_dict(),
+                             deliverable="The answer is 38.7 metres.")
+        raw["execution"]["output"]["host_derive"] = _host()
+        result = lrc.classify_cell(tmp_path / "cell.json", raw)
+        assert result["host_derive_reason"] == "computed"
+        assert result["host_available"] is True
+        assert result["host_agrees_final"] is True
+        assert result["host_unit_status"] == "match"
+        assert result["host_certified"] is True
+
+    def test_unit_mismatch_blocks_host_certified(self, tmp_path):
+        raw = _make_cell_raw(_build_plain_graph().to_dict(),
+                             deliverable="The answer is 38.7 ft.")
+        raw["execution"]["output"]["host_derive"] = _host(unit="m")
+        result = lrc.classify_cell(tmp_path / "cell.json", raw)
+        assert result["host_unit_status"] == "mismatch"
+        assert result["host_certified"] is False
+
+
+def _host_cell(file, test_id, model, wrong, host_certified=False, host_available=False,
+                reason=None, n_final_numbers=1, certified=True, value_correct=None):
+    cell = _synthetic_cell(file, test_id, model, wrong=wrong, n_derived_nodes=1,
+                            backed_only_flag=False)
+    cell["certified"] = certified
+    cell["n_final_numbers"] = n_final_numbers
+    cell.update({
+        "host_derive_reason": reason, "host_available": host_available,
+        "host_agrees_final": host_certified, "host_agrees_any": host_available,
+        "host_unit_status": "match" if host_certified else "unassessed",
+        "host_value_correct": value_correct, "host_certified": host_certified,
+        "host_agrees_entity": None, "host_agrees_final_magnitude_only": host_certified,
+        "host_value_close": None, "host_operation": "difference", "host_mode": None,
+    })
+    return cell
+
+
+class TestBuildReportHostSections:
+    def _pool(self):
+        return [
+            _host_cell("h1.json", "210", "m1", wrong=False, host_certified=True,
+                        host_available=True, reason="computed", value_correct=True),
+            _host_cell("h2.json", "211", "m1", wrong=True, host_certified=False,
+                        host_available=True, reason="computed", n_final_numbers=4,
+                        value_correct=True),
+            _host_cell("h3.json", "212", "m1", wrong=True, host_certified=False,
+                        host_available=False, reason="operand_not_found", certified=False),
+            _host_cell("h4.json", "214", "m2", wrong=False, host_certified=True,
+                        host_available=True, reason="computed", n_final_numbers=2,
+                        certified=False, value_correct=False),
+        ]
+
+    def test_all_new_keys_present(self):
+        report = lrc.build_report(self._pool())
+        for key in ("host_derive_availability", "host_derive_dev_derive_on",
+                    "host_value_correct_rate", "host_agrees_conditioned_on_n_final_numbers",
+                    "host_availability_only_baseline", "host_vs_chain"):
+            assert key in report, key
+
+    def test_availability_counts_by_reason(self):
+        avail = lrc.build_report(self._pool())["host_derive_availability"]
+        assert avail["pooled"] == {"computed": 3, "operand_not_found": 1}
+        assert avail["n_available_dev_derive_on"] == 3
+        assert avail["by_model"]["m1"] == {"computed": 2, "operand_not_found": 1}
+        assert avail["by_test_id"]["210"] == {"computed": 1}
+
+    def test_operating_point_denominator_is_all_dev_derive_on_cells(self):
+        point = lrc.build_report(self._pool())["host_derive_dev_derive_on"]
+        assert point["n"] == 4                       # NOT 3 (the available stratum)
+        assert point["accepted"] == 2
+        assert point["coverage"] == pytest.approx(0.5)
+        assert point["wrong"] == 0
+        assert point["risk"] == pytest.approx(0.0)
+        assert point["risk_upper95"] > 0.0           # exact-binomial, never a zero-width bound
+        assert point["risk_decision_bearing"] is False
+        assert point["min_accepted_for_decision"] == 59
+
+    def test_availability_only_baseline_is_looser_than_host_certified(self):
+        report = lrc.build_report(self._pool())
+        base = report["host_availability_only_baseline"]
+        assert base["accepted"] == 3
+        assert base["coverage"] == pytest.approx(0.75)
+        assert base["risk"] == pytest.approx(1 / 3)  # h2 is wrong and merely available
+
+    def test_value_correct_rate_is_among_available(self):
+        rate = lrc.build_report(self._pool())["host_value_correct_rate"]["dev_derive_on"]
+        assert rate["n_available"] == 3
+        assert rate["n_scoreable"] == 3
+        assert rate["n_correct"] == 2
+        assert rate["rate"] == pytest.approx(2 / 3)
+
+    def test_agreement_bucketed_by_n_final_numbers(self):
+        buckets = lrc.build_report(
+            self._pool())["host_agrees_conditioned_on_n_final_numbers"]["buckets"]
+        assert buckets["1"]["n"] == 1 and buckets["1"]["rate_final"] == pytest.approx(1.0)
+        assert buckets["2-3"]["n"] == 1 and buckets["2-3"]["rate_final"] == pytest.approx(1.0)
+        assert buckets["4+"]["n"] == 1 and buckets["4+"]["rate_final"] == pytest.approx(0.0)
+
+    def test_host_vs_chain_union_and_intersection(self):
+        hvc = lrc.build_report(self._pool())["host_vs_chain"]
+        assert hvc["chain_certified"]["accepted"] == 2      # h1, h2
+        assert hvc["host_certified"]["accepted"] == 2      # h1, h4
+        assert hvc["union"]["accepted"] == 3               # h1, h2, h4
+        assert hvc["intersection"]["accepted"] == 1        # h1 only
+
+    def test_sections_do_not_crash_on_a_corpus_with_no_host_key(self):
+        """The mint02/ladder03 corpora predate the hook: every host field is absent from the row
+        dict entirely (not just None), and the sections must still build."""
+        pool = [_synthetic_cell("a.json", "210", "m1", wrong=False, n_derived_nodes=1,
+                                 backed_only_flag=False)]
+        report = lrc.build_report(pool)
+        assert report["host_derive_availability"]["pooled"] == {"absent": 1}
+        assert report["host_derive_dev_derive_on"]["accepted"] == 0
+        assert report["host_derive_dev_derive_on"]["risk"] is None
+        assert report["host_value_correct_rate"]["dev_derive_on"]["rate"] is None
+
+    def test_preexisting_report_keys_are_byte_identical_with_and_without_host_fields(self):
+        """The frozen half of the report must not move when host fields appear on the rows."""
+        import json as _json
+
+        without = [_synthetic_cell(f"p{i}.json", tid, "m1", wrong=(i % 2 == 0),
+                                    n_derived_nodes=i % 2, backed_only_flag=(i % 3 == 0))
+                   for i, tid in enumerate(["210", "211", "212", "213", "214", "217"])]
+        with_host = [dict(c) for c in without]
+        for i, cell in enumerate(with_host):
+            cell.update({
+                "host_derive_reason": "computed" if i % 2 else "no_pages",
+                "host_available": bool(i % 2), "host_agrees_final": bool(i % 2),
+                "host_agrees_any": True, "host_unit_status": "match",
+                "host_value_correct": True, "host_certified": bool(i % 2),
+                "host_agrees_entity": None, "host_agrees_final_magnitude_only": True,
+                "host_value_close": None, "host_operation": "difference", "host_mode": None,
+            })
+        report_a, report_b = lrc.build_report(without), lrc.build_report(with_host)
+        old_keys = [k for k in report_a if not k.startswith("host_")]
+        assert old_keys, "sanity: the frozen half must be non-empty"
+        for key in old_keys:
+            assert _json.dumps(report_a[key], sort_keys=True, default=str) == \
+                   _json.dumps(report_b[key], sort_keys=True, default=str), key
+
+
+def test_print_report_renders_the_host_section(capsys):
+    report = lrc.build_report(TestBuildReportHostSections()._pool())
+    report["n_parse_failed"] = 0
+    report["provisional"] = False
+    lrc.print_report(report)
+    out = capsys.readouterr().out
+    assert "host derive" in out
+    assert "host_value_correct" in out

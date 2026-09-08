@@ -32,7 +32,9 @@ from __future__ import annotations
 
 import argparse
 import glob
+import importlib
 import json
+import math
 import os
 import re
 import sys
@@ -53,6 +55,16 @@ HOLDOUT_TEST_IDS = frozenset({"213", "217", "221"})
 DEV_TEST_IDS = frozenset({"210", "211", "212", "214", "215", "216", "218", "219", "220"})
 
 REL_TOL = 0.005  # 0.5% relative tolerance, per GATE_PRECISION_PRECHECK_2026-09-04.md
+
+#: ``minted_by`` values whose nodes are excluded from the pre-registered 5-clause certify chain.
+#: Every mechanical host pass belongs here: a host-minted node backs exactly the number that was
+#: extracted from the deliverable (or computed for it) to produce the node, so admitting one makes
+#: clause5 ("no unbacked final-answer number") circular and silently inflates ``certified``.
+#: ``host_derive`` is the Phase-2 host hook: it computes the answer from the mandate's own slots
+#: and mints DERIVED nodes, which would otherwise flip clause1 AND clause5 on cells where the model
+#: itself derived nothing. Its signal is reported separately (see the "host derive" section) and
+#: must never enter ``certified``.
+MECHANICALLY_MINTED_BY: Tuple[str, ...] = ("answer_audit", "shape_derive", "host_derive")
 
 COVERAGE_TARGETS = (0.50, 0.80, 1.00)
 
@@ -472,6 +484,416 @@ def answer_audit_sweep(cells: Sequence[Dict[str, Any]], wrong_key: str = "wrong"
 
 
 # ==============================================================================================
+# host_derive: the model-invisible host computation, and the signals derived FROM it
+# ==============================================================================================
+#
+# The host hook stores its result at ``execution.output.host_derive`` (absent when the module is
+# off). Contract, as produced by ``LedgerToolkit.host_derive``::
+#
+#     {"reason": "computed"|"no_unambiguous_shape"|"fewer_than_two_slots"|"operand_not_found"
+#                |"unit_mismatch"|"unit_inconsistent_across_entities"|"argmax_formula_unparsed"
+#                |"no_pages"|"error",
+#      "operation": str|None, "absolute": bool, "mode": "max"|"min"|None,
+#      "value": float|None, "value_text": str|None, "unit": str,
+#      "node_id": str|None, "winner_entity": str|None, "slots": [...], "ranker": str,
+#      "n_pages": int, "n_entries": int, "min_score": float}
+#
+# NOTHING here feeds the pre-registered certify chain: host-minted nodes are excluded at the
+# graph walk (see :data:`MECHANICALLY_MINTED_BY`) and every key below is additive.
+
+#: Reason strings the host hook can return, in the order the availability table prints them.
+#: Any reason not on this list still counts (the table is built from what the corpus holds); the
+#: order exists so a table is comparable across runs rather than sorted by whatever fired most.
+HOST_DERIVE_REASONS: Tuple[str, ...] = (
+    "computed", "no_unambiguous_shape", "fewer_than_two_slots", "operand_not_found",
+    "unit_mismatch", "unit_inconsistent_across_entities", "argmax_formula_unparsed",
+    "no_pages", "error",
+)
+
+#: Accepted-cell count below which the risk figure in ``host_derive_dev_derive_on`` is REPORTED
+#: but not decision-bearing (replan Phase 3: "risk is decision-bearing only at >=59 accepted").
+HOST_RISK_DECISION_MIN_ACCEPTED = 59
+
+#: Words dropped before the plain (module-less) entity token match, so "the Mekong River" in the
+#: deliverable still matches a ``winner_entity`` of "Mekong River" and vice versa.
+_ENTITY_STOPWORDS = frozenset({"the", "of", "a", "an", "and"})
+_TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
+
+
+def clean_deliverable_text(text: str) -> str:
+    """The deliverable as :func:`extract_numbers` sees it in :func:`classify_cell`.
+
+    Exactly ``strip_identifiers(strip_citation_markers(strip_urls(text)))`` -- the same
+    composition ``classify_cell`` applies (``strip_identifiers`` runs inside
+    :func:`extract_numbers`), hoisted into one function so the host-agreement path can take
+    OFFSETS into the identical cleaned string. Offsets matter here and nowhere else: the unit a
+    number carries is read from the characters immediately after it.
+    """
+    return strip_identifiers(strip_citation_markers(strip_urls(text or "")))
+
+
+def numbers_with_spans(cleaned: str) -> List[Tuple[float, int, int]]:
+    """``(value, start, end)`` for every numeric token in an ALREADY-CLEANED string.
+
+    Same regex and same thousands-separator handling as :func:`extract_numbers`; the only
+    difference is that the spans survive, so :func:`deliverable_unit_at` can read the unit token
+    that follows. Pass :func:`clean_deliverable_text` output, not raw deliverable text -- the
+    strip passes shift offsets.
+    """
+    out: List[Tuple[float, int, int]] = []
+    for match in _NUM_RE.finditer(cleaned or ""):
+        try:
+            out.append((float(match.group(0).replace(",", "")), match.start(), match.end()))
+        except ValueError:
+            continue
+    return out
+
+
+def final_answer_number(deliverable: str) -> Optional[Dict[str, Any]]:
+    """The deliverable's FINAL ANSWER NUMBER, or ``None`` when it states none.
+
+    No such notion existed anywhere in this script, in ``agent/app/answer_numbers.py`` or in the
+    ``answer_audit`` block (all of which work over EVERY number in the answer), so it is defined
+    here, once:
+
+        clean the deliverable with :func:`clean_deliverable_text`, then take the LAST non-empty
+        line that contains at least one number, and within it the LAST number.
+
+    Why this rule and not another: the corpus's answers put the working first and the conclusion
+    last ("A is 419.7 m; B is 381 m; the difference is 38.7 m"), and a trailing "Sources:" block
+    contributes no numbers once URLs and ``[n]`` markers are stripped -- so the last numeric line
+    is the answer line and its last number is the answer. It is a HEURISTIC, which is exactly why
+    ``host_agrees`` reports ``agrees_any`` (the old looser "any number in the answer" semantics)
+    beside ``agrees_final``: where the two disagree, the rule is what is being questioned.
+
+    :returns: ``{"value", "start", "end", "cleaned"}`` -- ``start``/``end`` index into
+        ``cleaned``, which is the cleaned deliverable -- or ``None`` if no number is present.
+    """
+    cleaned = clean_deliverable_text(deliverable)
+    best: Optional[Tuple[float, int, int]] = None
+    offset = 0
+    for line in cleaned.splitlines(keepends=True):
+        if line.strip():
+            spans = numbers_with_spans(line)
+            if spans:
+                value, start, end = spans[-1]
+                best = (value, start + offset, end + offset)
+        offset += len(line)
+    if best is None:
+        return None
+    return {"value": best[0], "start": best[1], "end": best[2], "cleaned": cleaned}
+
+
+def canonical_compound_unit(unit: Any) -> str:
+    """``canonical_unit`` applied per component of a ``"/"``-separated unit (``"km/h"``).
+
+    Spelling only, never conversion -- see ``evidence_graph.canonical_unit``, which this delegates
+    to component-wise so a compound rate unit is comparable at all (that function collapses
+    ``metres``->``m`` but treats ``"km/h"`` as one opaque token).
+    """
+    from agent.app.testing.evidence_graph import canonical_unit
+
+    text = str(unit or "").strip().lower()
+    if not text:
+        return ""
+    return "/".join(canonical_unit(part) for part in text.split("/"))
+
+
+def deliverable_unit_at(cleaned: str, start: int, end: int) -> str:
+    """The unit the DELIVERABLE gives the number at ``[start:end)``, or ``""`` when it states none.
+
+    Reuses ``ledger_tools._unit_at_span`` (whitelist-gated, superscript-aware) rather than
+    re-reading "whatever word follows the number" -- that whitelist exists precisely because the
+    corpus is full of ``104\\nFloors`` shapes that a naive read turns into fake dimensions. The one
+    thing added here is the ``"/"`` continuation: ``_unit_at_span``'s pattern stops at the slash,
+    so a genuine ``219.32 km/h`` in the answer would read as ``km`` and then MISMATCH a host unit
+    of ``km/h``. The continuation reads what the answer actually wrote; it never invents a
+    denominator that is not there.
+    """
+    from agent.app.ledger_tools import _SPAN_UNIT_RE, _unit_at_span
+
+    base = _unit_at_span(cleaned or "", start, end)
+    if not base:
+        return ""
+    match = _SPAN_UNIT_RE.match(cleaned, end)
+    pos = match.end() if match else end
+    if cleaned[pos:pos + 1] == "/":
+        tail = _unit_at_span(cleaned, pos, pos + 1)
+        if tail:
+            return f"{base}/{tail}"
+    return base
+
+
+def _entity_tokens(text: str) -> List[str]:
+    return [t for t in (m.group(0).lower() for m in _TOKEN_RE.finditer(text or ""))
+            if t not in _ENTITY_STOPWORDS]
+
+
+def deliverable_names_entity(deliverable: str, entity: str,
+                              name_rx: Optional[str] = None) -> bool:
+    """Whether ``deliverable`` names ``entity``.
+
+    ``name_rx`` (the task module's own winner pattern -- see :func:`_entity_name_rx`) is used when
+    one is available, so agreement is judged by the same regex the task's validator uses. Without
+    a module the fallback is a case-insensitive token match: every non-stopword token of ``entity``
+    must appear as a token of the deliverable. Substring matching is deliberately avoided ("Ob"
+    inside "Obvious").
+    """
+    if name_rx:
+        try:
+            return bool(re.search(name_rx, deliverable or "", re.IGNORECASE))
+        except re.error:
+            pass
+    tokens = set(_entity_tokens(deliverable))
+    wanted = _entity_tokens(entity)
+    return bool(wanted) and all(t in tokens for t in wanted)
+
+
+def host_agrees(host_derive: Any, deliverable: str,
+                 final_numbers: Sequence[float] = (),
+                 test_id: Optional[str] = None,
+                 rel_tol: float = REL_TOL) -> Dict[str, Any]:
+    """Does the model's answer agree with what the host computed, WITH units?
+
+    This is the secondary mechanism signal (``host_value_correct`` is primary: agreement with a
+    wrong answer is agreement, not correctness). Absence of the key, a non-dict, a non-``computed``
+    reason or a ``None`` value all come back ``available: False`` with every flag ``False`` --
+    this function never raises.
+
+    :param host_derive: the raw ``execution.output.host_derive`` value (or ``None``).
+    :param deliverable: the cell's ``final_deliverable`` text.
+    :param final_numbers: numbers already extracted from the deliverable by
+        :func:`classify_cell`; used for ``agrees_any`` so the loose semantics are computed over
+        exactly the same list clause5 uses.
+    :param test_id: when given and the task module loads, the argmax winner's ``name_rx`` is used
+        for the entity match instead of the plain token match.
+    :returns: ``{"available", "reason", "operation", "mode", "host_value", "host_unit",
+        "final_answer_number", "deliverable_unit", "unit_status", "agrees_final",
+        "agrees_final_magnitude_only", "agrees_any", "agrees_entity", "wrong_by_unit"}``.
+        ``unit_status`` is ``"match"``/``"mismatch"``/``"unassessed"``; unassessed means the
+        deliverable's final number carries no unit, or the host reported none -- there is nothing
+        to compare, which is a different fact from the units disagreeing.
+    """
+    out: Dict[str, Any] = {
+        "available": False, "reason": None, "operation": None, "mode": None,
+        "host_value": None, "host_unit": "", "final_answer_number": None,
+        "deliverable_unit": "", "unit_status": "unassessed",
+        "agrees_final": False, "agrees_final_magnitude_only": False, "agrees_any": False,
+        "agrees_entity": None, "wrong_by_unit": False,
+    }
+    if not isinstance(host_derive, dict):
+        return out
+    out["reason"] = host_derive.get("reason")
+    out["operation"] = host_derive.get("operation")
+    out["mode"] = host_derive.get("mode")
+    out["host_unit"] = str(host_derive.get("unit") or "")
+    try:
+        value = None if host_derive.get("value") is None else float(host_derive["value"])
+    except (TypeError, ValueError):
+        value = None
+    out["host_value"] = value
+    if out["reason"] != "computed" or value is None:
+        return out
+    out["available"] = True
+
+    out["agrees_any"] = value_backed(value, list(final_numbers), rel_tol)
+
+    entry = final_answer_number(deliverable)
+    if entry is not None:
+        out["final_answer_number"] = entry["value"]
+        magnitude_ok = value_backed(value, [entry["value"]], rel_tol)
+        out["agrees_final_magnitude_only"] = magnitude_ok
+        answer_unit = canonical_compound_unit(
+            deliverable_unit_at(entry["cleaned"], entry["start"], entry["end"])
+        )
+        host_unit = canonical_compound_unit(out["host_unit"])
+        out["deliverable_unit"] = answer_unit
+        if not answer_unit or not host_unit:
+            out["unit_status"] = "unassessed"
+        else:
+            out["unit_status"] = "match" if answer_unit == host_unit else "mismatch"
+        out["wrong_by_unit"] = out["unit_status"] == "mismatch"
+        out["agrees_final"] = magnitude_ok and not out["wrong_by_unit"]
+
+    winner = host_derive.get("winner_entity")
+    if host_derive.get("mode") and winner:
+        out["agrees_entity"] = deliverable_names_entity(
+            deliverable, str(winner), _entity_name_rx(test_id, str(winner))
+        )
+    return out
+
+
+# ---------------------------------------------------------------------------------------------
+# host_value_correct: the host's value against the TASK MODULE's ground truth
+# ---------------------------------------------------------------------------------------------
+
+#: ``{test_id: module | None}``. Populated lazily by :func:`_load_task_module`; a test injects a
+#: stub by writing the module object (or ``None``) straight into this dict.
+_TASK_MODULE_CACHE: Dict[str, Any] = {}
+
+#: Ground-truth pairs the argmax tasks (218-221) expose for the WINNER's computed quantity:
+#: ``(value constant, tolerance constant)``. All three are relative tolerances, like ``VALUE_TOL``.
+_WINNER_VALUE_CONSTANTS: Tuple[Tuple[str, str], ...] = (
+    ("WINNER_RATIO", "RATIO_TOL"),
+    ("WINNER_DENSITY", "DENSITY_TOL"),
+    ("WINNER_FRACTION", "FRACTION_TOL"),
+)
+
+
+def _load_task_module(test_id: Optional[str]) -> Any:
+    """The real ``agent.app.idea_tests.test_<id>_*`` module, or ``None``.
+
+    Imported as a real package module (the ``scripts/rescore_results.py:38-46`` pattern) so the
+    module-level constants keep their identity -- ``OP_A``/``DERIVED``/``WINNER`` are read, not
+    re-derived. Cached per test id (module import is not free and this runs once per cell), and
+    never raises: an unimportable or absent module caches as ``None``.
+    """
+    key = str(test_id or "")
+    if key in _TASK_MODULE_CACHE:
+        return _TASK_MODULE_CACHE[key]
+    module = None
+    if key:
+        matches = sorted(glob.glob(str(_REPO_ROOT / "agent" / "app" / "idea_tests" /
+                                       f"test_{key}_*.py")))
+        if matches:
+            name = "agent.app.idea_tests." + os.path.basename(matches[0])[:-3]
+            try:
+                module = importlib.import_module(name)
+            except Exception:  # noqa: BLE001 -- a broken task module must not kill the analysis
+                module = None
+    _TASK_MODULE_CACHE[key] = module
+    return module
+
+
+def _entity_name_rx(test_id: Optional[str], winner_entity: str) -> Optional[str]:
+    """The task module's ``name_rx`` for ``winner_entity``, or ``None`` when unavailable."""
+    module = _load_task_module(test_id)
+    entities = getattr(module, "ENTITIES", None) if module is not None else None
+    if not isinstance(entities, list):
+        return None
+    tokens = set(_entity_tokens(winner_entity))
+    for entity in entities:
+        if not isinstance(entity, dict):
+            continue
+        name = str(entity.get("name") or "")
+        rx = entity.get("name_rx")
+        if not rx:
+            continue
+        if name.lower() == winner_entity.strip().lower() or tokens == set(_entity_tokens(name)):
+            return str(rx)
+    return None
+
+
+def host_value_correct_detail(host_derive: Any, test_id: Optional[str]) -> Dict[str, Any]:
+    """``host_value_correct`` with its working shown.
+
+    Two ground-truth shapes, both read from the REAL task module:
+
+    * 210-217 (arithmetic): correct iff ``abs(value - DERIVED) <= VALUE_TOL * abs(DERIVED)``.
+      ``VALUE_TOL`` is RELATIVE in every module (``_has_value`` compares
+      ``abs(v - target) <= abs(target) * tol``), so it is applied relatively here too.
+    * 218-221 (argmax): correct iff ``winner_entity`` matches ``WINNER["name_rx"]``. When the
+      module also exposes the winner's computed quantity and its tolerance (see
+      :data:`_WINNER_VALUE_CONSTANTS`), ``close`` additionally reports whether the host's VALUE is
+      within that relative tolerance of it -- reported beside correctness, never folded into it,
+      because the argmax task's keystone is the name.
+
+    :returns: ``{"correct": bool|None, "close": bool|None, "kind": "arith"|"argmax"|None,
+        "reason": str}``. ``correct`` is ``None`` whenever the mechanism produced nothing, the
+        module will not load, or the module exposes neither ground-truth shape.
+    """
+    out: Dict[str, Any] = {"correct": None, "close": None, "kind": None, "reason": ""}
+    if not isinstance(host_derive, dict) or host_derive.get("reason") != "computed":
+        out["reason"] = "not_available"
+        return out
+    module = _load_task_module(test_id)
+    if module is None:
+        out["reason"] = "no_module"
+        return out
+
+    derived = getattr(module, "DERIVED", None)
+    value_tol = getattr(module, "VALUE_TOL", None)
+    if derived is not None and value_tol is not None:
+        out["kind"] = "arith"
+        try:
+            value = float(host_derive.get("value"))
+        except (TypeError, ValueError):
+            out["reason"] = "unreadable_value"
+            return out
+        out["correct"] = abs(value - float(derived)) <= float(value_tol) * abs(float(derived))
+        out["reason"] = "arith_vs_DERIVED"
+        return out
+
+    winner = getattr(module, "WINNER", None)
+    if isinstance(winner, dict) and winner.get("name_rx"):
+        out["kind"] = "argmax"
+        entity = str(host_derive.get("winner_entity") or "")
+        out["correct"] = bool(entity) and bool(
+            re.search(str(winner["name_rx"]), entity, re.IGNORECASE)
+        )
+        out["reason"] = "argmax_vs_WINNER"
+        for value_name, tol_name in _WINNER_VALUE_CONSTANTS:
+            target, tol = getattr(module, value_name, None), getattr(module, tol_name, None)
+            if target is None or tol is None:
+                continue
+            try:
+                value = float(host_derive.get("value"))
+            except (TypeError, ValueError):
+                break
+            out["close"] = abs(value - float(target)) <= float(tol) * abs(float(target))
+            break
+        return out
+
+    out["reason"] = "no_ground_truth_constants"
+    return out
+
+
+def host_value_correct(host_derive: Any, test_id: Optional[str]) -> Optional[bool]:
+    """Whether the host's own computation matches the task's ground truth -- the PRIMARY mechanism
+    metric. ``None`` when unavailable (see :func:`host_value_correct_detail`)."""
+    return host_value_correct_detail(host_derive, test_id)["correct"]
+
+
+# ---------------------------------------------------------------------------------------------
+# Exact-binomial (Clopper-Pearson) upper bound
+# ---------------------------------------------------------------------------------------------
+
+def _binomial_cdf(k: int, n: int, p: float) -> float:
+    """``P(X <= k)`` for ``X ~ Binomial(n, p)``, summed exactly (``n`` here is in the hundreds)."""
+    if k >= n:
+        return 1.0
+    if k < 0:
+        return 0.0
+    return sum(math.comb(n, i) * (p ** i) * ((1.0 - p) ** (n - i)) for i in range(k + 1))
+
+
+def clopper_pearson_upper(hits: int, n: int, alpha: float = 0.05) -> Optional[float]:
+    """The exact-binomial (Clopper-Pearson) UPPER confidence limit for ``hits / n``.
+
+    Exact rather than normal-approximate because the accepted stratum this is applied to is small
+    and frequently sits at the ``hits == 0`` boundary, where a Wald interval reports a
+    zero-width interval around zero -- precisely the "0% risk" over-claim this bound exists to
+    prevent. The limit is the two-sided ``1 - alpha`` interval's upper end (tail ``alpha / 2``),
+    i.e. the smallest ``p`` with ``P(X <= hits; n, p) <= alpha / 2``, found by bisection on the
+    exact CDF (monotone decreasing in ``p``). No scipy: this venv may not have it.
+
+    :returns: the bound in ``[0, 1]``, or ``None`` when ``n <= 0``.
+    """
+    if n <= 0:
+        return None
+    if hits >= n:
+        return 1.0
+    low, high = 0.0, 1.0
+    for _ in range(200):
+        mid = (low + high) / 2.0
+        if _binomial_cdf(hits, n, mid) > alpha / 2.0:
+            low = mid
+        else:
+            high = mid
+    return (low + high) / 2.0
+
+
+# ==============================================================================================
 # Filesystem / evidence-graph plumbing (not unit-tested directly; exercised by the smoke run)
 # ==============================================================================================
 
@@ -556,6 +978,8 @@ def classify_cell(path: Path, raw: Dict[str, Any]) -> Dict[str, Any]:
     evidence_graph = output.get("evidence_graph")
     answer_audit = classify_answer_audit_summary(output.get("answer_audit"))
     shape_derive = classify_shape_derive_summary(output.get("shape_derive"))
+    host_derive = output.get("host_derive")
+    host_derive = host_derive if isinstance(host_derive, dict) else None
 
     derived_nodes: List[Dict[str, Any]] = []
     source_quote_verified: Dict[str, Optional[bool]] = {}
@@ -571,8 +995,8 @@ def classify_cell(path: Path, raw: Dict[str, Any]) -> Dict[str, Any]:
             for row in reverify_result.get("nodes", []) if row.get("kind") == KIND_DERIVED
         }
         for node in graph.nodes():
-            # Old-chain integrity, LOAD-BEARING for clause5: skip any node minted by the
-            # answer_audit / shape_derive mechanical passes (see API contract in
+            # Old-chain integrity, LOAD-BEARING for clause5: skip any node minted by a
+            # mechanical host pass (see :data:`MECHANICALLY_MINTED_BY` and the API contract in
             # mechanical_minting_plan.md REVISION 1 -- "clause semantics must be stable across
             # the minting boundary"). Without this exclusion, a host-minted node would enter
             # backing_values and make clause5 ("no unbacked final-answer number") circular: it
@@ -580,7 +1004,7 @@ def classify_cell(path: Path, raw: Dict[str, Any]) -> Dict[str, Any]:
             # it. Read via getattr with a "" default so evidence-graph artifacts predating the
             # minted_by field (which defaults to "" on deserialization) are unaffected -- every
             # node from before either mechanism existed is treated as non-minted, same as today.
-            if (getattr(node, "minted_by", "") or "") in ("answer_audit", "shape_derive"):
+            if (getattr(node, "minted_by", "") or "") in MECHANICALLY_MINTED_BY:
                 continue
             if node.kind == KIND_SOURCE:
                 source_quote_verified[node.id] = node.quote_verified
@@ -605,6 +1029,15 @@ def classify_cell(path: Path, raw: Dict[str, Any]) -> Dict[str, Any]:
         include_trivial=False, max_ambiguity=1,
     )
 
+    # host_derive: ADDITIVE ONLY. Every field below is new; none of them feeds `certified` or any
+    # pre-existing key (the host's own nodes are excluded from the graph walk above). All are
+    # None/False when the host module was off for the run and the key is absent.
+    agreement = host_agrees(host_derive, deliverable, final_numbers, test_id)
+    value_detail = host_value_correct_detail(host_derive, test_id)
+    host_certified = bool(
+        agreement["available"] and agreement["agrees_final"] and not agreement["wrong_by_unit"]
+    )
+
     return {
         "file": path.name, "test_id": test_id, "model": model, "host": host,
         "campaign": campaign, "arm": arm, "infra_failed": infra_failed, "score": score,
@@ -621,6 +1054,20 @@ def classify_cell(path: Path, raw: Dict[str, Any]) -> Dict[str, Any]:
         "answer_audit": answer_audit,
         "backed_only_flag": backed_only_flag,
         "shape_derive": shape_derive,
+        "host_derive_reason": (host_derive or {}).get("reason"),
+        "host_available": agreement["available"],
+        "host_agrees_final": agreement["agrees_final"],
+        "host_agrees_any": agreement["agrees_any"],
+        "host_unit_status": agreement["unit_status"],
+        "host_value_correct": value_detail["correct"],
+        "host_certified": host_certified,
+        # Beyond the required set, so the argmax half and the final-vs-any gap stay auditable
+        # per-cell rather than only in aggregate.
+        "host_agrees_entity": agreement["agrees_entity"],
+        "host_agrees_final_magnitude_only": agreement["agrees_final_magnitude_only"],
+        "host_value_close": value_detail["close"],
+        "host_operation": agreement["operation"],
+        "host_mode": agreement["mode"],
     }
 
 
@@ -933,6 +1380,142 @@ def build_report(cells: List[Dict[str, Any]]) -> Dict[str, Any]:
         ),
     }
 
+    # ==========================================================================================
+    # host_derive (NEW, additive-only). Every operating point below has ALL dev derive-ON cells
+    # as its denominator -- never the "available" stratum. Conditioning coverage on availability
+    # is the escape hatch the replan closes explicitly ("availability shown beside it, never the
+    # denominator"), because a mechanism that fires on 5 cells and is right on all 5 would
+    # otherwise print 100% coverage. Availability is therefore reported as its OWN table.
+    # A corpus predating the host hook has no `host_derive` key anywhere: every count here comes
+    # out zero and no section crashes (verified on the mint02 smoke run).
+    # ==========================================================================================
+    def _host_flag(cell: Dict[str, Any], key: str) -> Any:
+        return cell.get(key)
+
+    def _host_point(pool: Sequence[Dict[str, Any]], key: str) -> Dict[str, Any]:
+        """Coverage/risk of one host acceptance flag over ``pool``, with the exact-binomial 95%
+        upper bound on risk and whether that risk is decision-bearing at this n."""
+        n = len(pool)
+        accepted = [c for c in pool if _host_flag(c, key)]
+        wrong = [c for c in accepted if c["wrong"]]
+        return {
+            "n": n,
+            "accepted": len(accepted),
+            "wrong": len(wrong),
+            "coverage": (len(accepted) / n) if n else None,
+            "risk": (len(wrong) / len(accepted)) if accepted else None,
+            "risk_upper95": clopper_pearson_upper(len(wrong), len(accepted)),
+            "risk_decision_bearing": len(accepted) >= HOST_RISK_DECISION_MIN_ACCEPTED,
+        }
+
+    def _reason_counts(pool: Sequence[Dict[str, Any]]) -> Dict[str, int]:
+        counts: Dict[str, int] = {}
+        for cell in pool:
+            reason = cell.get("host_derive_reason") or "absent"
+            counts[reason] = counts.get(reason, 0) + 1
+        ordered = {r: counts[r] for r in HOST_DERIVE_REASONS if r in counts}
+        ordered.update({r: n for r, n in sorted(counts.items()) if r not in ordered})
+        return ordered
+
+    def _by(pool: Sequence[Dict[str, Any]], keys: Sequence[str]) -> Dict[str, Dict[str, int]]:
+        return {"/".join(str(k) for k in key): _reason_counts(group)
+                for key, group in sorted(stratify(pool, keys).items(),
+                                          key=lambda kv: tuple(str(x) for x in kv[0]))}
+
+    report["host_derive_availability"] = {
+        "note": ("counts by host_derive reason. 'absent' = the host module was off for that run "
+                 "(no key stored). Pooled/by-model/by-test_id are over DEV DERIVE-ON cells, the "
+                 "same population as host_derive_dev_derive_on; all_usable is context."),
+        "n_dev_derive_on": len(dev_derive_on),
+        "pooled": _reason_counts(dev_derive_on),
+        "by_model": _by(dev_derive_on, ["model"]),
+        "by_test_id": _by(dev_derive_on, ["test_id"]),
+        "all_usable": _reason_counts(usable),
+        "n_available_dev_derive_on": sum(1 for c in dev_derive_on if _host_flag(c, "host_available")),
+    }
+
+    report["host_derive_dev_derive_on"] = {
+        **_host_point(dev_derive_on, "host_certified"),
+        "min_accepted_for_decision": HOST_RISK_DECISION_MIN_ACCEPTED,
+        "note": ("host_certified = available AND agrees_final AND NOT wrong-by-unit. Risk is "
+                 f"reported at any n but is decision-bearing only at >= "
+                 f"{HOST_RISK_DECISION_MIN_ACCEPTED} accepted cells (replan Phase 3)."),
+        "by_model": {"/".join(str(k) for k in key): _host_point(group, "host_certified")
+                     for key, group in sorted(stratify(dev_derive_on, ["model"]).items(),
+                                               key=lambda kv: tuple(str(x) for x in kv[0]))},
+    }
+
+    def _correct_rate(pool: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+        available = [c for c in pool if _host_flag(c, "host_available")]
+        scoreable = [c for c in available if c.get("host_value_correct") is not None]
+        correct = [c for c in scoreable if c["host_value_correct"] is True]
+        close_scoreable = [c for c in available if c.get("host_value_close") is not None]
+        return {
+            "n_available": len(available),
+            "n_scoreable": len(scoreable),
+            "n_correct": len(correct),
+            "rate": (len(correct) / len(scoreable)) if scoreable else None,
+            "n_close_scoreable": len(close_scoreable),
+            "n_close": sum(1 for c in close_scoreable if c["host_value_close"] is True),
+        }
+
+    report["host_value_correct_rate"] = {
+        "note": ("PRIMARY mechanism metric: the host's own value/winner against the task module's "
+                 "ground truth, among cells where the host produced one. Independent of what the "
+                 "model answered. n_scoreable < n_available means a module would not load or "
+                 "exposes no ground-truth constants."),
+        "dev_derive_on": _correct_rate(dev_derive_on),
+        "all_usable": _correct_rate(usable),
+        "by_test_id": {"/".join(str(k) for k in key): _correct_rate(group)
+                       for key, group in sorted(stratify(usable, ["test_id"]).items(),
+                                                 key=lambda kv: tuple(str(x) for x in kv[0]))},
+    }
+
+    def _n_final_bucket(cell: Dict[str, Any]) -> str:
+        n = int(cell.get("n_final_numbers") or 0)
+        if n <= 1:
+            return "1"
+        return "2-3" if n <= 3 else "4+"
+
+    buckets: Dict[str, Dict[str, Any]] = {}
+    for label in ("1", "2-3", "4+"):
+        group = [c for c in dev_derive_on
+                 if _host_flag(c, "host_available") and _n_final_bucket(c) == label]
+        buckets[label] = {
+            "n": len(group),
+            "n_agrees_final": sum(1 for c in group if c.get("host_agrees_final")),
+            "n_agrees_any": sum(1 for c in group if c.get("host_agrees_any")),
+            "rate_final": (sum(1 for c in group if c.get("host_agrees_final")) / len(group))
+                           if group else None,
+            "rate_any": (sum(1 for c in group if c.get("host_agrees_any")) / len(group))
+                         if group else None,
+        }
+    report["host_agrees_conditioned_on_n_final_numbers"] = {
+        "note": ("among AVAILABLE dev derive-ON cells. The final-vs-any gap widens with the "
+                 "number count: 'any' accepts a host value that matches some intermediate figure "
+                 "in the working, which is why agrees_final is the reported signal."),
+        "buckets": buckets,
+    }
+
+    report["host_availability_only_baseline"] = {
+        **_host_point(dev_derive_on, "host_available"),
+        "note": ("NEGATIVE CONTROL: accept every cell where the host computed anything, ignoring "
+                 "whether the model's answer agrees. host_certified must beat this to mean "
+                 "anything; identical numbers mean the agreement test is inert."),
+    }
+
+    union_cells = [dict(c, _host_union=bool(c.get("certified") or c.get("host_certified")),
+                        _host_inter=bool(c.get("certified") and c.get("host_certified")))
+                   for c in dev_derive_on]
+    report["host_vs_chain"] = {
+        "note": ("same dev derive-ON cells, four acceptance rules side by side: the frozen "
+                 "5-clause chain, the host signal, and their union/intersection."),
+        "chain_certified": _host_point(dev_derive_on, "certified"),
+        "host_certified": _host_point(dev_derive_on, "host_certified"),
+        "union": _host_point(union_cells, "_host_union"),
+        "intersection": _host_point(union_cells, "_host_inter"),
+    }
+
     return report
 
 
@@ -1065,6 +1648,54 @@ def print_report(report: Dict[str, Any]) -> None:
     print(f"  verdict_true_but_wrong_files: {len(sd['verdict_true_but_wrong_files'])} cells")
     for f in sd["verdict_true_but_wrong_files"]:
         print(f"    {f}")
+    print()
+
+    print("--- host derive (model-invisible host computation; NEVER part of `certified`) ---")
+    avail = report["host_derive_availability"]
+    print(f"  availability (dev derive-ON, n={avail['n_dev_derive_on']}, "
+          f"available={avail['n_available_dev_derive_on']}):")
+    print(f"    pooled: {avail['pooled']}")
+    print(f"    all_usable: {avail['all_usable']}")
+    for label in ("by_model", "by_test_id"):
+        print(f"    {label}:")
+        for key, row in avail[label].items():
+            print(f"      {key:20s} {row}")
+
+    def _print_host_point(label: str, row: Dict[str, Any]) -> None:
+        upper = row.get("risk_upper95")
+        print(f"    {label:22s} n={row['n']:4d} accepted={row['accepted']:4d} "
+              f"coverage={_fmt_pct(row['coverage']):>7} risk={_fmt_pct(row['risk']):>7} "
+              f"risk_upper95={_fmt_pct(upper):>7} "
+              f"decision_bearing={row['risk_decision_bearing']}")
+
+    point = report["host_derive_dev_derive_on"]
+    print("  host_certified operating point (denominator = ALL dev derive-ON cells):")
+    _print_host_point("pooled", point)
+    for key, row in point["by_model"].items():
+        _print_host_point(key, row)
+
+    print("  negative control (availability only, no agreement test):")
+    _print_host_point("available", report["host_availability_only_baseline"])
+
+    hvc = report["host_value_correct_rate"]
+    print("  host_value_correct (PRIMARY: host value vs task ground truth, among available):")
+    for label in ("dev_derive_on", "all_usable"):
+        row = hvc[label]
+        print(f"    {label:22s} available={row['n_available']} scoreable={row['n_scoreable']} "
+              f"correct={row['n_correct']} rate={_fmt_pct(row['rate'])} "
+              f"close={row['n_close']}/{row['n_close_scoreable']}")
+    print("    by_test_id:")
+    for key, row in hvc["by_test_id"].items():
+        print(f"      {key:8s} {row}")
+
+    print("  agreement conditioned on n_final_numbers (available dev derive-ON cells):")
+    for label, row in report["host_agrees_conditioned_on_n_final_numbers"]["buckets"].items():
+        print(f"    n_final={label:4s} n={row['n']:4d} agrees_final={_fmt_pct(row['rate_final'])} "
+              f"agrees_any={_fmt_pct(row['rate_any'])}")
+
+    print("  host vs chain (same dev derive-ON cells):")
+    for label in ("chain_certified", "host_certified", "union", "intersection"):
+        _print_host_point(label, report["host_vs_chain"][label])
 
 
 def main() -> int:
