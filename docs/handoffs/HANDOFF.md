@@ -1,3 +1,20 @@
+> **Start here (2026-09-08): the adversarial-review cycle.** Both 2026-09-07 plans were
+> superseded after a four-panel review (`docs/superpowers/reviews/2026-09-08-ledger-dag-adversarial-review.md`)
+> by `docs/superpowers/plans/2026-09-08-ledger-dag-replan.md`. Outcomes that day, all from
+> stored cells or a $0 local run: the **engine track is closed**
+> (`docs/handoffs/ENGINE_TRACK_CLOSURE_2026-09-08.md` — graph loses 0/24 and 0/19 on the mechanical
+> registry's narrow-aggregation/breadth subsets; `evidence_loop` does not rescue it); `host_derive`
+> was rebuilt (slot parser, hand-rule ranker, argmax, unit-aware agreement, five refusals) and
+> replays at **140/140 correct, 27.9% availability** over 502 stored cells
+> (`docs/handoffs/HOST_DERIVE_REPLAY_2026-09-08.md`, §15–16 carry two corrections to its own first
+> run); **mint03 ran** (96 cells, 41 min): primary union-coverage bar **failed at 1.29×** (bar 1.5×),
+> co-primary `host_value_correct` **20/20 passed**
+> (`docs/handoffs/MINT03_RESULTS_2026-09-08.md`). **Next cycle's input:** availability is the
+> binding constraint — page coverage (both entity pages fetched; full rosters for argmax) and the
+> 6000-char stored window are the levers, not more arithmetic; no further union-KPI campaign until
+> an offline page-coverage lever moves availability well above 40%. Freeze rule sharpened: no
+> commits of any kind while a campaign runs.
+
 # webRAG / Euglena — Session Handoff (2026-08-10)
 
 > **Start here (2026-09-07): `docs/STATE_OF_EVIDENCE_2026-09-07.md`** — what the project can
