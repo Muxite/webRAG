@@ -279,3 +279,149 @@ class TestNoUnitConversion:
         entries = build_index(text)
         assert entries[0].unit == "m"
         assert "ft" not in entries[0].unit
+
+
+class TestSuperscriptUnits:
+    """km<sup>2</sup> flattens to ``km\\n2``: the unit window must keep growing past the lone
+    superscript digit instead of returning at the shorter ``km`` parse."""
+
+    @staticmethod
+    def _river_page(name, length, basin):
+        # The exact fixture shape from host_derive_test.py.
+        return (f"{name}\n{name} is a major river.\nLength\n{length}\nkm\n"
+                f"Basin size\n{basin}\nkm\n2\n")
+
+    def test_basin_size_indexes_as_km2_and_length_as_km(self):
+        from agent.app.testing.evidence_graph import canonical_unit
+        text = self._river_page("Nile", "6,650", "3,400,000")
+        entries = build_index(text)
+        # The label of the first row also absorbs the preceding "... river." sentence via the
+        # existing period-continuation rule; only the label's tail is pinned here.
+        by_label = {e.label.split()[-1]: e for e in entries if e.source == "infobox"}
+        by_label["Basin size"] = by_label.pop("size")
+        assert canonical_unit(by_label["Length"].unit) == "km"
+        assert by_label["Length"].value == "6,650"
+        assert canonical_unit(by_label["Basin size"].unit) == "km2"
+        assert by_label["Basin size"].value == "3,400,000"
+        assert text[by_label["Basin size"].start:by_label["Basin size"].end] == "3,400,000"
+
+    def test_following_label_is_never_swallowed_as_a_unit(self):
+        text = "Length\n4,909\nkm\nBasin size\n795,000\nkm\n2\n"
+        entries = build_index(text)
+        length = next(e for e in entries if e.label == "Length")
+        assert length.unit == "km"
+
+    @pytest.mark.parametrize("unit_line,digit,expected", [
+        ("m", "2", "m2"), ("mi", "2", "mi2"), ("km", "3", "km3"), ("km", "²", "km2"),
+    ])
+    def test_other_superscript_units(self, unit_line, digit, expected):
+        from agent.app.testing.evidence_graph import canonical_unit
+        text = f"Area\n1,234\n{unit_line}\n{digit}\nElevation\n12\nm\n"
+        entries = build_index(text)
+        area = next(e for e in entries if e.label == "Area")
+        assert canonical_unit(area.unit) == expected
+        elevation = next(e for e in entries if e.label == "Elevation")
+        assert elevation.unit == "m"
+
+    def test_superscript_digit_followed_by_punctuation(self):
+        text = "Basin size\n795,000\nkm\n2\n)\nLength\n5\nkm\n"
+        entries = build_index(text)
+        basin = next(e for e in entries if e.label == "Basin size")
+        assert basin.unit == "km2"
+
+    def test_real_infobox_slice_with_dual_unit_restatement(self):
+        text = "Basin size\n795,000\nkm\n2\n(307,000\nmi\n2\n)\nLength\n5\nkm\n"
+        entries = build_index(text)
+        basin = next(e for e in entries if e.label == "Basin size")
+        assert basin.value == "795,000"
+        assert basin.unit == "km2"
+
+
+class TestCurrency:
+    """Currency values must reach ``parse_quantity`` through every digit-anchored gate."""
+
+    def test_infobox_euro_prefix_with_scale(self):
+        text = "Construction cost\n€533 million\nOpened\n2009\n"
+        entries = build_index(text)
+        assert len(entries) == 1
+        entry = entries[0]
+        assert entry.label == "Construction cost"
+        assert entry.currency == "EUR"
+        assert entry.scale == "million"
+        assert text[entry.start:entry.end] == entry.value
+        # The value+unit recombination consumers parse must keep currency AND scale.
+        from agent.app.testing.evidence_graph import parse_quantity
+        parsed = parse_quantity(f"{entry.value} {entry.unit}")
+        assert parsed.ok and parsed.currency == "EUR" and parsed.magnitude == 533e6
+
+    def test_infobox_dollar_prefix_with_scale(self):
+        text = "Cost\n$1.2 billion\n"
+        entries = build_index(text)
+        assert len(entries) == 1
+        assert entries[0].currency == "USD"
+        assert entries[0].scale == "billion"
+        assert entries[0].label == "Cost"
+
+    def test_infobox_prefix_split_across_lines(self):
+        text = "Cost\n€533\nmillion\nOpened\n2009\n"
+        entries = build_index(text)
+        assert len(entries) == 1
+        assert entries[0].currency == "EUR"
+        assert entries[0].scale == "million"
+        assert entries[0].value == "€533"
+
+    def test_infobox_suffix_symbol(self):
+        text = "Ticket price\n100 €\n"
+        entries = build_index(text)
+        assert len(entries) == 1
+        assert entries[0].currency == "EUR"
+        assert entries[0].value == "100"
+        from agent.app.testing.evidence_graph import numeric_value
+        assert numeric_value(f"{entries[0].value} {entries[0].unit}") == 100
+
+    def test_infobox_suffix_code_with_scale(self):
+        text = "Cost\n533 million EUR\n"
+        entries = build_index(text)
+        assert len(entries) == 1
+        assert entries[0].currency == "EUR"
+        assert entries[0].scale == "million"
+        from agent.app.testing.evidence_graph import numeric_value
+        assert numeric_value(f"{entries[0].value} {entries[0].unit}") == 533e6
+
+    def test_prose_euro_prefix_with_scale(self):
+        text = "The stadium cost €533 million to build."
+        entries = build_index(text)
+        assert len(entries) == 1
+        entry = entries[0]
+        assert entry.source == "prose"
+        assert entry.currency == "EUR"
+        assert entry.scale == "million"
+        assert text[entry.start:entry.end] == entry.value
+        assert "to" not in entry.unit
+
+    def test_prose_suffix_code(self):
+        text = "It was sold for 533 million EUR at auction."
+        entries = build_index(text)
+        assert len(entries) == 1
+        assert entries[0].currency == "EUR"
+        assert entries[0].scale == "million"
+
+    def test_plain_numbers_unchanged(self):
+        text = "Max.\ndepth\n1,642\nm (5,387\nft)\nThe tower reaches 419.7 metres."
+        entries = build_index(text)
+        assert [(e.value, e.unit) for e in entries] == [
+            ("1,642", "m"), ("5,387", "ft"), ("419.7", "metres")]
+        assert all(e.currency == "" and e.scale == "" for e in entries)
+
+    def test_currency_line_is_not_a_label(self):
+        text = "Cost\n€533 million\n40\nm\n"
+        entries = build_index(text)
+        forty = next(e for e in entries if e.value == "40")
+        assert forty.label == ""
+
+
+class TestUncappedIndex:
+    def test_limit_none_returns_every_entry_default_still_forty(self):
+        rows = "\n".join(f"Row{i}\n{i}\nm" for i in range(1, 61))
+        assert len(build_index(rows)) == 40
+        assert len(build_index(rows, limit=None)) == 60

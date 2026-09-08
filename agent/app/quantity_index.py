@@ -79,6 +79,14 @@ class QuantityRef:
     :param start: start offset of ``value`` in the RAW page text passed to :func:`build_index`.
     :param end: end offset (exclusive) of ``value`` in the same RAW page text.
     :param source: ``"infobox"`` or ``"prose"`` — which extractor found it.
+    :param currency: the normalized currency code ``parse_quantity`` read (``"EUR"``), or ``""``.
+        A prefix currency (``"€533"``) stays glued inside ``value`` exactly as written, which is
+        what lets a consumer re-parsing ``value`` see the currency dimension; a suffix currency
+        (``"100 €"``, ``"533 million EUR"``) is carried in ``unit`` as its code (``"EUR"``,
+        ``"million EUR"``) because ``parse_quantity`` only reads currency as a PREFIX.
+    :param scale: the scale word consumed (``"million"``), or ``""``. Provenance only — it is
+        also still present in ``value``/``unit`` text so ``f"{value} {unit}"`` re-parses to the
+        full magnitude.
     """
 
     label: str
@@ -87,6 +95,8 @@ class QuantityRef:
     start: int
     end: int
     source: str
+    currency: str = ""
+    scale: str = ""
 
 
 #: Units this index will recognize, normalized (lowercased, dash-unified) the way
@@ -140,9 +150,15 @@ _UNIT_WORDS = [
 _UNIT_WHITELIST = frozenset(normalize_for_match(word) for word in _UNIT_WORDS)
 
 
+def _collapse_superscript(unit: str) -> str:
+    """``"km 2"`` -> ``"km2"``: the newline-split superscript re-joined with no space, so the
+    stored unit is the spelling :func:`~evidence_graph.canonical_unit` already understands."""
+    return re.sub(r"\s+(?=[23²³]$)", "", unit)
+
+
 def _unit_allowed(unit: str) -> bool:
     """True when ``unit`` (as :func:`~evidence_graph.parse_quantity` split it out) is whitelisted."""
-    return bool(unit) and normalize_for_match(unit) in _UNIT_WHITELIST
+    return bool(unit) and normalize_for_match(_collapse_superscript(unit)) in _UNIT_WHITELIST
 
 
 def _accept(quantity: _ParsedQuantity) -> bool:
@@ -154,7 +170,10 @@ def _accept(quantity: _ParsedQuantity) -> bool:
     """
     if quantity.unit and _unit_allowed(quantity.unit):
         return True
-    if quantity.currency:
+    if quantity.currency and not quantity.unit:
+        # A currency alone is a dimension; a currency dragging a NON-whitelisted "unit" behind
+        # it ("€533 to" from "cost €533 to build") is the same label-word trap the whitelist
+        # exists for, so it is not admitted here either — the shorter, unit-less candidate is.
         return True
     if quantity.scale_name and not quantity.unit:
         return True
@@ -223,7 +242,50 @@ def _bare_count_label(lines: List[Tuple[str, int, int]], index: int) -> Optional
 #: A line that is nothing but a (possibly negative, possibly decimal, possibly comma-grouped)
 #: number. Deliberately simple: this only decides which lines are VALUE-line CANDIDATES.
 #: Correctness of the number itself is `parse_quantity`'s job, not this regex's.
-_NUM_ONLY_LINE = re.compile(r"^-?\d[\d,]*(?:\.\d+)?$")
+#: Mirrors ``evidence_graph._CURRENCY_PREFIX``'s alternation (kept in step by hand; the parser is
+#: still the only authority on what a prefix MEANS -- these gates only decide what may reach it).
+_CURRENCY_TOKEN = r"(?:US\$|Rs\.?|INR|USD|GBP|EUR|JPY|[$£€¥₹])"
+_NUM_ONLY_LINE = re.compile(rf"^(?:{_CURRENCY_TOKEN}\s*)?-?\d[\d,]*(?:\.\d+)?$", re.IGNORECASE)
+
+#: A currency written AFTER the number (``"100 €"``, ``"533 million EUR"``). ``parse_quantity``
+#: reads currency only as a prefix, so :func:`_parse_candidate` moves a trailing token to the
+#: front before retrying -- the string is re-ordered for the parser, never for the stored entry.
+_CURRENCY_SUFFIX = re.compile(rf"(?:^|\s)({_CURRENCY_TOKEN})\s*$", re.IGNORECASE)
+
+
+def _parse_candidate(text: str) -> _ParsedQuantity:
+    """:func:`parse_quantity` on ``text``, retried with a trailing currency token moved to the
+    front when the literal order is not an accepted quantity. The returned ``source_text``
+    differs from ``text`` exactly when that re-ordering was used (see :func:`_entry_unit`)."""
+    parsed = parse_quantity(text)
+    if parsed.ok and _accept(parsed):
+        return parsed
+    suffix = _CURRENCY_SUFFIX.search(text)
+    if suffix:
+        head = text[:suffix.start()].strip()
+        if head:
+            moved = parse_quantity(f"{suffix.group(1)} {head}")
+            if moved.ok and _accept(moved):
+                return moved
+    return parsed
+
+
+#: A lone superscript digit the flattener dropped onto its own line (``km<sup>2</sup>`` ->
+#: ``"km\n2"``), optionally trailed by punctuation (``"2)"``, ``"2):"``) -- never a digit run.
+_SUPERSCRIPT_LINE = re.compile(r"^[23²³][\W_]*$")
+
+
+def _entry_unit(parsed: _ParsedQuantity, candidate: str, fallback: str) -> str:
+    """The ``unit`` text to store for an accepted ``parsed`` that :func:`_parse_candidate` read
+    from ``candidate``: the parsed unit when there is one; for a suffix-currency parse (detected
+    by the re-ordered ``source_text``) the scale word plus currency CODE so that
+    ``f"{value} {unit}"`` still re-parses to the full magnitude; otherwise ``fallback`` (the
+    literal text after the number -- a scale word, or empty)."""
+    if parsed.unit:
+        return _collapse_superscript(parsed.unit)
+    if parsed.currency and parsed.source_text != candidate.strip():
+        return " ".join(part for part in (parsed.scale_name, parsed.currency) if part)
+    return fallback
 
 #: How many lines past a value line to search for its unit before giving up. Generous enough to
 #: cross a dual-unit restatement split by a newline (``"m (5,387\nft)"`` is 2 lines), small enough
@@ -262,6 +324,10 @@ def _looks_like_label(candidate: str) -> bool:
     # "165\nkm\n45\nkm\n72\nkm" shape (a comma list of measurements) would otherwise donate
     # "km" as a bogus label for the next measurement in the list.
     if normalize_for_match(candidate) in _UNIT_WHITELIST:
+        return False
+    # Likewise a line that is itself an accepted one-line quantity ("€533 million", "13,860 MW")
+    # is the PREVIOUS row's value, not the next row's label.
+    if _LEADING_NUMBER.match(candidate) and _leading_quantity(candidate) is not None:
         return False
     return True
 
@@ -328,13 +394,14 @@ def _forward_quantity(lines: List[Tuple[str, int, int]], index: int,
     """
     parts: List[str] = []
     stop = min(len(lines), index + 1 + _FORWARD_UNIT_LINES)
+    best: Optional[_ForwardMatch] = None
     for k in range(index + 1, stop):
         segment = lines[k][0].strip()
         if not segment:
             break
         parts.append(segment)
         candidate = " ".join(parts)
-        parsed = parse_quantity(f"{value_text} {candidate}")
+        parsed = _parse_candidate(f"{value_text} {candidate}")
         if not (parsed.ok and _accept(parsed)):
             # A trailing punctuation mark glued onto a closing parenthesis by the flattener
             # ("... km\n2\n):" -- a sentence colon landing right after the restatement's own
@@ -345,14 +412,24 @@ def _forward_quantity(lines: List[Tuple[str, int, int]], index: int,
             # over the raw candidate.
             trimmed = candidate.rstrip(":;,.")
             if trimmed != candidate:
-                parsed = parse_quantity(f"{value_text} {trimmed}")
+                parsed = _parse_candidate(f"{value_text} {trimmed}")
         if parsed.ok and _accept(parsed):
             window_start = lines[index + 1][1]
             window_end = lines[index + len(parts)][2]
-            return _ForwardMatch(parsed, window_start, window_end, "", candidate)
+            best = _ForwardMatch(parsed, window_start, window_end, "", candidate)
+            # A whitelisted unit followed by a lone superscript digit line ("km\n2") is the
+            # flattened km<sup>2</sup>: the shorter "km" parse is real but wrong, so keep
+            # growing and prefer the longer parse when it is accepted too. Anything else on the
+            # next line (the next row's label, a parenthetical) ends the search here.
+            if k + 1 < stop and _SUPERSCRIPT_LINE.match(lines[k + 1][0].strip() or "x"):
+                continue
+            return best
+        if best is not None:
+            # The superscript growth did not parse; the shorter accepted unit stands.
+            return best
         if ";" in candidate:
             head, _sep, tail_start = candidate.partition(";")
-            head_parsed = parse_quantity(f"{value_text} {head.strip()}")
+            head_parsed = _parse_candidate(f"{value_text} {head.strip()}")
             if not (head_parsed.ok and _accept(head_parsed)):
                 continue
             window_start = lines[index + 1][1]
@@ -371,7 +448,7 @@ def _forward_quantity(lines: List[Tuple[str, int, int]], index: int,
             tail_candidate = " ".join(p for p in tail_parts if p)
             return _ForwardMatch(head_parsed, window_start, window_end, tail_candidate,
                                   head.strip())
-    return None
+    return best
 
 
 def _raw_offset(window_raw: str, raw_start: int, value_str: str,
@@ -412,9 +489,11 @@ def _emit_restatement_chain(quantity: _ParsedQuantity, window_raw: str, raw_star
             located = _raw_offset(window_raw, raw_start, value_str, cursor)
             if located is not None:
                 start, end = located
-                unit = current.unit if current.unit else (current.scale_name or "")
+                unit = _entry_unit(current, current.source_text, current.scale_name or "")
                 entries.append(QuantityRef(label=label, value=value_str, unit=unit,
-                                            start=start, end=end, source="infobox"))
+                                            start=start, end=end, source="infobox",
+                                            currency=current.currency,
+                                            scale=current.scale_name))
                 cursor = end - raw_start
         current = current.restatement
     return entries
@@ -430,7 +509,7 @@ def _emit_tail_chain(tail_text: str, window_raw: str, raw_start: int, cursor: in
         segment = segment.strip()
         if not segment:
             continue
-        parsed = parse_quantity(segment)
+        parsed = _parse_candidate(segment)
         if not parsed.ok:
             continue
         match = _LEADING_NUMBER.match(parsed.source_text.strip())
@@ -439,9 +518,10 @@ def _emit_tail_chain(tail_text: str, window_raw: str, raw_start: int, cursor: in
             located = _raw_offset(window_raw, raw_start, value_str, cursor)
             if located is not None:
                 start, end = located
-                unit = parsed.unit if parsed.unit else (parsed.scale_name or "")
+                unit = _entry_unit(parsed, segment, parsed.scale_name or "")
                 entries.append(QuantityRef(label=label, value=value_str, unit=unit,
-                                            start=start, end=end, source="infobox"))
+                                            start=start, end=end, source="infobox",
+                                            currency=parsed.currency, scale=parsed.scale_name))
                 cursor = end - raw_start
         entries.extend(_emit_restatement_chain(parsed, window_raw, raw_start, cursor, label))
         if entries:
@@ -451,7 +531,9 @@ def _emit_tail_chain(tail_text: str, window_raw: str, raw_start: int, cursor: in
 
 #: The leading number of a line that is NOT purely numeric — the ``"13,860 MW"`` shape, where the
 #: flattener kept a value and its unit on one row instead of splitting them onto separate lines.
-_LEADING_NUMBER = re.compile(r"^-?\d[\d,]*(?:\.\d+)?")
+#: An optional currency prefix rides along INSIDE the matched value (``"€533"``): that is how the
+#: page wrote it, and a consumer re-parsing the stored ``value`` then sees the currency dimension.
+_LEADING_NUMBER = re.compile(rf"^(?:{_CURRENCY_TOKEN}\s*)?-?\d[\d,]*(?:\.\d+)?", re.IGNORECASE)
 
 
 def _leading_quantity(stripped: str) -> Optional[Tuple[str, _ParsedQuantity, str]]:
@@ -475,7 +557,7 @@ def _leading_quantity(stripped: str) -> Optional[Tuple[str, _ParsedQuantity, str
         number = _LEADING_NUMBER.match(prefix)
         if not number:
             continue
-        parsed = parse_quantity(prefix)
+        parsed = _parse_candidate(prefix)
         if parsed.ok and _accept(parsed):
             return number.group(0), parsed, prefix
     return None
@@ -505,11 +587,13 @@ def _scan_infobox(text: str) -> List[QuantityRef]:
                         source="infobox",
                     ))
                 continue
-            unit = match.parsed.unit if match.parsed.unit else match.unit_fallback
+            unit = _entry_unit(match.parsed, f"{stripped} {match.unit_fallback}",
+                               match.unit_fallback)
             entries.append(QuantityRef(
                 label=label, value=stripped, unit=unit,
                 start=line_value_start, end=line_value_start + len(stripped),
-                source="infobox",
+                source="infobox", currency=match.parsed.currency,
+                scale=match.parsed.scale_name,
             ))
             window_raw = text[match.window_start:match.window_end]
             entries.extend(_emit_restatement_chain(
@@ -535,11 +619,11 @@ def _scan_infobox(text: str) -> List[QuantityRef]:
                     ))
                 continue
             value_text, parsed, matched_text = found
-            unit = parsed.unit if parsed.unit else matched_text[len(value_text):].strip()
+            unit = _entry_unit(parsed, matched_text, matched_text[len(value_text):].strip())
             entries.append(QuantityRef(
                 label=label, value=value_text, unit=unit,
                 start=line_value_start, end=line_value_start + len(value_text),
-                source="infobox",
+                source="infobox", currency=parsed.currency, scale=parsed.scale_name,
             ))
             line_window_start = line_value_start + len(value_text)
             entries.extend(_emit_restatement_chain(
@@ -554,9 +638,14 @@ def _scan_infobox(text: str) -> List[QuantityRef]:
 #: rediscover every infobox row too, defeating the source-priority de-duplication in
 #: :func:`build_index`. The lookbehind keeps this from re-matching the tail of a longer number
 #: (``"1,642"`` must not also offer ``"642"`` as a second candidate).
+#: A currency may lead the number (``"€533 million"``, kept inside ``value``) or trail it as a
+#: word (``"100 €"``, ``"533 million EUR"``); with a leading currency the unit words become
+#: optional, since ``"€533"`` alone is already a dimensioned quantity.
 _PROSE_QUANTITY = re.compile(
-    r"(?<![\d,.])(?P<num>-?\d[\d,]*(?:\.\d+)?)(?:[^\S\n]+|-)"
-    r"(?P<unit>[A-Za-z°%][A-Za-z°%./-]*(?:[^\S\n]+[A-Za-z]+)?)"
+    rf"(?<![\d,.])(?P<value>(?:{_CURRENCY_TOKEN}[^\S\n]*)?-?\d[\d,]*(?:\.\d+)?)"
+    r"(?:(?:[^\S\n]+|-)"
+    r"(?P<unit>[A-Za-z°%$£€¥₹][A-Za-z°%./-]*(?:[^\S\n]+[A-Za-z$£€¥₹]+)?))?",
+    re.IGNORECASE,
 )
 
 
@@ -564,25 +653,30 @@ def _scan_prose(text: str) -> List[QuantityRef]:
     """Every inline ``NUMBER unit`` mention in ``text`` (see the module docstring)."""
     entries: List[QuantityRef] = []
     for match in _PROSE_QUANTITY.finditer(text):
-        value_text = match.group("num")
-        words = match.group("unit").split()
+        value_text = match.group("value")
+        words = (match.group("unit") or "").split()
         unit: Optional[str] = None
+        accepted: Optional[_ParsedQuantity] = None
         # Try the two-word candidate first ("square kilometres"), then fall back to just the
         # first word, so a genuine unit is not missed because a stray following word rode along.
-        for take in range(len(words), 0, -1):
+        # ``take == 0`` (the bare value) is reached only by a currency-prefixed value, which is a
+        # quantity on its own; a bare number still needs a unit word to be one.
+        for take in range(len(words), -1, -1):
             # Strip trailing sentence punctuation ("meters." at a full stop, "feet," before a
             # comma) that the regex's permissive unit-word class swept in — a real unit token
             # never legitimately ends in one, and leaving it on defeats the whitelist lookup.
             candidate = " ".join(words[:take]).rstrip(".,;:)")
-            if not candidate:
+            if not candidate and take:
                 continue
-            parsed = parse_quantity(f"{value_text} {candidate}")
+            text_candidate = f"{value_text} {candidate}".strip()
+            parsed = _parse_candidate(text_candidate)
             if parsed.ok and _accept(parsed):
-                unit = parsed.unit if parsed.unit else candidate
+                unit = _entry_unit(parsed, text_candidate, candidate)
+                accepted = parsed
                 break
-        if unit is None:
+        if unit is None or accepted is None:
             continue
-        start = match.start("num")
+        start = match.start("value")
         entries.append(QuantityRef(
             label="",
             value=value_text,
@@ -590,6 +684,8 @@ def _scan_prose(text: str) -> List[QuantityRef]:
             start=start,
             end=start + len(value_text),
             source="prose",
+            currency=accepted.currency,
+            scale=accepted.scale_name,
         ))
     return entries
 
@@ -644,15 +740,16 @@ def _scan_durations(text: str) -> List[QuantityRef]:
     return entries
 
 
-def build_index(page_text: Optional[str], *, limit: int = 40) -> List[QuantityRef]:
+def build_index(page_text: Optional[str], *, limit: Optional[int] = 40) -> List[QuantityRef]:
     """Every quantity :func:`_scan_infobox` / :func:`_scan_prose` can extract from ``page_text``.
 
     Deterministic and stable: pure sequential scans, no dict/set governs ORDER (a ``set`` is used
     only for de-dup membership testing). Infobox entries come first, in document order, then prose
     entries in document order — this is both the display order and how "prefer infobox" is
     enforced, since a later duplicate (same normalized value + unit) is dropped in
-    :func:`build_index` rather than in either scanner. Capped at ``limit`` because the render goes
-    into a weak model's prompt.
+    :func:`build_index` rather than in either scanner. Capped at ``limit`` by default because the
+    render goes into a weak model's prompt; a mechanical consumer (a host-side derivation that
+    never shows the index to a model) passes ``limit=None`` to get every entry.
 
     A dual-unit restatement (``"1,642 m (5,387 ft)"``) surfaces BOTH halves here — ``parse_quantity``
     reads the ``"(5,387 ft)"`` parenthetical and separates it into ``.restatement`` precisely so it
@@ -663,7 +760,7 @@ def build_index(page_text: Optional[str], *, limit: int = 40) -> List[QuantityRe
     resolves to exactly one unit, never a computed alternate. See the module docstring.
 
     :param page_text: the raw page text, or ``None``/``""``.
-    :param limit: maximum entries returned.
+    :param limit: maximum entries returned, or ``None`` for no cap.
     :returns: a list of :class:`QuantityRef`, possibly empty. Never raises on absence — a page
         with nothing extractable returns ``[]``, not a sentinel.
     """
@@ -671,14 +768,22 @@ def build_index(page_text: Optional[str], *, limit: int = 40) -> List[QuantityRe
     if not text:
         return []
     seen = set()
+    seen_values = set()
     out: List[QuantityRef] = []
     for entry in _scan_infobox(text) + _scan_prose(text) + _scan_durations(text):
-        key = (normalize_for_match(entry.value), normalize_for_match(entry.unit))
+        value_key = normalize_for_match(entry.value)
+        key = (value_key, normalize_for_match(entry.unit))
         if key in seen:
             continue
+        # A unit-less entry (a prose "€533" re-found on an infobox row whose own entry already
+        # carries "million") adds nothing over an earlier entry of the same value: it is the
+        # same printed number, minus context the earlier extractor kept.
+        if not entry.unit and value_key in seen_values:
+            continue
         seen.add(key)
+        seen_values.add(value_key)
         out.append(entry)
-    return out[:limit]
+    return out if limit is None else out[:limit]
 
 
 def render_index(entries: List[QuantityRef], *, max_chars: int = 1200, start: int = 1) -> str:
