@@ -105,18 +105,19 @@ def _first_infobox(html: str):
     return soup.find("table", class_=_is_infobox_class)
 
 
-def infobox_rows(html: str) -> List[Tuple[str, str]]:
-    """The first infobox's rows as ``(label, value)`` pairs, in document order.
+def infobox_rows(html: str) -> List[Tuple[str, str, str]]:
+    """The first infobox's rows as ``(label, value, section)`` triples, in document order.
 
     A row is a ``<tr>`` carrying both a ``<th>`` and a ``<td>``; value-only rows (images,
     captions) are skipped because they are not labelled values. A header-only row (a ``<th>``
     with no ``<td>``) that is not the infobox TITLE -- the title is the first header-only row
     seen before any labelled row, or one whose class says ``above``/``title`` -- is a SECTION
-    header (a ``<caption>`` counts as the title too), and its text prefixes every following row
-    label until the next header (Shanghai
-    Tower: ``"Height"`` over ``Architectural`` / ``Tip`` / ``Roof`` gives ``"Height
-    Architectural"`` ..., so a slot asking for the height can see the field the sub-row belongs
-    to; a table with no section headers is rendered exactly as before). Text is the cell's ``get_text(" ", strip=True)`` after superscript folding,
+    header (a ``<caption>`` counts as the title too); its text becomes the ``section`` of every
+    following row until the next header, returned as the third element and carried on each
+    entry's :attr:`QuantityRef.section` (Shanghai Tower: ``"Height"`` over ``Architectural`` /
+    ``Tip`` / ``Roof``), while the label stays the bare row label -- so a ranker can read
+    ``section + label`` when the label alone does not name the field, and the rendered text and
+    labels are byte-identical to a table with no section headers. Text is the cell's ``get_text(" ", strip=True)`` after superscript folding,
     with ``<br>`` line breaks rendered as ``" | "`` so a multi-item cell can be split back apart.
 
     :param html: the page HTML.
@@ -127,7 +128,7 @@ def infobox_rows(html: str) -> List[Tuple[str, str]]:
     if table is None:
         return []
     _fold_superscripts(table)
-    rows: List[Tuple[str, str]] = []
+    rows: List[Tuple[str, str, str]] = []
     section = ""
     # A table whose title is a <caption> has no positional title row: its first header-only row
     # is already a section header (a state infobox's "Area").
@@ -146,13 +147,12 @@ def infobox_rows(html: str) -> List[Tuple[str, str]]:
             if not is_title and heading:
                 section = heading
             continue
-        own_label = _tidy(header.get_text(" ", strip=True))
-        label = f"{section} {own_label}".strip() if section else own_label
+        label = _tidy(header.get_text(" ", strip=True))
         text = " | ".join(part for part in
                           (_tidy(line) for line in value.get_text(" ", strip=True).split("|"))
                           if part)
         if label and text:
-            rows.append((label, text))
+            rows.append((label, text, section))
     return rows
 
 
@@ -161,19 +161,19 @@ def has_infobox(html: str) -> bool:
     return _first_infobox(html) is not None
 
 
-def _render(rows: List[Tuple[str, str]]) -> Tuple[str, List[Tuple[str, str, int]]]:
-    """``(rendered text, [(label, value, value_start_offset)])`` for ``rows``.
+def _render(rows: List[Tuple[str, str, str]]) -> Tuple[str, List[Tuple[str, str, int, str]]]:
+    """``(rendered text, [(label, value, value_start_offset, section)])`` for ``rows``.
 
     One ``Label: Value`` line per row (a cell's ``<br>`` breaks are already ``" | "``), so every
     value offset stays inside its own line.
     """
     lines: List[str] = []
-    located: List[Tuple[str, str, int]] = []
+    located: List[Tuple[str, str, int, str]] = []
     cursor = 0
-    for label, value in rows:
+    for label, value, section in rows:
         flat = value
         line = f"{label}: {flat}"
-        located.append((label, flat, cursor + len(label) + 2))
+        located.append((label, flat, cursor + len(label) + 2, section))
         lines.append(line)
         cursor += len(line) + 1
     return "\n".join(lines), located
@@ -207,7 +207,8 @@ def _parse_span(text: str) -> Optional[Quantity]:
     return parsed if parsed.ok and _admissible(parsed) else None
 
 
-def _chain(quantity: Quantity, span: str, span_start: int, label: str) -> List[QuantityRef]:
+def _chain(quantity: Quantity, span: str, span_start: int, label: str,
+           section: str = "") -> List[QuantityRef]:
     """The primary quantity and every restatement in its chain, offsets located inside ``span``.
 
     ``value`` is what ``quantity_index._LEADING_NUMBER`` matches off the parsed ``source_text``
@@ -239,13 +240,14 @@ def _chain(quantity: Quantity, span: str, span_start: int, label: str) -> List[Q
                                    unit=_entry_unit(current, candidate, current.scale_name or ""),
                                    start=span_start + local, end=span_start + local + len(value),
                                    source="infobox", currency=current.currency,
-                                   scale=current.scale_name))
+                                   scale=current.scale_name, section=section))
         current = current.restatement
         candidate = current.source_text if current is not None else ""
     return out
 
 
-def _quantities_in(value: str, value_start: int, label: str) -> List[QuantityRef]:
+def _quantities_in(value: str, value_start: int, label: str,
+                   section: str = "") -> List[QuantityRef]:
     """Every quantity in one rendered value string, in document order.
 
     Splits the cell into independent segments (bullets, ``;``, the ``" | "`` line joins), then
@@ -284,12 +286,13 @@ def _quantities_in(value: str, value_start: int, label: str) -> List[QuantityRef
                 if _INT_ONLY.fullmatch(bare) and _label_allows_bare_count(label):
                     start = value_start + seg_start + match.start()
                     out.append(QuantityRef(label=label, value=bare, unit="count",
-                                           start=start, end=start + len(bare), source="infobox"))
+                                           start=start, end=start + len(bare), source="infobox",
+                                           section=section))
                     consumed_to = match.start() + len(bare)
                 continue
             parsed, candidate = found
             span_start = value_start + seg_start + match.start()
-            out.extend(_chain(parsed, candidate, span_start, label))
+            out.extend(_chain(parsed, candidate, span_start, label, section))
             consumed_to = match.start() + len(candidate)
     return out
 
@@ -299,15 +302,16 @@ def infobox_quantities(html: str) -> List[QuantityRef]:
 
     :param html: the page HTML.
     :returns: entries in document order (row by row, primary before restatement), each with
-        ``label`` = the row's ``<th>`` text, ``value``/``unit`` byte-for-byte as written, and
+        ``label`` = the row's own ``<th>`` text, ``section`` = the header row it sits under
+        (``""`` when none), ``value``/``unit`` byte-for-byte as written, and
         ``start``/``end`` indexing :func:`infobox_text` of the same HTML. ``[]`` when the page has
         no infobox. Never raises.
     """
     try:
         _text, located = _render(infobox_rows(html))
         out: List[QuantityRef] = []
-        for label, flat, value_start in located:
-            out.extend(_quantities_in(flat, value_start, label))
+        for label, flat, value_start, section in located:
+            out.extend(_quantities_in(flat, value_start, label, section))
         return out
     except Exception:  # noqa: BLE001 -- a parser that raises would take a host down
         return []

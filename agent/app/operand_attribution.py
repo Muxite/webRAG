@@ -147,6 +147,23 @@ def label_token_overlap(field_phrase: str, label: str) -> float:
     return max(shared / len(field), shared / len(entry_label))
 
 
+def _label_feature(field_phrase: str, entry: Any) -> float:
+    """:func:`label_token_overlap` of the entry's label, or -- when the entry carries a
+    non-empty infobox ``section`` (:attr:`QuantityRef.section`; read with a default so entries
+    minted before the field existed still score) -- the better of the bare label and
+    ``section + " " + label``. A sub-row under a ``Height`` header (``Architectural``) then
+    scores as ``Height Architectural`` (0.5 against "its height, in meters" instead of 0.0),
+    while a row whose bare label already names the field (``Length`` under ``Physical
+    characteristics``) keeps its bare score exactly: the max never lowers it. Measured: the
+    prefix-only alternative fixed 221 and regressed 218/212/214/211."""
+    label = str(getattr(entry, "label", "") or "")
+    bare = label_token_overlap(field_phrase, label)
+    section = str(getattr(entry, "section", "") or "")
+    if not section:
+        return bare
+    return max(bare, label_token_overlap(field_phrase, f"{section} {label}"))
+
+
 def _entity_in_window(entity: str, entry: QuantityRef, page_text: str) -> float:
     if not page_text or not entity:
         return 0.0
@@ -211,7 +228,7 @@ def features(slot: Any, entry: QuantityRef, *, page_url: str = "",
     text = str(page_text or "")
     bare = _bare_int(entry)
     return [
-        label_token_overlap(field_phrase, entry.label),
+        _label_feature(field_phrase, entry),
         _entity_in_window(entity, entry, text),
         _entity_in_url_slug(entity, str(page_url or "")),
         float(entry.source == "infobox"),

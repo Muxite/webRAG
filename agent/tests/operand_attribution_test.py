@@ -281,3 +281,41 @@ class TestArtifact:
         path.write_text(json.dumps(artifact))
         with pytest.raises(ValueError):
             oa.OperandRanker.load(path)
+
+
+# -- `QuantityRef.section`: an infobox header read alongside the bare label -------------------
+
+def test_section_plus_label_lifts_a_sub_row_and_never_lowers_a_row_that_already_names_the_field():
+    from agent.app.operand_attribution import _label_feature, label_token_overlap
+
+    class Slot:
+        entity, field_phrase = "Shanghai Tower", "its height, in meters"
+
+    sub_row = QuantityRef(label="Architectural", value="632", unit="m", start=0, end=3,
+                          source="infobox", section="Height")
+    assert _label_feature(Slot.field_phrase, sub_row) == 0.5
+    assert label_token_overlap(Slot.field_phrase, "Architectural") == 0.0
+    length = QuantityRef(label="Length", value="57.09", unit="km", start=0, end=5,
+                         source="infobox", section="Technical")
+    bare = QuantityRef(label="Length", value="57.09", unit="km", start=0, end=5, source="infobox")
+    phrase = "its LENGTH, in kilometres"
+    assert _label_feature(phrase, length) == _label_feature(phrase, bare) == 1.0
+
+
+def test_a_tunnel_length_under_a_technical_header_outranks_a_prose_and_a_total_of_fragment():
+    """212 Gotthard: with the header PREFIXED onto the label, `Technical Length 57.09 km` lost to
+    the prose fragment `and a total of 151.84 km`; with the header on `section` it does not."""
+    ranker = oa.default_ranker()
+
+    class Slot:
+        entity, field_phrase = "Gotthard Base Tunnel", "its LENGTH, in kilometres"
+
+    page = "Gotthard Base Tunnel\nLength: 57.09 km\nThe tunnel has two bores and a total of 151.84 km of tunnels."
+    infobox = QuantityRef(label="Length", value="57.09", unit="km", start=page.index("57.09"),
+                          end=page.index("57.09") + 5, source="infobox", section="Technical")
+    prose = QuantityRef(label="", value="151.84", unit="km", start=page.index("151.84"),
+                        end=page.index("151.84") + 6, source="prose")
+    ranked = ranker.rank(Slot, [prose, infobox], page_url="https://en.wikipedia.org/wiki/Gotthard_Base_Tunnel",
+                         page_text=page)
+    assert ranked[0][1] is infobox
+    assert ranked[0][0] > ranked[1][0]

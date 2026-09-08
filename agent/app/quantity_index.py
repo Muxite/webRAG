@@ -97,6 +97,14 @@ class QuantityRef:
     source: str
     currency: str = ""
     scale: str = ""
+    #: The infobox SECTION header the row sits under (``"Height"`` over ``Architectural`` /
+    #: ``Tip`` / ``Roof`` on a building page; ``"Physical characteristics"`` over a river's
+    #: ``Length``), or ``""``. Set by :mod:`agent.app.infobox_quantities` only; ``label`` stays the
+    #: bare row label, and a ranker reads the two together when the bare label alone does not
+    #: name the field. Kept separate rather than prefixed onto ``label`` because a prefix halves
+    #: the token overlap of every row under a header that is NOT the field ("Physical
+    #: characteristics Length" vs a "length" phrase) -- measured as a 218/212/214/211 regression.
+    section: str = ""
 
 
 #: Units this index will recognize, normalized (lowercased, dash-unified) the way

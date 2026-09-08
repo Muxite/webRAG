@@ -56,8 +56,9 @@ def test_page_without_an_infobox_yields_nothing():
 
 def test_only_the_first_infobox_is_read_and_only_labelled_rows_become_rows():
     rows = infobox_rows(MEKONG_HTML)
-    assert [label for label, _ in rows] == ["Country", "Length", "Basin size", "• average"]
-    assert ("Other", "99 km") not in rows  # the wikitable is not an infobox
+    assert [label for label, _, _ in rows] == ["Country", "Length", "Basin size", "• average"]
+    assert [section for _, _, section in rows] == [""] * 4
+    assert ("Other", "99 km", "") not in rows  # the wikitable is not an infobox
 
 
 def test_basin_size_row_is_captured_with_the_superscript_folded_into_the_unit():
@@ -220,31 +221,58 @@ SHANGHAI_HTML = """
 """
 
 
-def test_section_header_rows_prefix_the_labels_of_the_rows_beneath_them():
+def test_section_header_rows_become_the_section_of_the_rows_beneath_them_labels_stay_bare():
     """221 Shanghai Tower: the sub-rows under a `Height` header carried only `Architectural` /
-    `Tip` / ..., so a slot asking for the height could not see which field they belonged to."""
+    `Tip` / ..., so a slot asking for the height could not see which field they belonged to.
+    The header rides on `section`; the label is byte-identical to a header-less table, because
+    prefixing it halved the overlap of every row under a header that is not the field
+    (measured regression on 218/212/214/211)."""
     rows = infobox_rows(SHANGHAI_HTML)
-    assert [label for label, _ in rows] == [
-        "General information Status", "Height Architectural", "Height Tip", "Height Roof",
-        "Height Top floor", "Technical details Floor count"]
+    assert [(label, section) for label, _, section in rows] == [
+        ("Status", "General information"), ("Architectural", "Height"), ("Tip", "Height"),
+        ("Roof", "Height"), ("Top floor", "Height"), ("Floor count", "Technical details")]
     entries = infobox_quantities(SHANGHAI_HTML)
-    assert [(e.label, e.value, e.unit) for e in entries][:2] == [
-        ("Height Architectural", "632", "m"), ("Height Architectural", "2,073", "ft")]
-    assert [(e.label, e.value, e.unit) for e in entries][-1] == (
-        "Technical details Floor count", "128", "count")
+    assert [(e.label, e.section, e.value, e.unit) for e in entries][:2] == [
+        ("Architectural", "Height", "632", "m"), ("Architectural", "Height", "2,073", "ft")]
+    assert [(e.label, e.section, e.value, e.unit) for e in entries][-1] == (
+        "Floor count", "Technical details", "128", "count")
     assert "Shanghai Tower" not in infobox_text(SHANGHAI_HTML)   # the title row is not a section
+    assert infobox_text(SHANGHAI_HTML).startswith("Status: Completed\nArchitectural: 632 m")
     text = infobox_text(SHANGHAI_HTML)
     for entry in entries:
         assert text[entry.start:entry.end] == entry.value
 
 
+def test_the_ranker_reads_section_plus_label_and_never_below_the_bare_label():
+    from agent.app.operand_attribution import features, label_token_overlap
+    from agent.app.quantity_index import QuantityRef
+
+    class Slot:
+        entity, field_phrase = "Shanghai Tower", "its height, in meters"
+
+    entries = infobox_quantities(SHANGHAI_HTML)
+    arch = next(e for e in entries if e.label == "Architectural")
+    label_feature = features(Slot, arch)[0]
+    assert label_feature == label_token_overlap(Slot.field_phrase, "Height Architectural") == 0.5
+    assert label_feature > label_token_overlap(Slot.field_phrase, "Architectural") == 0.0
+    # A river's `Length` under `Physical characteristics` scores exactly as bare `Length`.
+    river = QuantityRef(label="Length", value="4,909", unit="km", start=0, end=5,
+                        source="infobox", section="Physical characteristics")
+    bare = QuantityRef(label="Length", value="4,909", unit="km", start=0, end=5, source="infobox")
+
+    class River:
+        entity, field_phrase = "Mekong", "the river's LENGTH (in kilometres)"
+
+    assert features(River, river)[0] == features(River, bare)[0] == 1.0
+
+
 def test_a_leading_header_row_without_a_class_is_still_the_title_not_a_section():
     html = ("<table class='infobox'><tr><th colspan='2'>Mekong</th></tr>"
             "<tr><th>Length</th><td>4,909 km</td></tr></table>")
-    assert infobox_rows(html) == [("Length", "4,909 km")]
+    assert infobox_rows(html) == [("Length", "4,909 km", "")]
 
 
 def test_a_table_without_section_headers_is_rendered_exactly_as_before():
-    assert [label for label, _ in infobox_rows(MEKONG_HTML)] == ["Country", "Length", "Basin size",
-                                                                "• average"]
+    assert [label for label, _, _ in infobox_rows(MEKONG_HTML)] == ["Country", "Length",
+                                                                   "Basin size", "• average"]
     assert infobox_text(MEKONG_HTML).startswith("Country: China, Myanmar, Laos\nLength: 4,909 km")
