@@ -14,6 +14,10 @@
 > 6000-char stored window are the levers, not more arithmetic; no further union-KPI campaign until
 > an offline page-coverage lever moves availability well above 40%. Freeze rule sharpened: no
 > commits of any kind while a campaign runs.
+> **Next-cycle handoff: `docs/handoffs/AVAILABILITY_DRIVE_HANDOFF_2026-09-08.md`** — ranked levers to
+> maximise `host_derive` availability (unit parsing, host-side prefetch with live search/visits, page
+> store + host page window, SearXNG as $0 live provider, section-level vector retrieval), with the
+> mint03 failure decomposition and a gated sequence. Live search and live visits are now permitted.
 
 # webRAG / Euglena — Session Handoff (2026-08-10)
 
