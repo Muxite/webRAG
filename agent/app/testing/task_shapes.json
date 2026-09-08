@@ -1,0 +1,463 @@
+{
+  "_rule": "Shape is decided by named predicates over each task module's SOURCE only (get_validation_functions() names, get_required_deliverables(), get_task_statement() structure) -- never over any benchmark result, score, or externally written label. A task is 'aggregation' if any aggregation predicate fires: an extremum keystone (argmax/argmin/earliest/latest/longest/closest/median/k-th, or a 'winner_*' check); a count/sum-with-threshold keystone ('keystone_count', 'passing_*', 'inrange_*', 'subset_sum', 'keystone_difference'); an AND-filter keystone ('keystone_filter', 'winner_attributes'); roster coverage (a 'validate_coverage'/'breadth_*'/'span_values'/'validate_table' validator TOGETHER WITH an enumerated >=3-item entity roster under a fan-out cue in the statement); survivor-by-elimination ('survivor', 'branch_exploration', 'elimination_coverage'); cross-source comparison ('reconciliation_coverage', 'contradiction_coverage', 'identifies_correct_source', 'identifies_wrong_value', 'true_claims'); or an explicit two-entity combination ('keystone_combination', 'visited_both'). Otherwise it is 'chain' if a chain predicate fires: a single-thread chain validator ('chain_coverage', 'keystone_chain', 'chain_intermediate', 'chain_urls', 'chain_progress', 'terminal_resolution', 'path_adjacency'), a disambiguate-then-read re-expansion validator ('reexpansion_coverage', 'target_resolution'), or a statement dependent-hop cue ('from step N', 'the previous stage', 'follow the link'). Otherwise 'other'. Aggregation wins ties because two independently-retrievable facts falsify 'each hop's input is the previous hop's output'. The 'breadth' sub-flag is set only on aggregation tasks whose statement enumerates >=3 roster items under a fan-out cue with no dependency-gate cue, i.e. >=3 arms that could be fetched in parallel.",
+  "_written": "2026-09-08",
+  "040": {
+    "shape": "chain",
+    "breadth": false,
+    "evidence": [
+      "chain:chain_validator"
+    ]
+  },
+  "041": {
+    "shape": "aggregation",
+    "breadth": false,
+    "evidence": [
+      "extremum_keystone"
+    ]
+  },
+  "042": {
+    "shape": "aggregation",
+    "breadth": true,
+    "evidence": [
+      "cross_source_comparison",
+      "breadth:parallel_entity_roster"
+    ]
+  },
+  "044": {
+    "shape": "other",
+    "breadth": false,
+    "evidence": []
+  },
+  "046": {
+    "shape": "chain",
+    "breadth": false,
+    "evidence": [
+      "chain:chain_validator",
+      "chain:statement_dependent_hop"
+    ]
+  },
+  "047": {
+    "shape": "chain",
+    "breadth": false,
+    "evidence": [
+      "chain:chain_validator"
+    ]
+  },
+  "049": {
+    "shape": "aggregation",
+    "breadth": false,
+    "evidence": [
+      "explicit_two_entity_combination"
+    ]
+  },
+  "052": {
+    "shape": "aggregation",
+    "breadth": true,
+    "evidence": [
+      "extremum_keystone",
+      "roster_coverage",
+      "breadth:parallel_entity_roster"
+    ]
+  },
+  "054": {
+    "shape": "chain",
+    "breadth": false,
+    "evidence": [
+      "chain:statement_dependent_hop"
+    ]
+  },
+  "055": {
+    "shape": "aggregation",
+    "breadth": false,
+    "evidence": [
+      "count_or_sum_threshold"
+    ]
+  },
+  "056": {
+    "shape": "aggregation",
+    "breadth": false,
+    "evidence": [
+      "cross_source_comparison"
+    ]
+  },
+  "059": {
+    "shape": "aggregation",
+    "breadth": true,
+    "evidence": [
+      "extremum_keystone",
+      "roster_coverage",
+      "breadth:parallel_entity_roster"
+    ]
+  },
+  "060": {
+    "shape": "aggregation",
+    "breadth": false,
+    "evidence": [
+      "extremum_keystone"
+    ]
+  },
+  "061": {
+    "shape": "aggregation",
+    "breadth": false,
+    "evidence": [
+      "count_or_sum_threshold"
+    ]
+  },
+  "062": {
+    "shape": "aggregation",
+    "breadth": true,
+    "evidence": [
+      "extremum_keystone",
+      "roster_coverage",
+      "breadth:parallel_entity_roster"
+    ]
+  },
+  "065": {
+    "shape": "chain",
+    "breadth": false,
+    "evidence": [
+      "chain:chain_validator",
+      "chain:statement_dependent_hop"
+    ]
+  },
+  "067": {
+    "shape": "aggregation",
+    "breadth": true,
+    "evidence": [
+      "extremum_keystone",
+      "roster_coverage",
+      "breadth:parallel_entity_roster"
+    ]
+  },
+  "068": {
+    "shape": "aggregation",
+    "breadth": true,
+    "evidence": [
+      "extremum_keystone",
+      "and_filter",
+      "roster_coverage",
+      "breadth:parallel_entity_roster"
+    ]
+  },
+  "070": {
+    "shape": "aggregation",
+    "breadth": true,
+    "evidence": [
+      "count_or_sum_threshold",
+      "roster_coverage",
+      "breadth:parallel_entity_roster"
+    ]
+  },
+  "071": {
+    "shape": "aggregation",
+    "breadth": true,
+    "evidence": [
+      "extremum_keystone",
+      "roster_coverage",
+      "breadth:parallel_entity_roster"
+    ]
+  },
+  "072": {
+    "shape": "aggregation",
+    "breadth": true,
+    "evidence": [
+      "count_or_sum_threshold",
+      "roster_coverage",
+      "breadth:parallel_entity_roster"
+    ]
+  },
+  "073": {
+    "shape": "aggregation",
+    "breadth": true,
+    "evidence": [
+      "count_or_sum_threshold",
+      "roster_coverage",
+      "breadth:parallel_entity_roster"
+    ]
+  },
+  "075": {
+    "shape": "aggregation",
+    "breadth": true,
+    "evidence": [
+      "extremum_keystone",
+      "roster_coverage",
+      "breadth:parallel_entity_roster"
+    ]
+  },
+  "078": {
+    "shape": "aggregation",
+    "breadth": true,
+    "evidence": [
+      "count_or_sum_threshold",
+      "roster_coverage",
+      "breadth:parallel_entity_roster"
+    ]
+  },
+  "079": {
+    "shape": "aggregation",
+    "breadth": true,
+    "evidence": [
+      "extremum_keystone",
+      "roster_coverage",
+      "breadth:parallel_entity_roster"
+    ]
+  },
+  "081": {
+    "shape": "aggregation",
+    "breadth": true,
+    "evidence": [
+      "extremum_keystone",
+      "and_filter",
+      "roster_coverage",
+      "breadth:parallel_entity_roster"
+    ]
+  },
+  "082": {
+    "shape": "aggregation",
+    "breadth": true,
+    "evidence": [
+      "count_or_sum_threshold",
+      "roster_coverage",
+      "breadth:parallel_entity_roster"
+    ]
+  },
+  "084": {
+    "shape": "aggregation",
+    "breadth": true,
+    "evidence": [
+      "extremum_keystone",
+      "roster_coverage",
+      "breadth:parallel_entity_roster"
+    ]
+  },
+  "085": {
+    "shape": "aggregation",
+    "breadth": false,
+    "evidence": [
+      "count_or_sum_threshold"
+    ]
+  },
+  "090": {
+    "shape": "aggregation",
+    "breadth": true,
+    "evidence": [
+      "count_or_sum_threshold",
+      "roster_coverage",
+      "breadth:parallel_entity_roster"
+    ]
+  },
+  "091": {
+    "shape": "aggregation",
+    "breadth": true,
+    "evidence": [
+      "extremum_keystone",
+      "roster_coverage",
+      "breadth:parallel_entity_roster"
+    ]
+  },
+  "093": {
+    "shape": "other",
+    "breadth": false,
+    "evidence": []
+  },
+  "094": {
+    "shape": "aggregation",
+    "breadth": true,
+    "evidence": [
+      "extremum_keystone",
+      "and_filter",
+      "roster_coverage",
+      "breadth:parallel_entity_roster"
+    ]
+  },
+  "095": {
+    "shape": "aggregation",
+    "breadth": false,
+    "evidence": [
+      "survivor_elimination",
+      "chain:statement_dependent_hop"
+    ]
+  },
+  "108": {
+    "shape": "aggregation",
+    "breadth": false,
+    "evidence": [
+      "survivor_elimination",
+      "chain:statement_dependent_hop"
+    ]
+  },
+  "122": {
+    "shape": "aggregation",
+    "breadth": false,
+    "evidence": [
+      "survivor_elimination",
+      "chain:statement_dependent_hop"
+    ]
+  },
+  "123": {
+    "shape": "aggregation",
+    "breadth": false,
+    "evidence": [
+      "survivor_elimination",
+      "chain:statement_dependent_hop"
+    ]
+  },
+  "124": {
+    "shape": "aggregation",
+    "breadth": false,
+    "evidence": [
+      "survivor_elimination",
+      "chain:statement_dependent_hop"
+    ]
+  },
+  "125": {
+    "shape": "aggregation",
+    "breadth": false,
+    "evidence": [
+      "survivor_elimination",
+      "chain:statement_dependent_hop"
+    ]
+  },
+  "126": {
+    "shape": "aggregation",
+    "breadth": false,
+    "evidence": [
+      "survivor_elimination",
+      "chain:statement_dependent_hop"
+    ]
+  },
+  "127": {
+    "shape": "aggregation",
+    "breadth": false,
+    "evidence": [
+      "survivor_elimination",
+      "chain:statement_dependent_hop"
+    ]
+  },
+  "128": {
+    "shape": "aggregation",
+    "breadth": false,
+    "evidence": [
+      "cross_source_comparison"
+    ]
+  },
+  "129": {
+    "shape": "aggregation",
+    "breadth": false,
+    "evidence": [
+      "cross_source_comparison"
+    ]
+  },
+  "130": {
+    "shape": "aggregation",
+    "breadth": false,
+    "evidence": [
+      "cross_source_comparison"
+    ]
+  },
+  "131": {
+    "shape": "aggregation",
+    "breadth": false,
+    "evidence": [
+      "cross_source_comparison"
+    ]
+  },
+  "132": {
+    "shape": "aggregation",
+    "breadth": false,
+    "evidence": [
+      "cross_source_comparison"
+    ]
+  },
+  "133": {
+    "shape": "aggregation",
+    "breadth": false,
+    "evidence": [
+      "cross_source_comparison"
+    ]
+  },
+  "134": {
+    "shape": "chain",
+    "breadth": false,
+    "evidence": [
+      "chain:chain_validator"
+    ]
+  },
+  "135": {
+    "shape": "chain",
+    "breadth": false,
+    "evidence": [
+      "chain:chain_validator"
+    ]
+  },
+  "136": {
+    "shape": "chain",
+    "breadth": false,
+    "evidence": [
+      "chain:chain_validator"
+    ]
+  },
+  "137": {
+    "shape": "chain",
+    "breadth": false,
+    "evidence": [
+      "chain:chain_validator"
+    ]
+  },
+  "138": {
+    "shape": "chain",
+    "breadth": false,
+    "evidence": [
+      "chain:chain_validator"
+    ]
+  },
+  "139": {
+    "shape": "chain",
+    "breadth": false,
+    "evidence": [
+      "chain:chain_validator"
+    ]
+  },
+  "140": {
+    "shape": "chain",
+    "breadth": false,
+    "evidence": [
+      "chain:reexpansion_target"
+    ]
+  },
+  "141": {
+    "shape": "chain",
+    "breadth": false,
+    "evidence": [
+      "chain:reexpansion_target"
+    ]
+  },
+  "142": {
+    "shape": "chain",
+    "breadth": false,
+    "evidence": [
+      "chain:reexpansion_target"
+    ]
+  },
+  "143": {
+    "shape": "chain",
+    "breadth": false,
+    "evidence": [
+      "chain:reexpansion_target"
+    ]
+  },
+  "144": {
+    "shape": "chain",
+    "breadth": false,
+    "evidence": [
+      "chain:reexpansion_target"
+    ]
+  },
+  "145": {
+    "shape": "chain",
+    "breadth": false,
+    "evidence": [
+      "chain:reexpansion_target"
+    ]
+  }
+}
