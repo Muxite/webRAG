@@ -1293,21 +1293,13 @@ class LedgerToolkit:
             result["reason"] = "operand_not_found"
             return result
 
-        known_ids = {node.id for node in self._graph.nodes()}
         try:
-            extremum = self._graph.add_extremum(ratio_ids, mode)
+            extremum = self._graph.add_extremum(ratio_ids, mode, minted_by=HOST_DERIVE_TAG)
         except DerivationError as exc:
             self._graph.record_refusal(mode, ratio_ids, exc)
             result["reason"] = ("unit_inconsistent_across_entities"
                                 if isinstance(exc, UnitMismatch) else "error")
             return result
-        if extremum.id not in known_ids:
-            # `add_extremum` is the one minting entry point with no `minted_by=` kwarg (its
-            # `add_arith` / `add_derived` siblings have one) and `evidence_graph.py` is outside
-            # this change's scope, so the tag is stamped onto the node this call just created --
-            # guarded on the id being NEW, so a node that already existed keeps the provenance of
-            # whoever minted it first, exactly as `add_derived`'s own dedup rule promises.
-            object.__setattr__(extremum, "minted_by", HOST_DERIVE_TAG)
 
         # `add_extremum` reports the winning VALUE, not which input won, so the entity is recovered
         # by matching that value back to the ratio node that carries it. First match wins, which is

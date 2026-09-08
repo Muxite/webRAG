@@ -1533,12 +1533,36 @@ class TestMintedBy:
         node = graph.add_arith("sum", [a.id, b.id], minted_by="answer_audit")
         assert node.minted_by == "answer_audit"
 
+    def test_add_extremum_defaults_to_the_empty_tag(self):
+        graph = _arith_graph()
+        a = graph.add_source("p1", "400 goals")
+        b = graph.add_source("p1", "424 goals")
+        node = graph.add_extremum([a.id, b.id], "max")
+        assert node.minted_by == ""
+
+    def test_add_extremum_stamps_the_supplied_tag(self):
+        graph = _arith_graph()
+        a = graph.add_source("p1", "400 goals")
+        b = graph.add_source("p1", "424 goals")
+        node = graph.add_extremum([a.id, b.id], "max", minted_by="host_derive")
+        assert node.minted_by == "host_derive"
+
     def test_dedup_keeps_the_first_nodes_tag(self):
         """A content-identical re-mint under a different tag does not relabel the original node --
         the same dedup-keeps-first rule every other field on this node already follows."""
         graph = _arith_graph()
         first = graph.add_source("p1", "400 goals", minted_by="")
         second = graph.add_source("p1", "400 goals", minted_by="answer_audit")
+        assert first.id == second.id
+        assert second.minted_by == ""
+
+    def test_dedup_keeps_the_first_nodes_tag_for_extremum(self):
+        """Same dedup-keeps-first rule, exercised via `add_extremum` rather than `add_source`."""
+        graph = _arith_graph()
+        a = graph.add_source("p1", "400 goals")
+        b = graph.add_source("p1", "424 goals")
+        first = graph.add_extremum([a.id, b.id], "max", minted_by="")
+        second = graph.add_extremum([a.id, b.id], "max", minted_by="host_derive")
         assert first.id == second.id
         assert second.minted_by == ""
 

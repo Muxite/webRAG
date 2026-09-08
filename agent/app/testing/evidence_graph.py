@@ -1779,12 +1779,13 @@ class EvidenceGraph:
             return f"same_dimension_ratio ({display})"
         return f"cross_dimension_quotient ({display})"
 
-    def add_count(self, input_ids: Iterable[str]) -> EvidenceNode:
+    def add_count(self, input_ids: Iterable[str], *, minted_by: str = "") -> EvidenceNode:
         """Admit a DERIVED ``count`` node: the number of DISTINCT inputs, after de-duplication.
 
         The value is never asserted by a model — it is ``len()`` of the filtered input list.
 
         :param input_ids: ids of existing nodes to count; repeats are filtered before counting.
+        :param minted_by: provenance tag forwarded to :meth:`add_derived`.
         :returns: the new (or content-identical existing) node, ``value`` the count as a string.
         :raises: ValueError: an input id the graph does not hold.
         """
@@ -1793,9 +1794,11 @@ class EvidenceGraph:
         inputs_ok, invalid_ids = self._inputs_valid(inputs)
         detail = f"rests on invalid derivation(s): {invalid_ids}" if not inputs_ok else ""
         return self.add_derived(str(len(distinct_ids)), "count", distinct_ids,
-                                derivation_valid=inputs_ok, derivation_detail=detail)
+                                derivation_valid=inputs_ok, derivation_detail=detail,
+                                minted_by=minted_by)
 
-    def add_extremum(self, input_ids: Iterable[str], mode: str) -> EvidenceNode:
+    def add_extremum(self, input_ids: Iterable[str], mode: str, *,
+                     minted_by: str = "") -> EvidenceNode:
         """Admit a DERIVED ``max`` / ``min`` node: the extreme value among the inputs, verbatim.
 
         Postcondition, checked explicitly rather than merely assumed from ``max()`` / ``min()``:
@@ -1803,6 +1806,7 @@ class EvidenceGraph:
 
         :param input_ids: ids of existing nodes to compare; at least one.
         :param mode: ``"max"`` or ``"min"``.
+        :param minted_by: provenance tag forwarded to :meth:`add_derived`.
         :returns: the new (or content-identical existing) node, ``value`` the winning input's
             value VERBATIM (so its own provenance stays exact, e.g. ``"424 goals"``).
         :raises: ValueError: unknown mode, no inputs, an unknown input id, a non-numeric input, or
@@ -1823,9 +1827,11 @@ class EvidenceGraph:
         valid = postcondition_ok and inputs_ok
         detail = "" if inputs_ok else f"rests on invalid derivation(s): {invalid_ids}"
         return self.add_derived(winner_node.value, mode, [node.id for node, _ in numeric],
-                                unit=unit, derivation_valid=valid, derivation_detail=detail)
+                                unit=unit, derivation_valid=valid, derivation_detail=detail,
+                                minted_by=minted_by)
 
-    def add_compare(self, left_id: str, right_id: str, mode: str) -> EvidenceNode:
+    def add_compare(self, left_id: str, right_id: str, mode: str, *,
+                    minted_by: str = "") -> EvidenceNode:
         """Admit a DERIVED comparison node: ``"true"`` / ``"false"``, recomputed, never asserted.
 
         Both sides are looked up by id, so both must already be SOURCE-or-DERIVED nodes in this
@@ -1835,6 +1841,7 @@ class EvidenceGraph:
         :param left_id: id of the left-hand node.
         :param right_id: id of the right-hand node.
         :param mode: one of ``"gt"``, ``"lt"``, ``"ge"``, ``"le"``, ``"eq"``, ``"ne"``.
+        :param minted_by: provenance tag forwarded to :meth:`add_derived`.
         :returns: the new (or content-identical existing) node.
         :raises: ValueError: unknown mode, an unknown input id, a non-numeric input, or mismatched
             units between the two sides.
@@ -1857,7 +1864,7 @@ class EvidenceGraph:
         detail = f"rests on invalid derivation(s): {invalid_ids}" if not inputs_ok else ""
         return self.add_derived("true" if result else "false", f"compare_{mode}",
                                 [left.id, right.id], derivation_valid=inputs_ok,
-                                derivation_detail=detail)
+                                derivation_detail=detail, minted_by=minted_by)
 
     def derivation_validity(self) -> Optional[float]:
         """Fraction of DERIVED nodes whose postcondition is known to hold.
