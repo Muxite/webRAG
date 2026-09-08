@@ -58,6 +58,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import sys
 import time
 from collections import Counter, defaultdict
@@ -282,17 +283,15 @@ def make_live_prefetcher(loop: asyncio.AbstractEventLoop, *, http: Any, search: 
 def slug_coverage(entity: Any, url: str) -> Optional[float]:
     """Fraction of ``entity``'s significant tokens the URL slug of ``url`` carries.
 
-    Local re-implementation of ``LedgerToolkit._host_derive_slug_coverage`` (same tokeniser,
-    same slug rule) so the forensics can run over a stored row's ``url`` without a toolkit.
-    ``None`` when the entity has no significant token to match on.
+    Same tokeniser and slug rule as ``LedgerToolkit._host_derive_slug_coverage`` so the forensics
+    can run over a stored row's ``url`` without a toolkit. ``None`` when the entity has no
+    significant token to match on.
     """
-    from urllib.parse import unquote, urlparse
-    from agent.app.operand_attribution import _significant_tokens, _tokens
-    wanted = set(_significant_tokens(entity))
+    from agent.app.operand_attribution import _tokens
+    wanted = _significant(entity)
     if not wanted:
         return None
-    slug = unquote(urlparse(str(url or "")).path).rsplit("/", 1)[-1].replace("_", " ")
-    return len(wanted & set(_tokens(slug))) / len(wanted)
+    return len(wanted & set(_tokens(_slug_of(url)))) / len(wanted)
 
 
 def replay_cell(path: Path, raw: Dict[str, Any], ranker_names: Sequence[str],
@@ -561,38 +560,63 @@ def forensics(rows: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return out
 
 
+_PARENTHETICAL_RE = re.compile(r"\(([^()]*)\)")
+
+
+def _significant(entity: Any) -> set:
+    """The entity's identifying tokens -- the toolkit's own rule when importable."""
+    try:
+        from agent.app.ledger_tools import _significant_tokens  # re-exported from operand_attribution
+    except Exception:  # noqa: BLE001
+        from agent.app.operand_attribution import _significant_tokens
+    return set(_significant_tokens(entity))
+
+
+def _slug_of(url: str) -> str:
+    from urllib.parse import unquote, urlparse
+    return unquote(urlparse(str(url or "")).path).rsplit("/", 1)[-1].replace("_", " ")
+
+
+def slug_qualifiers(url: str) -> List[str]:
+    """Parenthetical qualifiers in the URL slug, e.g. ``["1974–2001"]`` for
+    ``.../Foo_(1974–2001)``: a disambiguated article the entity name itself did not ask for."""
+    return [q.strip() for q in _PARENTHETICAL_RE.findall(_slug_of(url)) if q.strip()]
+
+
 def prefetched_wrong_page(rows: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Selected slots that landed on a PREFETCHED page whose URL slug does not name the slot's
     entity -- the prefetcher fetched *a* page, not necessarily the entity's page.
 
-    Same two-part rule as the toolkit's candidate filter (``_host_derive_candidate_pages``): the
-    slug carries NONE of the entity's significant tokens, or it names one of the row's OTHER
-    entities strictly better ("Lake_Tanganyika" for a "Lake Baikal" slot covers 0.5 of the
-    entity but 1.0 of its rival). Partial self-coverage alone ("GRES-2_Power_Station" for
-    "GRES-2 Power Station chimney") is the page's own article and is not flagged.
+    Flagged unless the slug covers ALL of the entity's significant tokens: partial coverage is
+    exactly the failure seen live ("Burj_Azizi" for "Burj Khalifa" shares "burj",
+    "Jin_Mao_Tower" for "Shanghai Tower" shares "tower"). Also flagged when the slug carries a
+    parenthetical qualifier the entity does not ("Foo_(1974–2001)" for "Foo"): that is a
+    disambiguated sibling article, not the entity's own. Each entry names the entity, the URL
+    and the slot's field phrase so the fix can be aimed at the resolver query.
     """
     out = []
     for row in rows:
         prefetched_ids = set(row.get("prefetched_page_ids") or [])
         if not prefetched_ids:
             continue
-        slots = row.get("slots") or []
-        for slot in slots:
+        for slot in row.get("slots") or []:
             if slot.get("reason") != "selected" or str(slot.get("page_id")) not in prefetched_ids:
                 continue
+            entity = slot.get("entity")
             url = str(slot.get("url") or "")
-            cover = slug_coverage(slot.get("entity"), url)
-            if cover is None:
-                continue
-            rival_cover = max((slug_coverage(other.get("entity"), url) or 0.0)
-                              for other in slots if other is not slot) if len(slots) > 1 else 0.0
-            if cover > 0 and rival_cover <= cover:
+            cover = slug_coverage(entity, url)
+            entity_qualifiers = {q.strip().lower() for q in _PARENTHETICAL_RE.findall(str(entity or ""))}
+            extra_qualifiers = [q for q in slug_qualifiers(url) if q.lower() not in entity_qualifiers]
+            full_cover = cover is None or cover >= 1.0
+            if full_cover and not extra_qualifiers:
                 continue
             out.append({"file": row["file"], "ranker": row["ranker"], "test_id": row["test_id"],
                         "model": row["model"], "host": row["host"],
-                        "entity": slot.get("entity"), "url": slot.get("url"),
+                        "entity": entity, "field_phrase": slot.get("field_phrase"), "url": url,
                         "page_id": slot.get("page_id"), "slug_coverage": cover,
-                        "rival_slug_coverage": rival_cover,
+                        "slug_qualifiers": extra_qualifiers,
+                        "flag": ("partial_slug_coverage" if not full_cover
+                                 else "slug_qualifier_not_in_entity"),
                         "value_correct": row.get("value_correct"),
                         "reason": row.get("reason")})
     return out
@@ -929,12 +953,16 @@ def format_report(summary: Dict[str, Any]) -> str:
                        + "; ".join(pf["errors"][:FORENSICS_PRINT_CAP]))
         wrong = summary.get("prefetched_wrong_page", [])
         out.append(f"  prefetched_wrong_page ({len(wrong)} selected slots on a prefetched page "
-                   f"whose slug does not name the entity; first "
+                   f"whose slug does not fully name the entity or carries a foreign "
+                   f"qualifier; first "
                    f"{min(len(wrong), FORENSICS_PRINT_CAP)} shown)")
         for row in wrong[:FORENSICS_PRINT_CAP]:
+            cover = row["slug_coverage"]
             out.append(f"    {row['test_id']} {row['ranker']:<14}{row['model']:<16}"
-                       f"entity={row['entity']!r} slug_cover={row['slug_coverage']:.2f} "
-                       f"rival={row['rival_slug_coverage']:.2f} "
+                       f"{row['flag']} entity={row['entity']!r} "
+                       f"field={row['field_phrase']!r} "
+                       f"slug_cover={'n/a' if cover is None else f'{cover:.2f}'} "
+                       f"qualifiers={row['slug_qualifiers']} "
                        f"value_correct={row['value_correct']} url={row['url']}")
 
     rows = summary["forensics"]

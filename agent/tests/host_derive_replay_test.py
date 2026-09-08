@@ -670,28 +670,77 @@ def test_prefetched_wrong_page_flags_a_slug_that_does_not_name_the_entity(result
     selected = [s for s in row["slots"] if s["reason"] == "selected"]
     if row["reason"] == "computed":
         assert selected
-    assert [w["url"] for w in wrong] == ["https://example.org/wiki/List_of_tall_things"]
-    assert wrong[0]["entity"] == "Inco Superstack" and wrong[0]["slug_coverage"] == 0.0
-    assert wrong[0]["page_id"] in row["prefetched_page_ids"]
-    # Partial self-coverage on the entity's own article is NOT flagged (GRES-2 slug covers 3 of
-    # the 4 significant tokens of "GRES-2 Power Station chimney").
-    assert HDR.slug_coverage("GRES-2 Power Station chimney",
-                             "https://en.wikipedia.org/wiki/GRES-2_Power_Station") == 0.75
+    by_url = {w["url"]: w for w in wrong}
+    assert set(by_url) == {"https://example.org/wiki/List_of_tall_things",
+                           "https://en.wikipedia.org/wiki/GRES-2_Power_Station"}
+    inco = by_url["https://example.org/wiki/List_of_tall_things"]
+    assert inco["entity"] == "Inco Superstack" and inco["slug_coverage"] == 0.0
+    assert inco["flag"] == "partial_slug_coverage" and inco["field_phrase"]
+    assert inco["page_id"] in row["prefetched_page_ids"]
+    # Partial self-coverage is flagged too: "GRES-2_Power_Station" covers 3 of the 4 significant
+    # tokens of "GRES-2 Power Station chimney". The rule is ALL tokens, not "best available".
+    gres = by_url["https://en.wikipedia.org/wiki/GRES-2_Power_Station"]
+    assert gres["slug_coverage"] == 0.75 and gres["flag"] == "partial_slug_coverage"
+
+
+def _wrong_page_row(slots):
+    return {"file": "f", "ranker": "hand_rule", "test_id": "221", "model": "m", "host": "h",
+            "prefetched_page_ids": [s["page_id"] for s in slots], "value_correct": False,
+            "reason": "computed", "slots": slots}
+
+
+def _slot(entity, url, page_id, field="its height, in metres"):
+    return {"entity": entity, "url": url, "page_id": page_id, "reason": "selected",
+            "field_phrase": field}
+
+
+def test_prefetched_wrong_page_flags_partial_coverage_burj_azizi_and_jin_mao():
+    row = _wrong_page_row([
+        _slot("Burj Khalifa", "https://en.wikipedia.org/wiki/Burj_Azizi", "p1"),
+        _slot("Shanghai Tower", "https://en.wikipedia.org/wiki/Jin_Mao_Tower", "p2"),
+    ])
+    wrong = HDR.prefetched_wrong_page([row])
+    assert [(w["entity"], w["url"], w["field_phrase"], w["slug_coverage"], w["flag"])
+            for w in wrong] == [
+        ("Burj Khalifa", "https://en.wikipedia.org/wiki/Burj_Azizi", "its height, in metres",
+         0.5, "partial_slug_coverage"),
+        ("Shanghai Tower", "https://en.wikipedia.org/wiki/Jin_Mao_Tower",
+         "its height, in metres", 0.5, "partial_slug_coverage"),
+    ]
+
+
+def test_prefetched_wrong_page_does_not_flag_a_fully_named_page():
+    row = _wrong_page_row([
+        _slot("Burj Khalifa", "https://en.wikipedia.org/wiki/Burj_Khalifa", "p1"),
+        _slot("Shanghai Tower", "https://en.wikipedia.org/wiki/Shanghai_Tower", "p2"),
+    ])
+    assert HDR.prefetched_wrong_page([row]) == []
+
+
+def test_prefetched_wrong_page_flags_a_slug_qualifier_the_entity_lacks():
+    row = _wrong_page_row([
+        _slot("Warsaw Radio Mast", "https://en.wikipedia.org/wiki/Warsaw_Radio_Mast_(1974%E2%80%932001)",
+              "p1"),
+    ])
+    (w,) = HDR.prefetched_wrong_page([row])
+    assert w["slug_coverage"] == 1.0
+    assert w["slug_qualifiers"] == ["1974–2001"]
+    assert w["flag"] == "slug_qualifier_not_in_entity"
+    # ...but an entity that names the same qualifier itself is that article.
+    row2 = _wrong_page_row([
+        _slot("Warsaw Radio Mast (1974–2001)",
+              "https://en.wikipedia.org/wiki/Warsaw_Radio_Mast_(1974%E2%80%932001)", "p1"),
+    ])
+    assert HDR.prefetched_wrong_page([row2]) == []
 
 
 def test_prefetched_wrong_page_flags_a_rival_entity_slug():
-    row = {"file": "f", "ranker": "hand_rule", "test_id": "t", "model": "m", "host": "h",
-           "prefetched_page_ids": ["p1", "p2"], "value_correct": False, "reason": "computed",
-           "slots": [
-               {"entity": "Lake Baikal", "url": "https://en.wikipedia.org/wiki/Lake_Tanganyika",
-                "page_id": "p2", "reason": "selected"},
-               {"entity": "Lake Tanganyika",
-                "url": "https://en.wikipedia.org/wiki/Lake_Tanganyika", "page_id": "p2",
-                "reason": "selected"},
-           ]}
+    row = _wrong_page_row([
+        _slot("Lake Baikal", "https://en.wikipedia.org/wiki/Lake_Tanganyika", "p2"),
+        _slot("Lake Tanganyika", "https://en.wikipedia.org/wiki/Lake_Tanganyika", "p2"),
+    ])
     wrong = HDR.prefetched_wrong_page([row])
-    assert [(w["entity"], w["slug_coverage"], w["rival_slug_coverage"]) for w in wrong] == \
-        [("Lake Baikal", 0.5, 1.0)]
+    assert [(w["entity"], w["slug_coverage"]) for w in wrong] == [("Lake Baikal", 0.5)]
 
 
 def test_slug_coverage_matches_the_toolkit_rule():
