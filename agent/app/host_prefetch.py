@@ -45,6 +45,7 @@ hard-coded anywhere.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import time
@@ -138,11 +139,40 @@ def _candidates(hits: Sequence[Tuple[str, str]], entity: str, field_phrase: str)
     return out
 
 
+@dataclass(frozen=True)
+class _ParsedPage:
+    """Everything the prefetch derives from one fetched HTML document, computed once per document.
+
+    Keyed by a hash of the HTML itself, not the URL: a page the resolver reads as a CANDIDATE for
+    one entity and later registers for another (or reads again on the next cell of a replay) is
+    parsed once. Memory is bounded by the number of distinct documents a process sees -- a few
+    dozen Wikipedia pages -- so the memo is deliberately unbounded rather than capped.
+    """
+
+    body: str
+    has_infobox: bool
+    infobox_text: str
+    entries: Tuple[Any, ...]
+
+
+_PARSE_MEMO: Dict[str, _ParsedPage] = {}
+
+
+def _parsed(html: str) -> _ParsedPage:
+    key = hashlib.sha1(html.encode("utf-8", "surrogatepass")).hexdigest()
+    hit = _PARSE_MEMO.get(key)
+    if hit is None:
+        hit = _ParsedPage(body=clean_operation(html), has_infobox=has_infobox(html),
+                          infobox_text=infobox_text(html), entries=tuple(infobox_quantities(html)))
+        _PARSE_MEMO[key] = hit
+    return hit
+
+
 def _field_coverage(html: str, field_phrases: Sequence[str]) -> int:
     """The verification score: summed over ``field_phrases``, how many of each phrase's content
     tokens the page's quantity-bearing infobox labels cover between them. ``0`` for a page with
     no row sharing a token with any phrase (no infobox included)."""
-    labels = [_content_tokens(entry.label) for entry in infobox_quantities(html)]
+    labels = [_content_tokens(entry.label) for entry in _parsed(html).entries]
     score = 0
     for phrase in field_phrases:
         field_tokens = _content_tokens(phrase)
@@ -389,12 +419,13 @@ async def host_prefetch(kit: Any, mandate: str, *, http: Any, search: Any,
                 if html is None:
                     row["status"] = "fetch_failed"
                     continue
-                body = clean_operation(html)
-                if not (has_infobox(html) or _lead_names_entity(body, entity)):
+                parsed = _parsed(html)
+                body = parsed.body
+                if not (parsed.has_infobox or _lead_names_entity(body, entity)):
                     row["status"] = "fetch_failed"
                     continue
-                text = f"{infobox_text(html)}\n{body}"
-                entries = infobox_quantities(html)
+                text = f"{parsed.infobox_text}\n{body}"
+                entries = list(parsed.entries)
                 # `max_chars=None` would mean the toolkit's default window; the host page is
                 # stored in FULL, so the explicit length is passed -- no constant anywhere.
                 kit.register_page(url, text, source=PREFETCH_SOURCE, max_chars=len(text),
