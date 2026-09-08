@@ -563,3 +563,139 @@ not in kind.
   two lists, `skip_reason` on an evidence-graph-only cell, and the page-source / host tables.
 - `agent/idea_test_results/host_derive_replay/{rows.jsonl,summary.json,report.txt}` — overwritten
   with the corrected run (502 cells, 1004 rows, 52.5s, $0, offline).
+
+## 16. Both §15.5 failure families fixed, and what the roster rule costs
+
+Fix lane, same day, $0 offline. Two new refusal reasons in `LedgerToolkit.host_derive`, TDD'd on
+the real 211/216/218 mandates, then re-replayed over the same 502 stored cells. The frozen
+artefacts under `agent/idea_test_results/host_derive_replay/` were **not** touched; the after-run
+lives in the fix lane's scratch dir (`.../scratchpad/replay_after_fix/`), which is what every
+"after" number below is read from.
+
+### 16.1 What the two rules are
+
+**Family A → `operand_field_mismatch`** (new `OperandFieldMismatch`, code `OPERAND_FIELD_MISMATCH`).
+When `_host_derive_same_field` says both slots ask ONE field, the two selected entries' index
+LABELS must also be compatible: same normalised token set, one containing the other, or either
+empty (a prose operand carries no label to disagree with). Tokens are compared with function words
+dropped and qualifiers canonicalised, so `Max. depth` and `and a maximum depth of` are one field
+while `Average depth` and `Max. depth` are not. A qualifier disagreement — `avg` vs `max`, `min` vs
+`max`, `avg` vs `total` — refuses even when one label contains the other, so `Average depth` inside
+`Average maximum depth` is not waved through by the subset rule. Refused BEFORE minting: the two
+operands are individually well-supported, and a SOURCE node for each would put a pair on the
+artifact that no consumer should read as one.
+
+**Family B → `incomplete_roster`** (new `IncompleteRoster`, code `INCOMPLETE_ROSTER`). The argmax
+path now selects every slot's operands FIRST and mints nothing until the roster is known whole. If
+every one of the mandate's entities resolves, the path proceeds exactly as before; if two or more
+but not all resolve, the whole comparison is refused and **nothing is minted at all** — no
+per-entity ratio, no SOURCE node. The refusal message names the missing entities, and their
+`slots` rows already carry the per-entity reason (`no_candidate_page`, `below_min_score`, …).
+
+Two boundaries were decided and pinned in tests rather than left implicit:
+
+- **Fewer than two entities resolved stays `operand_not_found`.** That is not a roster the host
+  declined to rank, it is an absence of any comparison to make, and it is the reason that code has
+  always reported. Both outcomes are refusals, so risk accounting is identical; only the diagnosis
+  differs. (It now also mints nothing, where before it minted the one resolvable entity's ratio.)
+- **The roster check runs before the cross-entity unit check.** An incomplete roster is the more
+  fundamental fact and is now the reported reason for cells that previously read
+  `unit_inconsistent_across_entities` (40 hand-rule, 54 document-order). Zero availability effect —
+  it moves cells between two refusal reasons.
+
+The output contract is unchanged: no new top-level key (other lanes assert `set(result)` exactly),
+both reasons report their detail through `slots` and the recorded refusal.
+
+### 16.2 Before → after, hand rule, 502 cells
+
+| | before | after |
+|---|---|---|
+| availability (`computed` / 502) | **197 (39.2%)** | **140 (27.9%)** |
+| `value_correct` among computed | **194/197 (0.985)** | **140/140 (1.000)** |
+| argmax cells computed | 56 (54 correct, 2 wrong) | **0** |
+| two-operand cells computed | 141 (140 correct, 1 wrong) | **140 (140 correct)** |
+
+Reason profile, hand rule (before → after): `computed` 197 → 140, `operand_not_found` 186 → 186,
+`unit_inconsistent_across_entities` 90 → 50, `unit_mismatch` 29 → 29, `operand_field_mismatch`
+— → 1, `incomplete_roster` — → 96.
+
+Every row that changed, joined cell-by-cell on `(file, ranker)`:
+
+| ranker | before → after | n | of which were WRONG |
+|---|---|---|---|
+| hand_rule | `computed` → `operand_field_mismatch` | **1** (test 211) | **1** |
+| hand_rule | `computed` → `incomplete_roster` | **56** (18× 218, 36× 219, 2 wrong) | **2** |
+| hand_rule | `unit_inconsistent_across_entities` → `incomplete_roster` | 40 | n/a (already refused) |
+| document_order | `computed` → `incomplete_roster` | 20 | 15 |
+| document_order | `unit_mismatch` → `operand_field_mismatch` | 69 | n/a |
+| document_order | `unit_inconsistent_across_entities` → `incomplete_roster` | 54 | n/a |
+
+Per test, hand rule, availability and correctness (`before → after`); the four tests with zero
+availability in both runs (210/215/216/217, 220/221) are omitted:
+
+| test | n | availability | correct / computed |
+|---|---|---|---|
+| 211 | 48 | 42 → **41** | 41/42 → **41/41** |
+| 212 | 41 | 31 → 31 | 31/31 → 31/31 |
+| 213 | 31 | 28 → 28 | 28/28 → 28/28 |
+| 214 | 42 | 40 → 40 | 40/40 → 40/40 |
+| 218 | 48 | 20 → **0** | 18/20 → — |
+| 219 | 50 | 36 → **0** | 36/36 → — |
+
+Per host (hand rule, availability): `langgraph_react` 113/284 (39.8%) → 77/284 (27.1%);
+`sequential_react` 84/218 (38.5%) → 63/218 (28.9%). `value_correct` goes to 1.000 on both
+(previously 1.000 and 0.964) — the three wrong rows were all `sequential_react`, which is where
+§15.5 found them.
+
+### 16.3 The roster rule is not free, and the trade is worth stating plainly
+
+Fix A is surgical: **1 row changed, and it was the wrong one.** Availability −1, correctness +1.
+
+Fix B is not. It removes **56 hand-rule computed rows to remove 2 wrong ones**: 18 correct on 218
+and 36 correct on 219 go with them, and argmax availability drops to exactly zero on the whole
+stored set — no cell in 502 fetched all five entities of a five-entity mandate. The 219 pattern is
+the sharpest version: in 31 of the 36 lost cells the model had fetched precisely Multnomah and
+Kaieteur, the top-two ratios, so the partial-roster argmax named the right winner. It was right
+because the model's fetching happened to be biased toward the winner, which is a property of the
+run and not of the mechanism — that is the whole argument for the rule, and it is also exactly
+why it costs so much here.
+
+Read against a risk-coverage KPI: before, argmax contributed 56 rows at 96.4% precision; after, it
+contributes none at 100%. Pooled, the mechanism moves from 0.985 @ 39.2% coverage to 1.000 @ 27.9%.
+**Whether that is the right operating point is a policy call for the roadmap owner, not a bug** —
+if a zero-risk certify chain is the bar, the rule is correct as shipped; if coverage matters more
+than the last 1.5 points of precision, gating the roster refusal behind a keyword flag is a
+one-line change at the `len(resolved) < len(slots)` branch. Nothing downstream was flagged either
+way; it ships default-on because §15.5 asked for the refusal and because minting a winner over a
+roster that silently excludes the true one is the failure this module exists to refuse.
+
+### 16.4 Post-hoc secondary: mint03 under the fixed mechanism
+
+**Post-hoc, not preregistered** — mint03 was not in the 2e replay set, and these numbers were
+produced after the fix was written, so they are reported as a secondary read and decide nothing.
+96 files, 68 replayable (28 `no_pages`, 0 `infra_failed`), 136 rows.
+
+| ranker | availability | `value_correct` among computed |
+|---|---|---|
+| hand_rule | **18/68 (26.5%)** | **18/18 (1.000)** |
+| document_order | 26/68 (38.2%) | 9/26 (0.346) |
+
+hand-rule reasons: `operand_not_found` 28, `computed` 18, `incomplete_roster` 12,
+`unit_inconsistent_across_entities` 6, `unit_mismatch` 4, `operand_field_mismatch` 0. The shape
+matches the 2e set closely — same availability band, same perfect correctness among the computed
+rows, and the same argmax wipe-out via `incomplete_roster`.
+
+### 16.5 Files
+
+- `agent/app/ledger_tools.py` — `OperandFieldMismatch` / `IncompleteRoster`,
+  `_HOST_DERIVE_LABEL_QUALIFIERS` / `_HOST_DERIVE_LABEL_STOPWORDS`,
+  `_host_derive_label_tokens` / `_host_derive_labels_compatible`, the same-field label gate in
+  `_host_derive_two_operand`, the select-then-decide-then-mint restructure of
+  `_host_derive_argmax`, and the two new reasons in the `host_derive` output contract.
+- `agent/tests/host_derive_test.py` — 6 new tests (31 total, all passing): the real 211 average-vs-
+  maximum pair, two over-reach guards (`Max.` vs `Maximum` still computes; a two-different-fields
+  mandate is not label-checked), the real 218 three-of-five roster, the fewer-than-two boundary,
+  and a complete roster still computing.
+- Re-run: `PYTHONPATH=.:services:agent ./.venv/bin/python scripts/host_derive_replay.py --out-dir
+  <scratch>` (502 cells, 1004 rows, 47.7 s, $0, offline) and the same with `--prefixes mint03`
+  (68 cells, 136 rows). `agent/idea_test_results/host_derive_replay/` left untouched.

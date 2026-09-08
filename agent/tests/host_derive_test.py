@@ -588,3 +588,116 @@ def test_the_result_dict_always_carries_the_whole_contract(kit):
                                 "score", "reason"}
             assert row["entry"] is None or set(row["entry"]) == {"label", "value", "unit",
                                                                  "start", "end", "source"}
+
+
+# --------------------------------------------------------------------------------------------
+# The two failure families the 2026-09-08 replay's newly-included rows exposed
+# (`docs/handoffs/HOST_DERIVE_REPLAY_2026-09-08.md` section 15.5)
+# --------------------------------------------------------------------------------------------
+
+#: Baikal's article as the replay found it: no `Max. depth` row at all, so the only depth the page
+#: offers the 211 slot is its AVERAGE one.
+BAIKAL_PAGE_AVERAGE_ONLY = """Lake Baikal
+Lake Baikal is a rift lake in Siberia, Russia.
+Surface area
+31,722
+km
+2
+Average depth
+744.4
+m
+"""
+
+#: The same maximum depth written with the unabbreviated qualifier -- `Max.` and `Maximum` are the
+#: same field, and the compatibility rule must not read a spelling as a disagreement.
+TANGANYIKA_PAGE_SPELLED_OUT = TANGANYIKA_PAGE.replace("Max. depth", "Maximum depth")
+
+
+def test_two_slots_reading_the_SAME_field_must_agree_on_their_index_LABEL(kit):
+    """Task 211 asks each lake's MAXIMUM depth. The replay's Baikal page carried only an
+    `Average depth` row and Tanganyika's carried a maximum one; both are metres, so every unit
+    check passed and the host summed 744.4 + 1,471 = 2,215.4 m -- two well-supported operands that
+    are not comparable as a pair (`HOST_DERIVE_REPLAY_2026-09-08.md` section 15.5, family A). A
+    same-field mandate now requires the two LABELS to be compatible too."""
+    kit.register_page(BAIKAL_URL, BAIKAL_PAGE_AVERAGE_ONLY)
+    kit.register_page(TANGANYIKA_URL, TANGANYIKA_PAGE)
+
+    result = kit.host_derive(statement("211"))
+
+    assert result["reason"] == "operand_field_mismatch"
+    assert result["value"] is None and result["node_id"] is None
+    assert [row["entry"]["label"] for row in _selected(result)] == ["Average depth", "Max. depth"]
+    assert kit.artifact()["derivation_refusals"][-1]["code"] == "OPERAND_FIELD_MISMATCH"
+    assert not [node for node in kit.artifact()["nodes"]
+                if node["minted_by"] == HOST_DERIVE_TAG], "nothing is minted for a refused cell"
+
+
+def test_the_same_qualifier_spelled_two_ways_is_one_field_not_a_mismatch(kit):
+    """The guard against over-reach: `Max. depth` and `Maximum depth` are the same measurement,
+    and a mandate whose two articles abbreviate differently must stay available."""
+    kit.register_page(BAIKAL_URL, BAIKAL_PAGE)
+    kit.register_page(TANGANYIKA_URL, TANGANYIKA_PAGE_SPELLED_OUT)
+
+    result = kit.host_derive(statement("211"))
+
+    assert result["reason"] == "computed"
+    assert result["value"] == pytest.approx(1642.0 + 1470.0)
+    assert [row["entry"]["label"] for row in _selected(result)] == ["Max. depth", "Maximum depth"]
+
+
+def test_a_two_operand_mandate_naming_two_DIFFERENT_fields_is_not_label_checked(kit):
+    """The other half of the guard: 216 reads a line length and a journey time off ONE page, so
+    the labels SHOULD differ and the rule must not fire."""
+    kit.register_page(SHINKANSEN_URL, SHINKANSEN_PAGE)
+
+    result = kit.host_derive(statement("216"))
+
+    assert result["reason"] == "computed"
+    assert [row["entry"]["label"] for row in _selected(result)] == ["Line length", "Journey time"]
+
+
+def test_an_argmax_over_a_partly_resolved_roster_refuses_instead_of_crowning_a_winner(kit):
+    """Task 218 names five rivers. The replay's qwen cells fetched pages for two and three of
+    them, and the host crowned the Yangtze over a roster that silently excluded the real winner
+    (`HOST_DERIVE_REPLAY_2026-09-08.md` section 15.5, family B). An extremum is only as sound as
+    its roster: every slot entity must resolve, or the mechanism declines."""
+    for name, slug, length, basin in RIVERS[1:4]:
+        kit.register_page(_wiki(slug), _river_page(name, length, basin))
+
+    result = kit.host_derive(statement("218"))
+
+    assert result["reason"] == "incomplete_roster"
+    assert result["value"] is None and result["node_id"] is None
+    assert result["winner_entity"] is None
+    unresolved = sorted({row["entity"] for row in result["slots"]
+                         if row["reason"] != "selected"})
+    assert unresolved == ["Amazon", "Mekong"]
+    refusal = kit.artifact()["derivation_refusals"][-1]
+    assert refusal["code"] == "INCOMPLETE_ROSTER"
+    assert "Amazon" in refusal["message"] and "Mekong" in refusal["message"]
+    assert not [node for node in kit.artifact()["nodes"]
+                if node["minted_by"] == HOST_DERIVE_TAG], "no per-entity ratio is minted either"
+
+
+def test_a_roster_too_thin_to_compare_at_all_stays_operand_not_found(kit):
+    """The two refusals are layered, and the boundary is pinned: fewer than two entities resolved
+    means there was no comparison to make in the first place (an availability outcome, reported as
+    `operand_not_found` exactly as before), while `incomplete_roster` is reserved for a comparison
+    the host COULD have computed and declined because the roster was missing entries. Both are
+    refusals, so the risk accounting is identical either way; only the diagnosis differs."""
+    name, slug, length, basin = RIVERS[0]
+    kit.register_page(_wiki(slug), _river_page(name, length, basin))
+
+    result = kit.host_derive(statement("218"))
+
+    assert result["reason"] == "operand_not_found"
+    assert not [node for node in kit.artifact()["nodes"]
+                if node["minted_by"] == HOST_DERIVE_TAG]
+
+
+def test_a_complete_roster_is_unaffected_by_the_roster_rule(kit):
+    """Every one of the five rivers resolves, so 218 computes exactly as it did before."""
+    result = _rivers_kit(kit).host_derive(statement("218"))
+
+    assert result["reason"] == "computed"
+    assert result["winner_entity"] == "Mekong"

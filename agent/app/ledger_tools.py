@@ -58,6 +58,44 @@ class OperandNotOnPage(DerivationError):
 
     code = "OPERAND_NOT_ON_PAGE"
 
+
+class OperandFieldMismatch(DerivationError):
+    """Two operands of a SAME-FIELD mandate were read under incompatible index labels.
+
+    The neighbouring :class:`~agent.app.testing.evidence_graph.UnitMismatch` catches a pair whose
+    units disagree; this one catches a pair whose units AGREE and whose labels do not -- an average
+    depth minus a maximum depth is two metre figures the host has no business subtracting.
+    """
+
+    code = "OPERAND_FIELD_MISMATCH"
+
+
+class IncompleteRoster(DerivationError):
+    """An argmax was declined because not every entity the mandate named could be resolved.
+
+    An extremum is a claim ABOUT A SET: "the highest of these five". Computing it over the two the
+    host happened to read is not a weaker version of that claim, it is a different one, and it is
+    wrong exactly when the missing entity is the winner.
+    """
+
+    code = "INCOMPLETE_ROSTER"
+
+
+#: Qualifier tokens that make two same-dimension index labels name DIFFERENT measurements, mapped
+#: to a canonical form so a page that abbreviates ("Max. depth") and one that does not ("and a
+#: maximum depth of") still read as one field. Used only by
+#: :meth:`LedgerToolkit._host_derive_labels_compatible`; deliberately short, since every entry is a
+#: word whose presence changes WHICH number of a field a page states.
+_HOST_DERIVE_LABEL_QUALIFIERS = {
+    "max": "max", "maximum": "max", "min": "min", "minimum": "min",
+    "avg": "avg", "average": "avg", "mean": "avg", "total": "total", "median": "median",
+}
+
+#: Function words dropped before two index labels are compared, so a prose-shaped label ("and a
+#: maximum depth of") can still contain, or be contained by, an infobox one ("Max. depth").
+_HOST_DERIVE_LABEL_STOPWORDS = {"a", "an", "the", "and", "or", "of", "in", "on", "at", "to",
+                                "for", "its", "is", "was", "with", "by", "as", "s"}
+
 #: Provenance tag stamped on every node minted by :meth:`LedgerToolkit.audit_answer`, so a
 #: consumer (e.g. the risk-coverage certify chain) can include or exclude this mechanical,
 #: finish-time minting path from the model-driven ``derive`` path's own accounting.
@@ -1239,6 +1277,38 @@ class LedgerToolkit:
         phrases = {tuple(_tokens(getattr(slot, "field_phrase", ""))) for slot in slots}
         return len(phrases) == 1 and bool(next(iter(phrases)))
 
+    @staticmethod
+    def _host_derive_label_tokens(label: Any) -> set:
+        """``label`` as comparable tokens: function words dropped, qualifiers canonicalised."""
+        return {_HOST_DERIVE_LABEL_QUALIFIERS.get(token, token) for token in _tokens(label)
+                if token not in _HOST_DERIVE_LABEL_STOPWORDS}
+
+    @classmethod
+    def _host_derive_labels_compatible(cls, label_a: Any, label_b: Any) -> bool:
+        """Could these two index labels name the SAME measurement, read of two entities?
+
+        Only asked when both slots share one field phrase, and it is the label analogue of the
+        same-field unit rule above: 211 asks each lake's maximum depth, one article stated only an
+        `Average depth` and the other a maximum one, both in metres, so every unit check passed and
+        the host summed two figures that are not a pair
+        (``docs/handoffs/HOST_DERIVE_REPLAY_2026-09-08.md`` section 15.5, family A).
+
+        Compatible means: the same normalised token set, or one set containing the other (an
+        infobox `Max. depth` and a prose `and a maximum depth of` are one field), or either label
+        empty -- a prose operand carries no label to disagree with, and refusing it would cost
+        availability for no evidence. Incompatible means a QUALIFIER disagreement -- average vs
+        maximum, min vs max, mean vs total -- which is the shape that actually went wrong, and is
+        checked before containment so a label that merely adds a qualifier ("Average depth" inside
+        "Average maximum depth") is not waved through by the subset rule.
+        """
+        tokens_a = cls._host_derive_label_tokens(label_a)
+        tokens_b = cls._host_derive_label_tokens(label_b)
+        qualifiers_a = tokens_a & set(_HOST_DERIVE_LABEL_QUALIFIERS.values())
+        qualifiers_b = tokens_b & set(_HOST_DERIVE_LABEL_QUALIFIERS.values())
+        if qualifiers_a and qualifiers_b and qualifiers_a != qualifiers_b:
+            return False
+        return tokens_a <= tokens_b or tokens_b <= tokens_a
+
     def _host_derive_two_operand(self, result: Dict[str, Any], slots: List[Any], operation: str,
                                  absolute: bool, ranker: Any, min_score: float) -> Dict[str, Any]:
         """The 210-217 shape: two slots, one operation, one DERIVED node."""
@@ -1261,6 +1331,16 @@ class LedgerToolkit:
             return result
 
         operands = [picked for picked in chosen if picked is not None]
+        if same_field and not self._host_derive_labels_compatible(operands[0][1].label,
+                                                                  operands[1][1].label):
+            # Refused BEFORE minting: the two operands are individually well-supported, and a
+            # SOURCE node for each would put a pair on the artifact that no consumer should read
+            # as one. The refusal names both labels, which is the whole diagnosis.
+            self._graph.record_refusal(operation, [], OperandFieldMismatch(
+                f"same field {slots[0].field_phrase!r} read under incompatible labels: "
+                f"{operands[0][1].label!r} and {operands[1][1].label!r}"))
+            result["reason"] = "operand_field_mismatch"
+            return result
         if absolute and operation == "difference":
             # Mint larger-first so the NODE ITSELF carries the absolute difference the mandate
             # asked for, rather than a signed value this method then reports the modulus of.
@@ -1327,9 +1407,12 @@ class LedgerToolkit:
 
         taken: set = set()
         rows: List[Dict[str, Any]] = []
-        ratios: List[Tuple[Any, Any]] = []
-        unit_pairs: set = set()
+        resolved: List[Tuple[Any, Tuple[str, Any], Tuple[str, Any]]] = []
         entities = [str(getattr(slot, "entity", "")) for slot in slots]
+        # Pass one selects only. Nothing is minted until the ROSTER is known to be whole, because
+        # the two refusals below are refusals of the whole comparison, not of one entity's share
+        # of it, and a half-minted roster on the artifact is exactly the partial evidence the
+        # extremum is being declined over.
         for position, slot in enumerate(slots):
             rivals = [entity for index, entity in enumerate(entities) if index != position]
             numerator_row, numerator = self._host_derive_select(slot, numerator_phrase, ranker,
@@ -1339,7 +1422,32 @@ class LedgerToolkit:
                                                                     rivals)
             rows.extend((numerator_row, denominator_row))
             if numerator is None or denominator is None:
-                continue  # an entity nobody read both numbers for simply does not compete
+                continue  # an entity nobody read both numbers for cannot compete
+            resolved.append((slot, numerator, denominator))
+        result["slots"] = rows
+
+        if len(resolved) < 2:
+            # Fewer than two entities is not a roster at all: there was no comparison to decline,
+            # so this stays the availability outcome it has always been rather than becoming an
+            # `incomplete_roster` refusal. Both are refusals; only the diagnosis differs.
+            result["reason"] = "operand_not_found"
+            return result
+        if len(resolved) < len(slots):
+            # 218's qwen cells crowned the Yangtze over a roster whose Mekong -- the true winner --
+            # was never fetched (`docs/handoffs/HOST_DERIVE_REPLAY_2026-09-08.md` section 15.5,
+            # family B). The slot rows already record WHICH entities went missing and why; the
+            # refusal names them, and nothing at all is minted.
+            missing = sorted({str(getattr(slot, "entity", "")) for slot in slots}
+                             - {str(getattr(slot, "entity", "")) for slot, _, _ in resolved})
+            self._graph.record_refusal(mode, [], IncompleteRoster(
+                f"{mode} over {len(slots)} entities, {len(resolved)} resolved: "
+                f"no operands for {', '.join(missing)}"))
+            result["reason"] = "incomplete_roster"
+            return result
+
+        ratios: List[Tuple[Any, Any]] = []
+        unit_pairs: set = set()
+        for slot, numerator, denominator in resolved:
             nodes = [self._mint_source_from_entry(page_id, entry, minted_by=HOST_DERIVE_TAG)
                      for page_id, entry in (numerator, denominator)]
             if any(node is None for node in nodes):
@@ -1351,7 +1459,6 @@ class LedgerToolkit:
                                                            minted_by=HOST_DERIVE_TAG)))
             except DerivationError as exc:
                 self._graph.record_refusal("ratio", [node.id for node in nodes], exc)
-        result["slots"] = rows
 
         ratio_ids = [node.id for _, node in ratios]
         if len(unit_pairs) > 1:
@@ -1423,9 +1530,9 @@ class LedgerToolkit:
         :returns: always the same keys, whatever the outcome::
 
             {"reason": "computed" | "no_unambiguous_shape" | "fewer_than_two_slots" |
-                       "operand_not_found" | "unit_mismatch" |
-                       "unit_inconsistent_across_entities" | "argmax_formula_unparsed" |
-                       "no_pages" | "error",
+                       "operand_not_found" | "unit_mismatch" | "operand_field_mismatch" |
+                       "unit_inconsistent_across_entities" | "incomplete_roster" |
+                       "argmax_formula_unparsed" | "no_pages" | "error",
              "operation": str|None, "absolute": bool, "mode": "max"|"min"|None,
              "value": float|None, "value_text": str|None, "unit": str,
              "node_id": str|None, "winner_entity": str|None,
@@ -1434,7 +1541,11 @@ class LedgerToolkit:
              "ranker": str, "n_pages": int, "n_entries": int, "min_score": float}
 
             ``slots`` carries ONE row per operand read, so an argmax mandate contributes two rows
-            per entity (numerator and denominator) sharing that entity's ``index``.
+            per entity (numerator and denominator) sharing that entity's ``index``. It is also
+            where the two 2026-09-08 refusals report their detail, since the contract's top-level
+            keys are fixed: ``operand_field_mismatch`` leaves both rows ``selected`` and the
+            disagreeing labels readable in their ``entry``, and ``incomplete_roster`` leaves the
+            unresolved entities' rows carrying the reason each of them failed on.
         :raises: nothing, ever -- a host calls this at its single exit, and an exception here would
             take a completed run's whole result with it.
         """
