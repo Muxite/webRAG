@@ -1089,37 +1089,74 @@ class LedgerToolkit:
         page = self._graph.page(page_id) or {}
         return str(page.get("url") or ""), str(page.get("text") or "")
 
-    def _host_derive_candidate_pages(self, entity: str) -> List[str]:
-        """The registered pages most likely to be ABOUT ``entity``, or all of them.
+    def _host_derive_candidate_pages(self, entity: str,
+                                     rivals: Sequence[str] = ()) -> List[str]:
+        """The registered pages that are ABOUT ``entity`` -- empty when none of them is.
 
         A run fetches every entity's page into ONE toolkit, so ranking a slot over the whole index
         would let Lake Tanganyika's depth answer for Lake Baikal's. The filter is deliberately
         soft: pages are scored by the fraction of the entity's identifying tokens their URL slug or
         their lead text carries, and every page tied at the best NON-ZERO score is kept -- an
         entity named on two pages (an article and a list page) keeps both and lets the ranker
-        choose. When no page names the entity at all the filter abstains and returns everything,
-        because a wrong filter that silently empties the candidate set would refuse a slot the
-        ranker could still have resolved.
+        choose.
+
+        When NO page names the entity the filter returns nothing, which the caller reads as
+        ``no_candidate_page``. This used to abstain and hand back every registered page, on the
+        theory that a wrong filter should not refuse a slot the ranker could still resolve; the
+        2026-09-08 replay measured what that actually bought (section 4a of
+        ``docs/handoffs/HOST_DERIVE_REPLAY_2026-09-08.md``): a run that fetched only the Inco
+        Superstack page resolved the *GRES-2* slot against it, both slots selected the SAME
+        ``Height`` row, and the host minted a confident ``|380 - 380| = 0.0 m``. 21 of 50 wrong
+        rows were that one substitution. An unfetched entity has no number on disk, so the honest
+        outcome is a refusal, not another entity's figure.
+
+        A page is dropped outright when its URL SLUG names one of ``rivals`` -- the mandate's other
+        entities -- better than it names ``entity``. That is the second half of the same finding:
+        removing the fallback alone moved nothing on the stored cells, because the real Inco
+        article's lead NAMES the GRES-2 chimney that surpassed it, so the GRES-2 slot still matched
+        the Inco page on lead tokens and read its height. A slug is the page's own claim about
+        whose article it is; a lead-text mention is not, and does not overrule it. A comparison
+        page whose slug names nobody ("List of tallest chimneys") is claimed by nobody and still
+        serves both slots on lead tokens, exactly as before.
 
         :param entity: the slot's entity name.
-        :returns: page ids, in registration order; never empty when any page is registered.
+        :param rivals: the other slots' entity names, for the slug rule above.
+        :returns: page ids, in registration order; EMPTY when no registered page names ``entity``.
         """
         page_ids = list(self._indexes)
         wanted = _significant_tokens(entity)
         if not wanted or not page_ids:
+            # No identifying token to match on is not the same as "matched nothing": a slot whose
+            # entity is empty has no claim to refuse, so it keeps the whole index as before.
             return page_ids
+        slug_cover = self._host_derive_slug_coverage(wanted, page_ids)
+        rival_slug = [self._host_derive_slug_coverage(tokens, page_ids)
+                      for tokens in {frozenset(_significant_tokens(rival)) for rival in rivals}
+                      if tokens and set(tokens) != wanted]
         coverage: Dict[str, float] = {}
         for page_id in page_ids:
-            url, text = self._host_derive_page(page_id)
-            slug = unquote(urlparse(url).path).rsplit("/", 1)[-1].replace("_", " ")
-            slug_tokens = set(_tokens(slug))
+            _, text = self._host_derive_page(page_id)
             lead_tokens = set(_tokens(text[:_HOST_DERIVE_PREFIX_CHARS]))
-            coverage[page_id] = max(len(wanted & slug_tokens),
-                                    len(wanted & lead_tokens)) / len(wanted)
-        best = max(coverage.values())
+            coverage[page_id] = max(slug_cover[page_id],
+                                    len(wanted & lead_tokens) / len(wanted))
+        owned = {page_id for page_id in page_ids
+                 if any(rival[page_id] > slug_cover[page_id] for rival in rival_slug)}
+        best = max((coverage[page_id] for page_id in page_ids if page_id not in owned),
+                   default=0.0)
         if best <= 0:
-            return page_ids
-        return [page_id for page_id in page_ids if coverage[page_id] >= best]
+            return []
+        return [page_id for page_id in page_ids
+                if page_id not in owned and coverage[page_id] >= best]
+
+    def _host_derive_slug_coverage(self, wanted: Any, page_ids: Sequence[str]) -> Dict[str, float]:
+        """Fraction of the identifying tokens ``wanted`` that each page's URL SLUG carries."""
+        wanted = set(wanted)
+        cover: Dict[str, float] = {}
+        for page_id in page_ids:
+            url, _ = self._host_derive_page(page_id)
+            slug = unquote(urlparse(url).path).rsplit("/", 1)[-1].replace("_", " ")
+            cover[page_id] = len(wanted & set(_tokens(slug))) / len(wanted)
+        return cover
 
     def _host_derive_rank(self, slot: Any, page_ids: Sequence[str],
                           ranker: Any) -> List[Tuple[float, str, Any]]:
@@ -1140,7 +1177,9 @@ class LedgerToolkit:
         return [(score, page_id, entry) for score, _, page_id, entry in ranked]
 
     def _host_derive_select(self, slot: Any, phrase: str, ranker: Any, min_score: float,
-                            taken: set) -> Tuple[Dict[str, Any], Optional[Tuple[str, Any]]]:
+                            taken: set,
+                            rivals: Sequence[str] = ()) -> Tuple[Dict[str, Any],
+                                                                 Optional[Tuple[str, Any]]]:
         """Pick one operand for ``slot`` read under ``phrase``, honouring the exclusion set.
 
         :param slot: a :class:`~agent.app.mandate_slots.Slot`.
@@ -1150,6 +1189,7 @@ class LedgerToolkit:
         :param min_score: the floor a candidate must reach; see :data:`_HOST_DERIVE_MIN_SCORE`.
         :param taken: ``(page_id, start, end)`` spans already used by another slot. MUTATED on a
             successful selection -- this is what stops two slots reading the same number twice.
+        :param rivals: the mandate's OTHER entity names; see :meth:`_host_derive_candidate_pages`.
         :returns: ``(row, (page_id, entry) or None)``. The row always reports the best candidate's
             page and score (so a refusal shows how close it came), but carries ``entry`` only when
             the candidate was actually selected.
@@ -1161,8 +1201,8 @@ class LedgerToolkit:
             "field_phrase": str(phrase), "page_id": None, "url": None, "entry": None,
             "score": None, "reason": "no_candidate_page",
         }
-        ranked = self._host_derive_rank(probe, self._host_derive_candidate_pages(row["entity"]),
-                                        ranker)
+        ranked = self._host_derive_rank(
+            probe, self._host_derive_candidate_pages(row["entity"], rivals), ranker)
         available = [cand for cand in ranked
                      if (cand[1], cand[2].start, cand[2].end) not in taken]
         if not available:
@@ -1188,6 +1228,17 @@ class LedgerToolkit:
             return self._compat_quotient(unit_a, unit_b)
         return False
 
+    @staticmethod
+    def _host_derive_same_field(slots: Sequence[Any]) -> bool:
+        """Do these slots ask for the SAME field, read of different entities?
+
+        Compared on normalised (lowercased, alphanumeric) tokens, so "its area, in km2" asked twice
+        is one field however the mandate spaces or cases it. True for the real 211/213/214/217,
+        false for 210/212/215/216, whose two slots name genuinely different fields.
+        """
+        phrases = {tuple(_tokens(getattr(slot, "field_phrase", ""))) for slot in slots}
+        return len(phrases) == 1 and bool(next(iter(phrases)))
+
     def _host_derive_two_operand(self, result: Dict[str, Any], slots: List[Any], operation: str,
                                  absolute: bool, ranker: Any, min_score: float) -> Dict[str, Any]:
         """The 210-217 shape: two slots, one operation, one DERIVED node."""
@@ -1196,9 +1247,12 @@ class LedgerToolkit:
         chosen: List[Optional[Tuple[str, Any]]] = []
         # Only the first two slots: every operation this path handles is binary, so a third slot
         # would have no argument position to occupy.
-        for slot in slots[:2]:
+        same_field = self._host_derive_same_field(slots[:2])
+        entities = [str(getattr(slot, "entity", "")) for slot in slots[:2]]
+        for position, slot in enumerate(slots[:2]):
+            rivals = [entity for index, entity in enumerate(entities) if index != position]
             row, picked = self._host_derive_select(slot, slot.field_phrase, ranker, min_score,
-                                                   taken)
+                                                   taken, rivals)
             rows.append(row)
             chosen.append(picked)
         result["slots"] = rows
@@ -1222,6 +1276,22 @@ class LedgerToolkit:
 
         node_ids = [node.id for node in nodes]
         units = [entry.unit for _, entry in operands]
+        if same_field and canonical_unit(units[0]) != canonical_unit(units[1]):
+            # Narrower than `_host_derive_compatible`, and deliberately NOT folded into it.
+            # `_compat_quotient` allows two different units because a rate is a legitimate
+            # derivation -- 216 divides km by minutes and must keep computing. But when BOTH slots
+            # read the same field, two different units are two different measurements of one
+            # quantity, never a rate: 217 asks each lake's surface area and the two articles write
+            # `8,372 km` (the flattened infobox loses the exponent) and `191 sq mi`, which the
+            # quotient rule accepted as `43.83 km/sq mi`. Same-dimension-different-unit is already
+            # refused ACROSS entities in the argmax path
+            # (`unit_inconsistent_across_entities`); this is the same refusal for a two-operand
+            # mandate, and like every unit rule here it refuses rather than converting.
+            self._graph.record_refusal(operation, node_ids, UnitMismatch(
+                f"same field {slots[0].field_phrase!r} read in different units: "
+                f"{units[0]!r} and {units[1]!r}"))
+            result["reason"] = "unit_mismatch"
+            return result
         if not self._host_derive_compatible(operation, units[0], units[1]):
             self._graph.record_refusal(operation, node_ids, UnitMismatch(
                 f"incompatible units for {operation}: {units[0]!r} and {units[1]!r}"))
@@ -1259,11 +1329,14 @@ class LedgerToolkit:
         rows: List[Dict[str, Any]] = []
         ratios: List[Tuple[Any, Any]] = []
         unit_pairs: set = set()
-        for slot in slots:
+        entities = [str(getattr(slot, "entity", "")) for slot in slots]
+        for position, slot in enumerate(slots):
+            rivals = [entity for index, entity in enumerate(entities) if index != position]
             numerator_row, numerator = self._host_derive_select(slot, numerator_phrase, ranker,
-                                                                min_score, taken)
+                                                                min_score, taken, rivals)
             denominator_row, denominator = self._host_derive_select(slot, denominator_phrase,
-                                                                    ranker, min_score, taken)
+                                                                    ranker, min_score, taken,
+                                                                    rivals)
             rows.extend((numerator_row, denominator_row))
             if numerator is None or denominator is None:
                 continue  # an entity nobody read both numbers for simply does not compete

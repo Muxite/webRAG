@@ -62,6 +62,24 @@ Completed
 #: The same page with its one height written in FEET -- the unit-mismatch fixture.
 INCO_PAGE_FEET = INCO_PAGE.replace("380.0\nm", "1,247\nft")
 
+#: The REAL Inco article's lead, abridged: its infobox names the GRES-2 chimney that surpassed it,
+#: so the lead text of the INCO page carries every identifying token of the OTHER slot's entity
+#: ("gres", "power", "station", "chimney"). Its URL slug still names only Inco.
+INCO_PAGE_NAMING_GRES2 = """Inco Superstack
+The Vale-Inco Superstack at the Inco Copper Cliff smelter
+Record height
+Tallest in the world from 1971 to 1987
+Preceded by
+Mitchell Power Plant
+Surpassed by
+Ekibastuz GRES-2 Power Station
+Type
+Chimney
+Height
+380.0
+m
+"""
+
 BAIKAL_URL = "https://en.wikipedia.org/wiki/Lake_Baikal"
 BAIKAL_PAGE = """Lake Baikal
 Lake Baikal is a rift lake in Siberia, Russia.
@@ -119,6 +137,33 @@ h
 Opened
 1964
 """
+
+TITICACA_URL = "https://en.wikipedia.org/wiki/Lake_Titicaca"
+TITICACA_PAGE = """Lake Titicaca
+Lake Titicaca is a lake in the Andes on the border of Peru and Bolivia.
+Surface area
+8,372
+km
+2
+Max. depth
+281
+m
+"""
+
+TAHOE_URL = "https://en.wikipedia.org/wiki/Lake_Tahoe"
+#: Tahoe's own article writes its surface area in SQUARE MILES -- the real 217 heterogeneity.
+TAHOE_PAGE = """Lake Tahoe
+Lake Tahoe is a freshwater lake in the Sierra Nevada of California and Nevada.
+Surface area
+191
+sq mi
+Max. depth
+501
+m
+"""
+
+#: The 216 page with its journey time written in MINUTES: a km-per-minute rate is still a rate.
+SHINKANSEN_PAGE_MINUTES = SHINKANSEN_PAGE.replace("2.35\nh", "141\nmin")
 
 #: (entity, url slug, length km, basin area km2) for task 218. Mekong wins on length/basin
 #: although it is neither the longest river nor the one with the largest basin.
@@ -299,6 +344,109 @@ def test_a_page_without_the_asked_field_reports_operand_not_found(kit):
     assert result["reason"] == "operand_not_found"
     assert result["value"] is None
     assert [row["reason"] for row in result["slots"]] == ["below_min_score", "selected"]
+
+
+def test_a_slot_no_registered_page_names_refuses_instead_of_reading_another_entity(kit):
+    """Task 210 with ONLY the Inco page fetched. `host_derive` used to fall back to ALL registered
+    pages when no page named a slot's entity, so the GRES-2 slot resolved against the INCO page,
+    both slots selected `Height = 380.0 m`, and the host minted a confident |380 - 380| = 0.0 m.
+    21 of the replay's 50 wrong hand-rule rows are that one substitution
+    (`docs/handoffs/HOST_DERIVE_REPLAY_2026-09-08.md` section 4a). No page names the entity is a
+    REFUSAL."""
+    kit.register_page(INCO_URL, INCO_PAGE)
+
+    result = kit.host_derive(statement("210"))
+
+    assert result["reason"] == "operand_not_found"
+    assert result["value"] is None and result["node_id"] is None
+    assert [row["reason"] for row in result["slots"]] == ["no_candidate_page", "selected"]
+    assert result["slots"][0]["page_id"] is None and result["slots"][0]["score"] is None
+    assert not [node for node in kit.artifact()["nodes"]
+                if node["minted_by"] == HOST_DERIVE_TAG], "nothing is minted for a refused cell"
+
+
+def test_a_page_whose_URL_names_ANOTHER_slots_entity_is_not_read_for_this_one(kit):
+    """The residual of the same substitution, and the reason removing the all-pages fallback alone
+    changed nothing on the stored cells: the real Inco article's lead NAMES the GRES-2 Power
+    Station chimney that surpassed it, so the GRES-2 slot matched the Inco page on lead tokens and
+    read `Height = 380.0 m` off it anyway -- 29 of the 30 remaining wrong hand-rule rows (210, 212,
+    211) are that shape. A page whose URL slug names one of the mandate's OTHER entities is that
+    entity's page, and lead-text mentions do not overrule the slug."""
+    kit.register_page(INCO_URL, INCO_PAGE_NAMING_GRES2)
+
+    result = kit.host_derive(statement("210"))
+
+    assert result["reason"] == "operand_not_found"
+    assert [row["reason"] for row in result["slots"]] == ["no_candidate_page", "selected"]
+    assert result["value"] is None and result["node_id"] is None
+
+
+def test_a_page_naming_both_entities_in_its_lead_is_still_shared_by_both_slots(kit):
+    """The guard against over-reach: a comparison page whose SLUG names neither entity is claimed
+    by neither, so the lead-token match still serves both slots exactly as it did before."""
+    kit.register_page("https://en.wikipedia.org/wiki/List_of_tallest_chimneys",
+                      "List of tallest chimneys\nThe Ekibastuz GRES-2 Power Station chimney is "
+                      "the tallest; the Inco Superstack is second.\n"
+                      "GRES-2\nHeight\n419.7\nm\nInco\nHeight\n380.0\nm\n")
+
+    result = kit.host_derive(statement("210"))
+
+    assert result["reason"] == "computed"
+    assert result["value"] == pytest.approx(39.7)
+    assert len({row["page_id"] for row in _selected(result)}) == 1
+
+
+def test_an_argmax_entity_with_no_page_of_its_own_is_skipped_not_read_off_a_neighbour(kit):
+    """The same fallback in the argmax path: four of the five rivers were never fetched, so those
+    four entities simply do not compete rather than each reading Mekong's numbers."""
+    name, slug, length, basin = RIVERS[0]
+    kit.register_page(_wiki(slug), _river_page(name, length, basin))
+
+    result = kit.host_derive(statement("218"))
+
+    assert result["reason"] == "operand_not_found"
+    assert len(_selected(result)) == 2
+    assert [row["reason"] for row in result["slots"] if row["entity"] != "Mekong"] == [
+        "no_candidate_page"] * 8
+
+
+def test_two_slots_reading_the_SAME_field_must_agree_on_their_unit(kit):
+    """Task 217 asks "its surface area, in km2" of BOTH lakes, and the two articles write that one
+    field in different units (`8,372 km` -- the flattened infobox loses the exponent -- and
+    `191 sq mi`). `_compat_quotient` allows two different units on purpose, because a rate like
+    km / min is legitimate (task 216), so the narrower rule is on the FIELD PHRASE: when both
+    slots read the same field, the two operands must carry the same canonical unit. 19 of the
+    replay's 50 wrong hand-rule rows minted `43.83 km/sq mi` from this pair."""
+    kit.register_page(TITICACA_URL, TITICACA_PAGE)
+    kit.register_page(TAHOE_URL, TAHOE_PAGE)
+
+    result = kit.host_derive(statement("217"))
+
+    assert result["reason"] == "unit_mismatch"
+    assert result["value"] is None and result["node_id"] is None
+    assert [row["entry"]["unit"] for row in _selected(result)] == ["km", "sq mi"]
+    assert kit.artifact()["derivation_refusals"][-1]["code"] == "UNIT_MISMATCH"
+
+
+def test_a_same_field_pair_that_does_agree_on_its_unit_still_computes(kit):
+    """The rule is a unit check, not a ban on same-field mandates: 211 asks ONE field of two
+    entities and both pages write metres, so it stays available."""
+    kit.register_page(BAIKAL_URL, BAIKAL_PAGE)
+    kit.register_page(TANGANYIKA_URL, TANGANYIKA_PAGE)
+
+    assert kit.host_derive(statement("211"))["reason"] == "computed"
+
+
+def test_a_rate_over_two_DIFFERENT_fields_keeps_its_two_different_units(kit):
+    """The guard against over-reach: 216 divides a length in km by a time in minutes. The two
+    slots name different fields, so the same-unit rule does not apply and the rate survives."""
+    kit.register_page(SHINKANSEN_URL, SHINKANSEN_PAGE_MINUTES)
+
+    result = kit.host_derive(statement("216"))
+
+    assert result["reason"] == "computed"
+    assert result["value"] == pytest.approx(515.4 / 141, abs=1e-6)
+    assert result["unit"] == "km/min"
 
 
 def test_an_operation_without_a_roster_reports_fewer_than_two_slots(kit):
