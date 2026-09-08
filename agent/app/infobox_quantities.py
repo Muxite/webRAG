@@ -49,9 +49,13 @@ from agent.app.testing.evidence_graph import Quantity
 #: scanned from the ``€`` and the currency rides inside ``value`` exactly as the index stores it.
 _NUMBER_START = re.compile(_LEADING_NUMBER.pattern.lstrip("^"), _LEADING_NUMBER.flags)
 _INT_ONLY = re.compile(r"^-?\d[\d,]*$")
-#: Separators between independent items inside ONE value cell: bullets, semicolons, and the
-#: ``" | "`` :func:`_render` joins a cell's ``<br>`` lines with.
-_SEGMENT_SPLIT = re.compile(r"(?: \| |[;•\n])")
+#: Boundaries between independent quantities inside ONE value cell: bullets, semicolons, the
+#: ``" | "`` a cell's ``<br>`` became, a comma that is NOT a digit-group separator (``"8980 ft,
+#: about 1.70 mi"`` splits; ``"1,151,000"`` does not), and the approximation/alternative words
+#: ``parse_quantity`` refuses as range markers anyway (``"8980 ft, about 1.70 mi (2.74 km)"`` on
+#: the Golden Gate Bridge page lost its leading ``8980 ft`` when only the first three were cut).
+_SEGMENT_SPLIT = re.compile(
+    r"(?: \| |[;•\n]|,(?!\d)|\babout\b|\bapprox(?:\.|imately)?\b|\bor\b|\bto\b)")
 _SUP_EXPONENTS = {"2": "²", "3": "³"}
 
 
@@ -104,9 +108,15 @@ def _first_infobox(html: str):
 def infobox_rows(html: str) -> List[Tuple[str, str]]:
     """The first infobox's rows as ``(label, value)`` pairs, in document order.
 
-    A row is a ``<tr>`` carrying both a ``<th>`` and a ``<td>``; header-only rows (section titles,
-    the article name) and value-only rows (images, captions) are skipped because they are not
-    labelled values. Text is the cell's ``get_text(" ", strip=True)`` after superscript folding,
+    A row is a ``<tr>`` carrying both a ``<th>`` and a ``<td>``; value-only rows (images,
+    captions) are skipped because they are not labelled values. A header-only row (a ``<th>``
+    with no ``<td>``) that is not the infobox TITLE -- the title is the first header-only row
+    seen before any labelled row, or one whose class says ``above``/``title`` -- is a SECTION
+    header (a ``<caption>`` counts as the title too), and its text prefixes every following row
+    label until the next header (Shanghai
+    Tower: ``"Height"`` over ``Architectural`` / ``Tip`` / ``Roof`` gives ``"Height
+    Architectural"`` ..., so a slot asking for the height can see the field the sub-row belongs
+    to; a table with no section headers is rendered exactly as before). Text is the cell's ``get_text(" ", strip=True)`` after superscript folding,
     with ``<br>`` line breaks rendered as ``" | "`` so a multi-item cell can be split back apart.
 
     :param html: the page HTML.
@@ -118,11 +128,26 @@ def infobox_rows(html: str) -> List[Tuple[str, str]]:
         return []
     _fold_superscripts(table)
     rows: List[Tuple[str, str]] = []
+    section = ""
+    # A table whose title is a <caption> has no positional title row: its first header-only row
+    # is already a section header (a state infobox's "Area").
+    title_seen = table.find("caption") is not None
     for row in table.find_all("tr"):
         header, value = row.find("th"), row.find("td")
-        if header is None or value is None:
+        if header is None:
             continue
-        label = _tidy(header.get_text(" ", strip=True))
+        if value is None:
+            heading = _tidy(header.get_text(" ", strip=True))
+            classes = header.get("class") or []
+            joined = (" ".join(classes) if isinstance(classes, list) else str(classes)).lower()
+            is_title = ("above" in joined or "title" in joined
+                        or (not rows and not title_seen and not section))
+            title_seen = title_seen or is_title
+            if not is_title and heading:
+                section = heading
+            continue
+        own_label = _tidy(header.get_text(" ", strip=True))
+        label = f"{section} {own_label}".strip() if section else own_label
         text = " | ".join(part for part in
                           (_tidy(line) for line in value.get_text(" ", strip=True).split("|"))
                           if part)

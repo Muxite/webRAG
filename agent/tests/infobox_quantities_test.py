@@ -13,7 +13,6 @@ MEKONG_HTML = """
   <tr><th colspan="2" class="infobox-above">Mekong</th></tr>
   <tr><td colspan="2"><img src="x.jpg"></td></tr>
   <tr><th scope="row">Country</th><td>China, Myanmar, Laos</td></tr>
-  <tr><th colspan="2">Physical characteristics</th></tr>
   <tr><th scope="row">Length</th><td>4,909 km (3,050 mi)<sup class="reference">[1]</sup></td></tr>
   <tr><th scope="row">Basin size</th><td>795,000 km<sup>2</sup> (307,000 mi<sup>2</sup>)</td></tr>
   <tr><th scope="row">• average</th><td>16,000 m<sup>3</sup>/s (570,000 cu ft/s)</td></tr>
@@ -164,3 +163,88 @@ def test_dual_unit_cells_yield_both_entries_under_the_same_label():
 def _infobox_html_rows(rows):
     body = "".join(f"<tr><th>{label}</th><td>{value}</td></tr>" for label, value in rows)
     return f"<html><body><table class='infobox'>{body}</table></body></html>"
+
+
+GOLDEN_GATE_HTML = """
+<table class="infobox">
+  <tr><th>Total length</th><td>8980 ft, about 1.70 mi (2.74 km)</td></tr>
+  <tr><th>Longest span</th><td>4200 ft, about 0.79 mi (1.27 km)</td></tr>
+  <tr><th>Height</th><td>746 ft (227.4 m)</td></tr>
+  <tr><th>Cost</th><td>€ 533 million</td></tr>
+  <tr><th>Opened</th><td>May 27, 1937; 89 years ago (1937-05-27)</td></tr>
+  <tr><th>Daily traffic</th><td>88,716 (FY2020)</td></tr>
+</table>
+"""
+
+
+def test_golden_gate_comma_separated_cells_emit_every_quantity_in_document_order():
+    """Live prefetch replay bug: the leading `8980 ft` (unit followed by a comma) was lost, so
+    the shared-unit rule found no ft entry under `Total length` and fell back to prose."""
+    entries = infobox_quantities(GOLDEN_GATE_HTML)
+    assert [(e.value, e.unit) for e in _by_label(entries, "Total length")] == [
+        ("8980", "ft"), ("1.70", "mi"), ("2.74", "km")]
+    assert [(e.value, e.unit) for e in _by_label(entries, "Longest span")] == [
+        ("4200", "ft"), ("0.79", "mi"), ("1.27", "km")]
+    text = infobox_text(GOLDEN_GATE_HTML)
+    for entry in entries:
+        assert text[entry.start:entry.end] == entry.value
+
+
+def test_golden_gate_other_rows_are_unchanged_by_the_comma_split():
+    entries = infobox_quantities(GOLDEN_GATE_HTML)
+    assert [(e.value, e.unit) for e in _by_label(entries, "Height")] == [("746", "ft"),
+                                                                          ("227.4", "m")]
+    cost = _by_label(entries, "Cost")
+    assert [(e.value, e.unit, e.currency) for e in cost] == [("€ 533", "million", "EUR")]
+    # A date cell yields no quantity: neither the day/year numbers nor "89 years ago".
+    assert _by_label(entries, "Opened") == []
+    # A bare count under a non-whitelisted label is not admitted (it was not before either).
+    assert _by_label(entries, "Daily traffic") == []
+    assert [e.label for e in entries] == ["Total length"] * 3 + ["Longest span"] * 3 + ["Height"] * 2 + ["Cost"]
+
+
+SHANGHAI_HTML = """
+<table class="infobox">
+  <tr><th class="infobox-above" colspan="2">Shanghai Tower</th></tr>
+  <tr><td colspan="2"><img src="tower.jpg"></td></tr>
+  <tr><th colspan="2">General information</th></tr>
+  <tr><th>Status</th><td>Completed</td></tr>
+  <tr><th colspan="2">Height</th></tr>
+  <tr><th>Architectural</th><td>632 m (2,073 ft)</td></tr>
+  <tr><th>Tip</th><td>632 m (2,073 ft)</td></tr>
+  <tr><th>Roof</th><td>587 m (1,926 ft)</td></tr>
+  <tr><th>Top floor</th><td>561 m (1,841 ft)</td></tr>
+  <tr><th colspan="2">Technical details</th></tr>
+  <tr><th>Floor count</th><td>128</td></tr>
+</table>
+"""
+
+
+def test_section_header_rows_prefix_the_labels_of_the_rows_beneath_them():
+    """221 Shanghai Tower: the sub-rows under a `Height` header carried only `Architectural` /
+    `Tip` / ..., so a slot asking for the height could not see which field they belonged to."""
+    rows = infobox_rows(SHANGHAI_HTML)
+    assert [label for label, _ in rows] == [
+        "General information Status", "Height Architectural", "Height Tip", "Height Roof",
+        "Height Top floor", "Technical details Floor count"]
+    entries = infobox_quantities(SHANGHAI_HTML)
+    assert [(e.label, e.value, e.unit) for e in entries][:2] == [
+        ("Height Architectural", "632", "m"), ("Height Architectural", "2,073", "ft")]
+    assert [(e.label, e.value, e.unit) for e in entries][-1] == (
+        "Technical details Floor count", "128", "count")
+    assert "Shanghai Tower" not in infobox_text(SHANGHAI_HTML)   # the title row is not a section
+    text = infobox_text(SHANGHAI_HTML)
+    for entry in entries:
+        assert text[entry.start:entry.end] == entry.value
+
+
+def test_a_leading_header_row_without_a_class_is_still_the_title_not_a_section():
+    html = ("<table class='infobox'><tr><th colspan='2'>Mekong</th></tr>"
+            "<tr><th>Length</th><td>4,909 km</td></tr></table>")
+    assert infobox_rows(html) == [("Length", "4,909 km")]
+
+
+def test_a_table_without_section_headers_is_rendered_exactly_as_before():
+    assert [label for label, _ in infobox_rows(MEKONG_HTML)] == ["Country", "Length", "Basin size",
+                                                                "• average"]
+    assert infobox_text(MEKONG_HTML).startswith("Country: China, Myanmar, Laos\nLength: 4,909 km")

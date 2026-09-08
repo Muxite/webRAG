@@ -33,11 +33,15 @@ that motivated it: ``srsearch="Amazon basin size"`` ranks ``Amazon`` (a broad-co
 ``Amazon basin`` above ``Amazon River``, and ``"Mississippi"`` ranks the state above the river. So
 candidates from the API are ordered structurally (slug coverage of the entity's identifying
 tokens, un-parenthesised first, then API rank, then field-phrase tokens in the snippet), and
-then each is FETCHED and read: the article whose infobox rows (:func:`infobox_quantities`) cover
-the most field-phrase tokens wins. A candidate with no infobox, or none of whose quantity-bearing
-rows share a token with the field phrase, is skipped. An exact-title candidate (Wikipedia's own
-primary-topic signal) with a matching row is accepted without sweeping the rest. No entity type
-is hard-coded anywhere.
+then EVERY acceptable candidate is fetched and read: for each field phrase the mandate asks of
+the entity (218 asks Mississippi for a length AND a basin area), the page's quantity-bearing
+infobox labels (:func:`infobox_quantities`) are scored by how many of that phrase's tokens they
+cover between them; the candidate with the highest sum wins, an exact title breaking ties before
+API rank. A candidate with no infobox, or none of whose rows share a token with any phrase, is
+out. There is deliberately NO exact-title early accept: the live replay resolved "Mississippi"
+to the STATE that way, because its ``Area • Total`` row shares the token ``area`` -- the river's
+``Length`` + ``Basin size`` only wins when both pages are read and compared. No entity type is
+hard-coded anywhere.
 """
 from __future__ import annotations
 
@@ -134,16 +138,21 @@ def _candidates(hits: Sequence[Tuple[str, str]], entity: str, field_phrase: str)
     return out
 
 
-def _field_coverage(html: str, field_phrase: str) -> int:
-    """How many of the field phrase's content tokens the page's quantity-bearing infobox rows
-    name in their labels -- the verification signal. ``0`` for a page without a matching row."""
-    field_tokens = _content_tokens(field_phrase)
-    if not field_tokens:
-        return 0
-    covered: Set[str] = set()
-    for entry in infobox_quantities(html):
-        covered |= _content_tokens(entry.label) & field_tokens
-    return len(covered)
+def _field_coverage(html: str, field_phrases: Sequence[str]) -> int:
+    """The verification score: summed over ``field_phrases``, how many of each phrase's content
+    tokens the page's quantity-bearing infobox labels cover between them. ``0`` for a page with
+    no row sharing a token with any phrase (no infobox included)."""
+    labels = [_content_tokens(entry.label) for entry in infobox_quantities(html)]
+    score = 0
+    for phrase in field_phrases:
+        field_tokens = _content_tokens(phrase)
+        if not field_tokens:
+            continue
+        covered: Set[str] = set()
+        for label_tokens in labels:
+            covered |= label_tokens & field_tokens
+        score += len(covered)
+    return score
 
 
 def _as_text(data: Any) -> str:
@@ -219,56 +228,73 @@ async def _web_hits(search: Any, entity: str, field_phrase: str) -> List[Tuple[s
 
 
 async def _verify(http: Any, candidates: Sequence[_Candidate],
-                  field_phrase: str) -> Tuple[Optional[Tuple[str, str]], int]:
-    """Fetch ``candidates`` in order and pick by :func:`_field_coverage`.
+                  field_phrases: Sequence[str]) -> Tuple[Optional[Tuple[str, str]], int]:
+    """Fetch every candidate and pick the :func:`_field_coverage` argmax.
 
-    :returns: ``((url, html) or None, fetches)``. An exact-title candidate with any matching row
-        is taken as soon as it is seen; otherwise the highest coverage wins, ties to earlier order.
+    :returns: ``((url, html) or None, fetches)``. Ties go to an exact-title candidate, then to
+        the earlier one in ``candidates`` order (API rank). A zero score is never picked.
     """
-    best: Optional[Tuple[int, str, str]] = None
+    best: Optional[Tuple[Tuple[int, int, int], str, str]] = None
     fetches = 0
-    for candidate in candidates:
+    for order, candidate in enumerate(candidates):
         html = await _fetch(http, candidate.url)
         fetches += 1
         if html is None:
             continue
-        score = _field_coverage(html, field_phrase)
+        score = _field_coverage(html, field_phrases)
         if score <= 0:
             continue
-        if candidate.exact:
-            return (candidate.url, html), fetches
-        if best is None or score > best[0]:
-            best = (score, candidate.url, html)
+        key = (score, int(candidate.exact), -order)
+        if best is None or key > best[0]:
+            best = (key, candidate.url, html)
     if best is None:
         return None, fetches
     return (best[1], best[2]), fetches
 
 
-async def resolve_entity_page(entity: str, field_phrase: str, *, http: Any,
-                              search: Any) -> Resolution:
-    """The en.wikipedia article for ``entity`` that carries ``field_phrase``'s field.
+async def resolve_entity_page(entity: str, field_phrase: str = "", *, http: Any,
+                              search: Any, field_phrases: Optional[Sequence[str]] = None
+                              ) -> Resolution:
+    """The en.wikipedia article for ``entity`` that carries the fields the mandate asks of it.
+
+    :param field_phrases: every field phrase the mandate asks of this entity; ``field_phrase``
+        alone is the one-element form.
 
     (1) Wikipedia's search API on the entity name alone -- the live probe showed a long field
     phrase in ``srsearch`` returns unrelated pages ("Tonle Sap" for the 218 Mekong phrase) while
     the bare name puts the right article in the top ten for every 218 entity; disambiguation is
     done by reading the pages, not by the query. (2) :func:`_candidates` ordering, then
-    :func:`_verify`. (3) Only when nothing was acceptable, one web search
-    (``"<entity> <field phrase> wikipedia"``) whose en.wikipedia URLs go through the same picker.
+    :func:`_verify`. (2b) When the full name found nothing acceptable, the same API query is
+    retried with the name trimmed of its LAST token, one token at a time while two remain
+    (``"GRES-2 Power Station chimney"`` -> ``"GRES-2 Power Station"`` -> ``"GRES-2 Power"``): a
+    mandate names the thing measured, the article names the thing. (3) Only when all of that was
+    unacceptable, one web search (``"<entity> <field phrase> wikipedia"``) whose en.wikipedia
+    URLs go through the same picker. Every API call is counted in ``searches``.
 
     :returns: a :class:`Resolution` (URL, fetched HTML, cost); ``url == ""`` when nothing was
         acceptable, with the searches/fetches spent still counted. Never raises.
     """
     searches = fetches = 0
+    phrases = [str(p) for p in (field_phrases or []) if str(p).strip()] or [str(field_phrase or "")]
     try:
-        hits = await _api_hits(http, str(entity or "").strip())
-        searches += 1
-        picked, used = await _verify(http, _candidates(hits, entity, field_phrase), field_phrase)
-        fetches += used
-        if picked is None:
-            hits = await _web_hits(search, entity, field_phrase)
+        picked = None
+        words = str(entity or "").split()
+        for take in range(len(words), 0, -1):
+            if take < len(words) and take < 2:
+                break
+            query = " ".join(words[:take])
+            hits = await _api_hits(http, query)
             searches += 1
-            picked, used = await _verify(http, _candidates(hits, entity, field_phrase),
-                                         field_phrase)
+            picked, used = await _verify(http, _candidates(hits, query, " ".join(phrases)),
+                                         phrases)
+            fetches += used
+            if picked is not None:
+                break
+        if picked is None:
+            hits = await _web_hits(search, entity, " ".join(phrases))
+            searches += 1
+            picked, used = await _verify(http, _candidates(hits, entity, " ".join(phrases)),
+                                         phrases)
             fetches += used
         if picked is None:
             return Resolution(url="", html="", searches=searches, fetches=fetches)
@@ -297,8 +323,9 @@ async def host_prefetch(kit: Any, mandate: str, *, http: Any, search: Any,
         :func:`~agent.app.mandate_slots.parse_slots`.
     :param http: the run's ``ConnectorHttp`` (``request(method, url, retries=)``).
     :param search: the run's ``ConnectorSearch`` (``query_search(query, count=)``), fallback only.
-    :param resolver: ``async (entity, field_phrase, *, http, search) -> Resolution | str | None``;
-        a plain URL string is fetched here, a falsy result is a ``no_hit``.
+    :param resolver: ``async (entity, field_phrase, *, http, search, field_phrases) ->
+        Resolution | str | None``; a plain URL string is fetched here, a falsy result is a
+        ``no_hit``. ``field_phrases`` is every phrase the mandate asks of that entity.
     :returns: ``{"entities": [{"entity", "field_phrase", "status", "url", "chars",
         "model_visited", "elapsed_ms"}], "uncovered_before", "searches", "fetches",
         "registered", "elapsed_s", "error"}`` with ``status`` one of ``prefetched`` / ``no_hit``
@@ -339,7 +366,8 @@ async def host_prefetch(kit: Any, mandate: str, *, http: Any, search: Any,
             try:
                 url, html = group["url"], None
                 if url is None:
-                    resolved = await resolver(entity, phrase, http=http, search=search)
+                    resolved = await resolver(entity, phrase, http=http, search=search,
+                                              field_phrases=list(group["phrases"]))
                     if isinstance(resolved, Resolution):
                         result["searches"] += resolved.searches
                         result["fetches"] += resolved.fetches

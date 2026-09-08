@@ -127,7 +127,7 @@ def test_every_slot_entity_is_fetched_even_when_the_model_already_visited_its_pa
 
     assert out["uncovered_before"] == 0
     assert out["searches"] == 5 and out["registered"] == 5
-    assert out["fetches"] == 7   # 3 exact-title entities x1, Mississippi/Amazon sweep both hits
+    assert out["fetches"] == 10   # every acceptable candidate is read: two per entity
     assert search.calls == [] and out["error"] is None
     assert [row["status"] for row in out["entities"]] == ["prefetched"] * 5
     assert all(row["model_visited"] is True for row in out["entities"])
@@ -173,10 +173,9 @@ def test_218_with_only_mekong_registered_prefetches_all_five_and_host_derive_com
     assert [row["status"] for row in out["entities"]] == ["prefetched"] * 5
     assert [row["model_visited"] for row in out["entities"]] == [True, False, False, False, False]
     assert out["searches"] == 5 and len(http.api_calls) == 5   # exactly one resolve per entity
-    # Mekong/Yangtze/Nile: exact-title hit, one fetch each. "Mississippi" / "Amazon" are not the
-    # article titles ("Mississippi River" / "Amazon River"), so both API hits are read and the
-    # one whose infobox names the fields wins: two fetches each.
-    assert out["fetches"] == 7 and len(http.page_calls) == 7
+    # Both API hits per entity are read (no exact-title short-circuit -- see the resolver
+    # docstring for the Mississippi-state replay that removed it); the better infobox wins.
+    assert out["fetches"] == 10 and len(http.page_calls) == 10
     assert out["registered"] == 5 and search.calls == []
     assert [p["url"] for p in _prefetched(kit)] == [_wiki(s) for _, s, _, _ in RIVERS]
     assert all(p["source"] == PREFETCH_SOURCE for p in _prefetched(kit))
@@ -268,7 +267,9 @@ def test_no_acceptable_page_anywhere_is_a_no_hit_row_after_the_web_fallback():
     out = _run(host_prefetch(kit, statement("210"), http=http, search=search))
 
     assert [r["status"] for r in out["entities"]] == ["no_hit", "no_hit"]
-    assert out["searches"] == 4   # API + web fallback, per entity
+    # "GRES-2 Power Station chimney": full, 3-token, 2-token API queries + web = 4;
+    # "Inco Superstack": full API query (already 2 tokens, nothing to trim) + web = 2.
+    assert out["searches"] == 6
     assert out["fetches"] == 0 and out["registered"] == 0 and out["error"] is None
     assert len(search.calls) == 2 and all(q.endswith(" wikipedia") for q, _ in search.calls)
 
@@ -300,7 +301,7 @@ def test_a_failure_inside_the_kits_own_hook_is_the_outer_error():
 def test_a_resolver_url_that_fails_to_fetch_is_a_fetch_failed_row():
     kit = LedgerToolkit()
 
-    async def resolver(entity, phrase, *, http, search):
+    async def resolver(entity, phrase, *, http, search, **kw):
         return "https://en.wikipedia.org/wiki/Missing_Page"
 
     out = _run(host_prefetch(kit, statement("210"), http=FakeHttp(), search=FakeSearch(),
@@ -313,7 +314,7 @@ def test_a_fetched_page_with_neither_infobox_nor_the_entity_in_its_lead_is_rejec
     kit = LedgerToolkit()
     url = "https://en.wikipedia.org/wiki/Something_Else"
 
-    async def resolver(entity, phrase, *, http, search):
+    async def resolver(entity, phrase, *, http, search, **kw):
         return url
 
     http = FakeHttp(pages={url: "<html><body><p>An unrelated error page.</p></body></html>"})
@@ -328,7 +329,7 @@ def test_two_entities_resolving_to_the_same_url_register_one_page():
     url = "https://en.wikipedia.org/wiki/Shared_Article"
     html = _infobox_html([("Height", "419.7 m")], lead="Inco Superstack and GRES-2 chimney.")
 
-    async def resolver(entity, phrase, *, http, search):
+    async def resolver(entity, phrase, *, http, search, **kw):
         return Resolution(url=url, html=html, searches=1, fetches=1)
 
     out = _run(host_prefetch(kit, statement("210"), http=FakeHttp(), search=FakeSearch(),
@@ -360,8 +361,16 @@ def test_a_slot_that_names_a_wikipedia_url_is_fetched_directly_without_a_search(
 # The resolver's picker -- verification, not titles
 # --------------------------------------------------------------------------------------------
 
-STATE_HTML = _infobox_html([("• Total", "48,430 sq mi (125,443 km<sup>2</sup>)"),
-                            ("Population", "2,961,279")], lead="Mississippi is a state.")
+#: The real state infobox shape: a title row, then an `Area` section header over `• Total`, so
+#: the quantity-bearing label is "Area • Total" -- which shares the token `area` with the 218
+#: field phrase. That is exactly what fooled the exact-title short-circuit live.
+STATE_HTML = ("<html><body><table class='infobox'>"
+              "<tr><th class='infobox-above' colspan='2'>Mississippi</th></tr>"
+              "<tr><th colspan='2'>Area</th></tr>"
+              "<tr><th>• Total</th><td>48,430 sq mi (125,443 km<sup>2</sup>)</td></tr>"
+              "<tr><th colspan='2'>Population</th></tr>"
+              "<tr><th>• Total</th><td>2,961,279</td></tr>"
+              "</table><p>Mississippi is a state.</p></body></html>")
 MS_RIVER_HTML = _infobox_html([("Length", "2,340 mi (3,766 km)"),
                                ("Basin size", "1,151,000 sq mi (2,980,000 km<sup>2</sup>)")],
                               lead="The Mississippi River is the primary river of the largest "
@@ -403,13 +412,19 @@ def test_bare_entity_ranking_the_state_first_still_resolves_to_the_river_by_read
                     pages={_article("Mississippi"): STATE_HTML,
                            _article("Mississippi River"): MS_RIVER_HTML,
                            _article("Jackson, Mississippi"): _infobox_html([("Area", "113 sq mi")])})
-    resolved = _resolve("Mississippi", "basin area", http)
+    # With the REAL 218 phrase (length + drainage basin size / basin area): the state's
+    # "Area • Total" covers `area` (1), the river's Length + Basin size cover 3. Every acceptable
+    # candidate is read (the disambiguation page never is). Note the bare phrase "basin area"
+    # alone would be a 1-1 tie (`area` vs `basin`) that the exact-title tie-break gives to the
+    # state -- which is why the host passes every phrase the mandate asks of the entity.
+    phrase = parse_slots(statement("218"))[3].field_phrase
+    resolved = _resolve("Mississippi", phrase, http)
     assert resolved.url == _article("Mississippi River")
-    # The state is exact-title but has no matching row, so the sweep continues through every
-    # acceptable candidate (the disambiguation page is never fetched) and the best wins.
     assert resolved.fetches == 3 and resolved.searches == 1
-    assert http.page_calls == [_article("Mississippi"), _article("Mississippi River"),
-                               _article("Jackson, Mississippi")]
+    # Order among the three is the snippet tie-break (the river's "river" snippet shares a token
+    # with the phrase); what matters is that all three were read and the disambiguation never.
+    assert set(http.page_calls) == {_article("Mississippi"), _article("Mississippi River"),
+                                    _article("Jackson, Mississippi")}
 
 
 def test_live_probe_amazon_basin_size_picks_amazon_river_over_amazon_and_amazon_basin():
@@ -440,13 +455,33 @@ def test_a_rival_page_sharing_one_field_token_loses_to_the_page_covering_more():
     assert resolved.fetches == 2   # both were read; the better one won, not the first one
 
 
-def test_an_exact_title_with_a_matching_row_is_accepted_without_sweeping_the_rest():
+def test_an_exact_title_only_breaks_a_tie_it_never_short_circuits_the_sweep():
     hits = [("Nile", "river"), ("Nile Delta", "delta"), ("Nile crocodile", "croc")]
     http = FakeHttp(api={"Nile": hits},
                     pages={_article("Nile"): _river_html("Nile", "6,650", "3,254,555"),
-                           _article("Nile Delta"): _infobox_html([("Area", "240 km")])})
+                           _article("Nile Delta"): _river_html("Nile Delta", "1", "240")})
     resolved = _resolve("Nile", "basin area", http)
-    assert resolved.url == _article("Nile") and resolved.fetches == 1
+    assert resolved.url == _article("Nile") and resolved.fetches == 3   # all three read
+    # Reverse the rank: the exact title still wins the tie over an equally-scored earlier hit.
+    http = FakeHttp(api={"Nile": list(reversed(hits))}, pages=http.pages)
+    assert _resolve("Nile", "basin area", http).url == _article("Nile")
+
+
+def test_the_state_beats_nothing_when_the_mandate_asks_two_fields_the_river_page_carries():
+    """The coordinator's replay case, with the entity's TWO field phrases passed together:
+    Mississippi (state) covers `area` once; Mississippi River covers `length` and `basin`."""
+    hits = [("Mississippi", "state"), ("Mississippi River", "river")]
+    http = FakeHttp(api={"Mississippi": hits},
+                    pages={_article("Mississippi"): STATE_HTML,
+                           _article("Mississippi River"): MS_RIVER_HTML})
+    resolved = _run(hp.resolve_entity_page(
+        "Mississippi", http=http, search=FakeSearch(),
+        field_phrases=["length in METRES", "basin area in km^2"]))
+    assert resolved.url == _article("Mississippi River")
+    # And with the single real 218 phrase, the same outcome.
+    phrase = parse_slots(statement("218"))[3].field_phrase
+    http = FakeHttp(api={"Mississippi": hits}, pages=http.pages)
+    assert _resolve("Mississippi", phrase, http).url == _article("Mississippi River")
 
 
 def test_disambiguation_list_and_namespace_titles_are_never_fetched():
@@ -492,3 +527,28 @@ def test_resolver_reports_a_miss_as_an_empty_url_with_its_cost_counted():
     assert miss.url == "" and miss.html == ""
     assert miss.searches == 2 and miss.fetches == 0   # API, then the web fallback
     assert _resolve("Amazon", "basin size", None).url == ""
+
+
+def test_entity_is_trimmed_of_its_last_token_when_the_full_name_finds_nothing():
+    """210: the mandate names "GRES-2 Power Station chimney"; the article is the power station."""
+    html = _infobox_html([("Height", "419.7 m (1,377 ft)")], lead="The Ekibastuz GRES-2 Power Station.")
+    http = FakeHttp(api={"GRES-2 Power Station chimney": [],
+                         "GRES-2 Power Station": [("Ekibastuz GRES-2 Power Station", "station")]},
+                    pages={_article("Ekibastuz GRES-2 Power Station"): html})
+    search = FakeSearch()
+    resolved = _resolve("GRES-2 Power Station chimney", "its HEIGHT, in meters", http, search)
+    assert resolved.url == _article("Ekibastuz GRES-2 Power Station")
+    assert resolved.searches == 2 and resolved.fetches == 1
+    assert search.calls == []
+    assert [parse_qs(urlparse(u).query)["srsearch"][0] for u in http.api_calls] == [
+        "GRES-2 Power Station chimney", "GRES-2 Power Station"]
+
+
+def test_trimming_stops_at_two_tokens_then_falls_back_to_the_web_search():
+    http = FakeHttp()
+    search = FakeSearch()
+    resolved = _resolve("GRES-2 Power Station chimney", "its HEIGHT, in meters", http, search)
+    assert resolved.url == ""
+    assert [parse_qs(urlparse(u).query)["srsearch"][0] for u in http.api_calls] == [
+        "GRES-2 Power Station chimney", "GRES-2 Power Station", "GRES-2 Power"]
+    assert resolved.searches == 4 and len(search.calls) == 1
