@@ -895,3 +895,108 @@ def test_two_copies_of_one_page_spelling_a_unit_differently_still_compute(kit):
     assert {node["unit"] for node in ratios} == {"km/km2"}
     assert all(node["unit"] in ("km", "km2") for node in kit.artifact()["nodes"]
                if node["kind"] == "source")
+
+
+# --------------------------------------------------------------------------------------------
+# Scale words fold into the minted magnitude; the field phrase's dimension gates selection.
+# --------------------------------------------------------------------------------------------
+
+PUSKAS_PAGE_SCALED = """Puskás Aréna
+Puskás Aréna is a football stadium in Budapest, Hungary.
+Construction cost
+€ 533 million
+Capacity
+67,215
+Opened
+2019
+"""
+
+SHINKANSEN_PAGE_WITH_SPEED = """Tōkaidō Shinkansen
+The Tōkaidō Shinkansen is a Japanese high-speed rail line between Tokyo and Shin-Osaka.
+The fastest Nozomi service runs at 275 km/h and takes 2 h 21 min end to end.
+Line length
+515.4
+km
+Journey time
+2.35
+h
+Opened
+1964
+"""
+
+
+def test_a_scaled_currency_operand_is_minted_at_its_full_magnitude(kit):
+    """215 live: the index carries `€ 533` + `million` (currency + scale) and the host divided
+    533 by the capacity, reporting 0.00793 `million/count`. The SOURCE node must denote the
+    page's full magnitude -- 533,000,000 EUR -- while its quote still points at the page span."""
+    import importlib
+    module = importlib.import_module(f"{_TESTS_PKG}.test_215_tier5_stadium_cost_per_seat")
+    expected = float(str(module.DERIVED).replace(",", ""))
+    kit.register_page(PUSKAS_URL, PUSKAS_PAGE_SCALED)
+
+    result = kit.host_derive(statement("215"))
+
+    assert result["reason"] == "computed"
+    assert result["unit"] == "EUR/count"
+    assert result["value"] == pytest.approx(533_000_000 / 67_215, rel=1e-6)
+    assert result["value"] == pytest.approx(expected, rel=1e-4)
+    cost = next(node for node in kit.artifact()["nodes"]
+                if node["kind"] == "source" and node["unit"] == "EUR")
+    assert "million" in cost["value"] and cost["quote_verified"] is True
+    assert [row["entry"]["value"] for row in _selected(result)] == ["€ 533", "67,215"]
+
+
+def test_a_scale_that_cannot_be_folded_refuses_instead_of_computing_raw_digits(kit):
+    """A structured entry claims a scale the page text does not carry as one span, so no
+    located SOURCE node can denote the full magnitude. The only honest outcome is a refusal,
+    never `533 / 67,215`."""
+    from agent.app.quantity_index import QuantityRef
+
+    text = "Puskás Aréna\nPuskás Aréna is a football stadium.\nConstruction cost\n€ 533 mn\nCapacity\n67,215\n"
+    structured = [QuantityRef(label="Construction cost", value="€ 533", unit="million",
+                              start=text.index("€ 533"), end=text.index("€ 533") + 5,
+                              source="infobox", currency="EUR", scale="million")]
+    kit.register_page(PUSKAS_URL, text, structured=structured)
+
+    result = kit.host_derive(statement("215"))
+
+    assert result["reason"] == "scale_unresolved"
+    assert result["value"] is None and result["node_id"] is None
+    assert kit.artifact()["derivation_refusals"][-1]["code"] == "SCALE_UNRESOLVED"
+    assert not any(node["kind"] == "derived" for node in kit.artifact()["nodes"])
+
+
+def test_a_time_field_never_selects_a_speed_even_when_the_speed_outscores_it(kit):
+    """216 live: the journey-time slot picked a prose `275 km/h` and the host minted `km/km/h`.
+    The field phrase says "in hours and minutes": a speed is a different dimension and is not
+    available to that slot at all."""
+    kit.register_page(SHINKANSEN_URL, SHINKANSEN_PAGE_WITH_SPEED)
+
+    result = kit.host_derive(statement("216"))
+
+    assert result["reason"] == "computed"
+    assert [row["entry"]["unit"] for row in _selected(result)] == ["km", "h"]
+    assert result["unit"] == "km/h"
+    assert result["value"] == pytest.approx(515.4 / 2.35, abs=1e-6)
+
+
+def test_a_time_field_with_no_duration_on_the_page_refuses_rather_than_reading_the_speed(kit):
+    page = SHINKANSEN_PAGE_WITH_SPEED.replace("and takes 2 h 21 min end to end", "").replace(
+        "Journey time\n2.35\nh\n", "")
+    kit.register_page(SHINKANSEN_URL, page)
+
+    result = kit.host_derive(statement("216"))
+
+    assert result["reason"] == "operand_not_found"
+    assert [row["reason"] for row in result["slots"]] == ["selected", "below_min_score"]
+    assert result["slots"][1]["entry"] is None
+    assert result["value"] is None
+
+
+def test_a_field_phrase_implying_no_dimension_gates_nothing(kit):
+    """221's formula sides (`height`, `floor count`) imply nothing / count; 218's imply length
+    and area. Both rosters compute exactly as before the gate existed."""
+    assert _rivers_kit(kit).host_derive(statement("218"))["winner_entity"] == "Mekong"
+    other = LedgerToolkit()
+    assert _buildings_kit(other).host_derive(statement("221"))["winner_entity"] == (
+        "One World Trade Center")

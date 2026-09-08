@@ -43,11 +43,11 @@ from agent.app.operand_attribution import (_significant_tokens, _tokens, _unit_h
                                            default_ranker)
 from agent.app.quantity_index import (QuantityRef, build_index, lookup, normalize_for_match,
                                       render_index)
-from agent.app.testing.evidence_graph import (KIND_DERIVED, DerivationError, EvidenceGraph,
-                                              UnitMismatch, UnknownOperation, WrongArity,
-                                              _numbers_agree, canonical_unit, canonicalize_url,
-                                              extract_unit, numeric_value, parse_quantity,
-                                              verify_value)
+from agent.app.testing.evidence_graph import (_CURRENCY_CODES, _SCALE_WORDS, KIND_DERIVED,
+                                              DerivationError, EvidenceGraph, UnitMismatch,
+                                              UnknownOperation, WrongArity, _numbers_agree,
+                                              canonical_unit, canonicalize_url, extract_unit,
+                                              numeric_value, parse_quantity, verify_value)
 
 #: Whether the graph's ``add_page`` accepts a provenance ``source`` kwarg. Read ONCE from the
 #: signature rather than probed with a ``TypeError`` fallback, so a genuine TypeError inside
@@ -89,6 +89,46 @@ class IncompleteRoster(DerivationError):
 
     code = "INCOMPLETE_ROSTER"
 
+
+class ScaleUnresolved(DerivationError):
+    """A host-picked operand carries a scale word (``533 million``) that could not be folded into
+    a page-located SOURCE node denoting the full magnitude. Computing over the raw digits instead
+    would be a confident number 10^6 off with full provenance -- the failure this module exists
+    to prevent -- so the derivation is declined."""
+
+    code = "SCALE_UNRESOLVED"
+
+
+#: Canonical unit spelling -> dimension class, for the field-phrase dimension gate in
+#: :meth:`LedgerToolkit._host_derive_available`. Only spellings :func:`canonical_unit` produces
+#: (plus the whitelist's long forms) appear; a unit absent here has an UNKNOWN dimension and is
+#: never gated, so the table can only ever exclude an entry whose dimension is positively known.
+_HOST_DERIVE_UNIT_DIMENSIONS: Dict[str, str] = {
+    **{unit: "length" for unit in ("m", "km", "cm", "mm", "mi", "ft", "yd", "nmi", "in")},
+    **{unit: "area" for unit in ("km2", "m2", "cm2", "mi2", "ft2", "sq mi", "sqmi", "ha",
+                                 "hectare", "hectares", "acre", "acres")},
+    **{unit: "volume" for unit in ("km3", "m3", "cm3", "mi3", "l", "ml", "gal", "cu mi")},
+    **{unit: "mass" for unit in ("kg", "g", "lb", "lbs", "t", "oz")},
+    **{unit: "speed" for unit in ("km/h", "kmh", "mph", "m/s", "kn", "knot", "knots")},
+    **{unit: "power" for unit in ("w", "kw", "mw", "gw", "tw", "hp")},
+    **{unit: "energy" for unit in ("wh", "kwh", "mwh", "gwh", "twh")},
+    **{unit: "time" for unit in ("s", "min", "h", "day", "days", "week", "weeks", "month",
+                                 "months", "yr", "yrs", "year", "years")},
+    **{unit: "count" for unit in ("count", "people", "residents", "inhabitants")},
+    "%": "percent",
+}
+
+#: Field-phrase words that name a dimension WITHOUT naming a unit ("journey time", "construction
+#: cost, in euros", "seating capacity"). Deliberately limited to the three classes whose unit
+#: words the quantity index does not whitelist (a duration phrase may still name `hours`, which
+#: `_unit_hints` already catches); length/area/etc. reach the gate through their unit hints.
+_HOST_DERIVE_PHRASE_DIMENSIONS: Dict[str, frozenset] = {
+    "time": frozenset({"time", "duration", "hours", "minutes", "seconds"}),
+    "currency": frozenset({"cost", "costs", "price", "budget", "revenue", "euro", "euros",
+                           "dollar", "dollars"} | {code.lower() for code in _CURRENCY_CODES}),
+    "count": frozenset({"capacity", "seat", "seats", "seating", "count", "floors",
+                        "population", "attendance"}),
+}
 
 #: Qualifier tokens that make two same-dimension index labels name DIFFERENT measurements, mapped
 #: to a canonical form so a page that abbreviates ("Max. depth") and one that does not ("and a
@@ -1273,11 +1313,52 @@ class LedgerToolkit:
         ranked.sort(key=lambda item: (-item[0], item[1]))
         return [(score, page_id, entry) for score, _, page_id, entry in ranked]
 
+    @staticmethod
+    def _host_derive_unit_dimension(unit: Any) -> Optional[str]:
+        """The dimension class of a unit spelling, or ``None`` when it is not positively known."""
+        token = re.sub(r"\s+(?=[23]$)", "", canonical_unit(unit))
+        if token in {code.lower() for code in _CURRENCY_CODES} or token in set(
+                _CURRENCY_CODES.values()) or token.upper() in _CURRENCY_CODES.values():
+            return "currency"
+        return _HOST_DERIVE_UNIT_DIMENSIONS.get(token)
+
+    @classmethod
+    def _host_derive_entry_dimension(cls, entry: Any) -> Optional[str]:
+        """An index entry's dimension: its currency when it carries one, else the class of its
+        unit with any scale word stripped (``"million tonnes"`` is mass; ``"million"`` alone is
+        magnitude, not dimension -> unknown)."""
+        if getattr(entry, "currency", ""):
+            return "currency"
+        residual = " ".join(token for token in str(entry.unit or "").split()
+                            if token.lower().rstrip(".,") not in _SCALE_WORDS)
+        return cls._host_derive_unit_dimension(residual) if residual else None
+
+    @classmethod
+    def _host_derive_phrase_dimensions(cls, phrase: Any) -> Set[str]:
+        """The dimension classes a field phrase implies -- from the units it names
+        (:func:`_unit_hints`) and from :data:`_HOST_DERIVE_PHRASE_DIMENSIONS`. Empty means the
+        phrase implies nothing and the gate stays open; several (``"basin area in km^2"`` hints
+        both `km` and `km2`) means any of them fits."""
+        dims = {dim for dim in (cls._host_derive_unit_dimension(hint)
+                                for hint in _unit_hints(str(phrase or ""))) if dim}
+        tokens = set(_tokens(str(phrase or "")))
+        dims.update(dim for dim, cues in _HOST_DERIVE_PHRASE_DIMENSIONS.items() if tokens & cues)
+        return dims
+
     def _host_derive_available(self, slot: Any, phrase: str, ranker: Any, taken: set,
-                               rivals: Sequence[str] = ()) -> Tuple[Dict[str, Any], List, List]:
-        """``(row, ranked, available)`` for ``slot`` read under ``phrase`` -- the shared first
-        half of :meth:`_host_derive_select` and :meth:`_host_derive_unit_options`, so the two
-        can never disagree about which entries a slot may draw from. Mutates nothing."""
+                               rivals: Sequence[str] = ()) -> Tuple[Dict[str, Any], List, List,
+                                                                    List]:
+        """``(row, ranked, available, off_dimension)`` for ``slot`` read under ``phrase`` -- the
+        shared first half of :meth:`_host_derive_select` and :meth:`_host_derive_unit_options`,
+        so the two can never disagree about which entries a slot may draw from. Mutates nothing.
+
+        ``available`` excludes spans in ``taken`` AND, when the phrase implies a dimension
+        (:meth:`_host_derive_phrase_dimensions`), every entry whose own dimension is positively
+        known to be a different one: 216's journey-time slot must never read a `275 km/h`, however
+        well it scores. Those entries are returned separately as ``off_dimension`` so a refusal
+        can still report how close the best of them came. An entry of unknown dimension is not
+        gated -- the gate excludes on evidence, never on absence of it.
+        """
         probe = slot if phrase == getattr(slot, "field_phrase", None) else dataclasses.replace(
             slot, field_phrase=phrase)
         row: Dict[str, Any] = {
@@ -1287,9 +1368,16 @@ class LedgerToolkit:
         }
         ranked = self._host_derive_rank(
             probe, self._host_derive_candidate_pages(row["entity"], rivals), ranker)
-        available = [cand for cand in ranked
-                     if (cand[1], cand[2].start, cand[2].end) not in taken]
-        return row, ranked, available
+        untaken = [cand for cand in ranked
+                   if (cand[1], cand[2].start, cand[2].end) not in taken]
+        implied = self._host_derive_phrase_dimensions(phrase)
+        if not implied:
+            return row, ranked, untaken, []
+        available, off_dimension = [], []
+        for cand in untaken:
+            dim = self._host_derive_entry_dimension(cand[2])
+            (available if dim is None or dim in implied else off_dimension).append(cand)
+        return row, ranked, available, off_dimension
 
     def _host_derive_unit_options(self, slot: Any, phrase: str, ranker: Any, min_score: float,
                                   taken: set, rivals: Sequence[str] = ()) -> List[Tuple[str, float]]:
@@ -1301,7 +1389,7 @@ class LedgerToolkit:
         keeps ranked order (first occurrence per unit), which is the tie-break
         :meth:`_host_derive_shared_unit` falls back on.
         """
-        _, _, available = self._host_derive_available(slot, phrase, ranker, taken, rivals)
+        _, _, available, _ = self._host_derive_available(slot, phrase, ranker, taken, rivals)
         options: List[Tuple[str, float]] = []
         seen: set = set()
         for score, _, entry in available:
@@ -1368,8 +1456,17 @@ class LedgerToolkit:
             page and score (so a refusal shows how close it came), but carries ``entry`` only when
             the candidate was actually selected.
         """
-        row, ranked, available = self._host_derive_available(slot, phrase, ranker, taken, rivals)
+        row, ranked, available, off_dimension = self._host_derive_available(
+            slot, phrase, ranker, taken, rivals)
         if not available:
+            if off_dimension:
+                # Everything left was the wrong dimension for this field. Reported like a
+                # candidate that fell short -- page and score of the best of them -- rather than
+                # as a new refusal kind: for the roster it IS "no acceptable operand here".
+                score, page_id, _ = off_dimension[0]
+                row.update(page_id=page_id, url=self._host_derive_page(page_id)[0],
+                           score=float(score), reason="below_min_score")
+                return row, None
             # "nothing to rank" and "everything was already spoken for" are different refusals.
             row["reason"] = "excluded_duplicate" if ranked else "no_candidate_page"
             return row, None
@@ -1389,20 +1486,48 @@ class LedgerToolkit:
         taken.add((page_id, entry.start, entry.end))
         return row, (page_id, entry)
 
-    def _host_derive_mint(self, page_id: str, entry: Any) -> Optional[Any]:
-        """A host-tagged SOURCE node for ``entry`` carrying the CANONICAL spelling of its unit.
+    def _host_derive_mint(self, page_id: str, entry: Any) -> Tuple[Optional[Any], Optional[str]]:
+        """``(SOURCE node, refusal)`` for ``entry``, host-tagged, unit spelled canonically.
 
-        The graph builds a derived node's unit string from its operands' unit strings, so two
-        copies of one page -- the model's flattened window indexing `km2` and the host's rendered
-        copy indexing `km²` -- used to mint `km/km2` and `km/km²` ratios that the extremum then
-        refused as a unit mismatch. Spelling is not dimension; canonicalising it here (the same
-        :func:`canonical_unit` every unit comparison in this module already applies) means no
-        spelling ever decides a refusal. Still no conversion: `km2` and `km²` are one unit.
+        Two things a plain :meth:`_mint_source_from_entry` would get wrong for a host pick:
+
+        * **Spelling.** The graph builds a derived node's unit string from its operands' unit
+          strings, so two copies of one page -- the model's flattened window indexing `km2` and
+          the host's rendered copy indexing `km²` -- used to mint `km/km2` and `km/km²` ratios
+          that the extremum then refused as a unit mismatch. Spelling is not dimension; it is
+          canonicalised here with the same :func:`canonical_unit` every comparison uses.
+        * **Scale.** The index keeps a scale word in ``unit`` (``"€ 533"`` + ``"million"``), and a
+          node minted from those two fields denotes 533, not 533,000,000 (215 live: 0.00793
+          `million/count`). The node is minted instead from the page's own full text of the
+          quantity (``"€ 533 million"`` -- which is what locates on the page) with the currency
+          code, or the unit left after the scale word, as its unit, and its parsed magnitude is
+          then CHECKED against :meth:`_entry_numeric`. When no located node denotes the full
+          magnitude the pick is refused (``scale_unresolved``); raw digits are never computed.
+
+        Still no conversion: nothing here rescales between units.
         """
-        return self._mint_source_from_entry(
-            page_id, dataclasses.replace(entry, unit=canonical_unit(entry.unit) if entry.unit
-                                         else entry.unit),
-            minted_by=HOST_DERIVE_TAG)
+        unit_tokens = str(entry.unit or "").split()
+        scale = str(getattr(entry, "scale", "") or "") or next(
+            (tok for tok in unit_tokens if tok.lower().rstrip(".,") in _SCALE_WORDS), "")
+        if not scale:
+            node = self._mint_source_from_entry(
+                page_id, dataclasses.replace(entry, unit=canonical_unit(entry.unit)
+                                             if entry.unit else entry.unit),
+                minted_by=HOST_DERIVE_TAG)
+            return node, None
+        full_text = f"{entry.value} {entry.unit}".strip()
+        residual = " ".join(tok for tok in unit_tokens if tok.lower().rstrip(".,") not in _SCALE_WORDS)
+        unit = str(getattr(entry, "currency", "") or "") or (canonical_unit(residual)
+                                                             if residual else "")
+        expected = self._entry_numeric(entry)
+        for attempt_unit in ((unit, "") if unit else ("",)):
+            node = self._mint_source_from_entry(
+                page_id, dataclasses.replace(entry, value=full_text, unit=attempt_unit),
+                minted_by=HOST_DERIVE_TAG)
+            if node is not None and expected is not None and \
+                    numeric_value(node.value) == expected:
+                return node, None
+        return None, "scale_unresolved"
 
     def _host_derive_compatible(self, operation: str, unit_a: str, unit_b: str) -> bool:
         """The existing per-op unit rule :meth:`audit_answer` uses, applied to a host-picked pair."""
@@ -1505,13 +1630,21 @@ class LedgerToolkit:
             values = [self._entry_numeric(entry) for _, entry in operands]
             if None not in values and values[0] < values[1]:
                 operands.reverse()
-        nodes = [self._host_derive_mint(page_id, entry) for page_id, entry in operands]
+        minted = [self._host_derive_mint(page_id, entry) for page_id, entry in operands]
+        if any(refusal == "scale_unresolved" for _, refusal in minted):
+            self._graph.record_refusal(operation, [], ScaleUnresolved(
+                f"scale word could not be folded for {[e.value + ' ' + e.unit for _, e in operands]}"))
+            result["reason"] = "scale_unresolved"
+            return result
+        nodes = [node for node, _ in minted]
         if any(node is None for node in nodes):
             result["reason"] = "operand_not_found"
             return result
 
         node_ids = [node.id for node in nodes]
-        units = [entry.unit for _, entry in operands]
+        # Units as MINTED (canonical spelling, scale folded, currency code), not as the index
+        # spelled them -- `million` is not a unit and `km²` is `km2`.
+        units = [str(node.unit or "") for node in nodes]
         if same_field and canonical_unit(units[0]) != canonical_unit(units[1]):
             # Narrower than `_host_derive_compatible`, and deliberately NOT folded into it.
             # `_compat_quotient` allows two different units because a rate is a legitimate
@@ -1618,12 +1751,17 @@ class LedgerToolkit:
         ratios: List[Tuple[Any, Any]] = []
         unit_pairs: set = set()
         for slot, numerator, denominator in resolved:
-            nodes = [self._host_derive_mint(page_id, entry)
-                     for page_id, entry in (numerator, denominator)]
+            minted = [self._host_derive_mint(page_id, entry)
+                      for page_id, entry in (numerator, denominator)]
+            if any(refusal == "scale_unresolved" for _, refusal in minted):
+                self._graph.record_refusal("ratio", [], ScaleUnresolved(
+                    f"scale word could not be folded for {getattr(slot, 'entity', '')!r}"))
+                result["reason"] = "scale_unresolved"
+                return result
+            nodes = [node for node, _ in minted]
             if any(node is None for node in nodes):
                 continue
-            unit_pairs.add((canonical_unit(numerator[1].unit),
-                            canonical_unit(denominator[1].unit)))
+            unit_pairs.add((canonical_unit(nodes[0].unit), canonical_unit(nodes[1].unit)))
             try:
                 ratios.append((slot, self._graph.add_arith("ratio", [node.id for node in nodes],
                                                            minted_by=HOST_DERIVE_TAG)))
@@ -1702,7 +1840,7 @@ class LedgerToolkit:
             {"reason": "computed" | "no_unambiguous_shape" | "fewer_than_two_slots" |
                        "operand_not_found" | "unit_mismatch" | "operand_field_mismatch" |
                        "unit_inconsistent_across_entities" | "incomplete_roster" |
-                       "argmax_formula_unparsed" | "no_pages" | "error",
+                       "scale_unresolved" | "argmax_formula_unparsed" | "no_pages" | "error",
              "operation": str|None, "absolute": bool, "mode": "max"|"min"|None,
              "value": float|None, "value_text": str|None, "unit": str,
              "node_id": str|None, "winner_entity": str|None,
