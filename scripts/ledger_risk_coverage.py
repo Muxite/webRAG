@@ -66,6 +66,11 @@ REL_TOL = 0.005  # 0.5% relative tolerance, per GATE_PRECISION_PRECHECK_2026-09-
 #: must never enter ``certified``.
 MECHANICALLY_MINTED_BY: Tuple[str, ...] = ("answer_audit", "shape_derive", "host_derive")
 
+#: ``evidence_graph.pages[].source`` value ``agent.app.host_prefetch`` stamps on the pages it
+#: registers (its ``PREFETCH_SOURCE``). Kept as a literal here so this script stays importable
+#: without the module; the replay reads the module's constant and the two must agree.
+HOST_PREFETCH_SOURCE = "host_prefetch"
+
 COVERAGE_TARGETS = (0.50, 0.80, 1.00)
 
 _URL_RE = re.compile(r"https?://\S+")
@@ -1037,6 +1042,27 @@ def classify_cell(path: Path, raw: Dict[str, Any]) -> Dict[str, Any]:
     host_certified = bool(
         agreement["available"] and agreement["agrees_final"] and not agreement["wrong_by_unit"]
     )
+    # Page provenance: a page the model fetched itself carries no ``source``; one that
+    # ``host_prefetch`` registered carries ``source == HOST_PREFETCH_SOURCE`` (evidence_graph
+    # pages[]). A selected host_derive slot on such a page means the host certified a number the
+    # MODEL never read -- a different claim, so host_certified is split, never redefined.
+    page_source_by_id = {
+        str(page.get("page_id")): str(page.get("source") or "")
+        for page in ((evidence_graph.get("pages") or []) if isinstance(evidence_graph, dict) else [])
+        if isinstance(page, dict)
+    }
+    host_used_prefetched = any(
+        page_source_by_id.get(str(slot.get("page_id"))) == HOST_PREFETCH_SOURCE
+        for slot in ((host_derive or {}).get("slots") or [])
+        if isinstance(slot, dict) and slot.get("reason") == "selected"
+    )
+    host_prefetch = output.get("host_prefetch")
+    host_prefetch = host_prefetch if isinstance(host_prefetch, dict) else None
+    host_prefetch_status_counts: Dict[str, int] = {}
+    for entity in ((host_prefetch or {}).get("entities") or []):
+        if isinstance(entity, dict):
+            status = str(entity.get("status") or "?")
+            host_prefetch_status_counts[status] = host_prefetch_status_counts.get(status, 0) + 1
 
     return {
         "file": path.name, "test_id": test_id, "model": model, "host": host,
@@ -1068,6 +1094,16 @@ def classify_cell(path: Path, raw: Dict[str, Any]) -> Dict[str, Any]:
         "host_value_close": value_detail["close"],
         "host_operation": agreement["operation"],
         "host_mode": agreement["mode"],
+        # Provenance split (additive). ``host_certified == model_read OR prefetched`` always.
+        "host_used_prefetched": host_used_prefetched,
+        "host_certified_model_read": host_certified and not host_used_prefetched,
+        "host_certified_prefetched": host_certified and host_used_prefetched,
+        "host_prefetch_present": host_prefetch is not None,
+        "host_prefetch_registered": (int((host_prefetch or {}).get("registered") or 0)
+                                     if host_prefetch is not None else None),
+        "host_prefetch_status_counts": host_prefetch_status_counts,
+        "n_pages_prefetched": sum(1 for src in page_source_by_id.values()
+                                  if src == HOST_PREFETCH_SOURCE),
     }
 
 
@@ -1434,15 +1470,52 @@ def build_report(cells: List[Dict[str, Any]]) -> Dict[str, Any]:
         "n_available_dev_derive_on": sum(1 for c in dev_derive_on if _host_flag(c, "host_available")),
     }
 
+    def _by_model_points(pool: Sequence[Dict[str, Any]], key: str) -> Dict[str, Dict[str, Any]]:
+        return {"/".join(str(k) for k in group_key): _host_point(group, key)
+                for group_key, group in sorted(stratify(pool, ["model"]).items(),
+                                               key=lambda kv: tuple(str(x) for x in kv[0]))}
+
     report["host_derive_dev_derive_on"] = {
         **_host_point(dev_derive_on, "host_certified"),
         "min_accepted_for_decision": HOST_RISK_DECISION_MIN_ACCEPTED,
         "note": ("host_certified = available AND agrees_final AND NOT wrong-by-unit. Risk is "
                  f"reported at any n but is decision-bearing only at >= "
                  f"{HOST_RISK_DECISION_MIN_ACCEPTED} accepted cells (replan Phase 3)."),
-        "by_model": {"/".join(str(k) for k in key): _host_point(group, "host_certified")
+        "by_model": _by_model_points(dev_derive_on, "host_certified"),
+        # Provenance split of the SAME operating point (same denominator): a certified number
+        # read off a page the model fetched vs one read off a host_prefetch page the model never
+        # saw. The two accepted counts sum to host_certified's.
+        "model_read": _by_model_points_with_pooled(dev_derive_on, "host_certified_model_read",
+                                                   _host_point, _by_model_points),
+        "prefetched": _by_model_points_with_pooled(dev_derive_on, "host_certified_prefetched",
+                                                   _host_point, _by_model_points),
+    }
+
+    def _prefetch_availability(pool: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+        present = [c for c in pool if c.get("host_prefetch_present")]
+        statuses: Dict[str, int] = {}
+        for cell in present:
+            for status, n in (cell.get("host_prefetch_status_counts") or {}).items():
+                statuses[status] = statuses.get(status, 0) + int(n)
+        return {
+            "n": len(pool),
+            "n_with_prefetch": len(present),
+            "n_registered_any": sum(1 for c in present if (c.get("host_prefetch_registered") or 0) > 0),
+            "pages_registered": sum(int(c.get("host_prefetch_registered") or 0) for c in present),
+            "n_used_prefetched": sum(1 for c in pool if c.get("host_used_prefetched")),
+            "n_certified_prefetched": sum(1 for c in pool if c.get("host_certified_prefetched")),
+            "statuses": dict(sorted(statuses.items())),
+        }
+
+    report["host_prefetch_availability"] = {
+        "note": ("host_prefetch per model (dev derive-ON cells): how many cells carried a "
+                 "prefetch summary, how many pages it registered, the entity-status histogram, "
+                 "and how many cells host_derive then SELECTED / CERTIFIED on a prefetched page."),
+        "pooled": _prefetch_availability(dev_derive_on),
+        "by_model": {"/".join(str(k) for k in key): _prefetch_availability(group)
                      for key, group in sorted(stratify(dev_derive_on, ["model"]).items(),
                                                key=lambda kv: tuple(str(x) for x in kv[0]))},
+        "all_usable": _prefetch_availability(usable),
     }
 
     def _correct_rate(pool: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
@@ -1512,11 +1585,18 @@ def build_report(cells: List[Dict[str, Any]]) -> Dict[str, Any]:
                  "5-clause chain, the host signal, and their union/intersection."),
         "chain_certified": _host_point(dev_derive_on, "certified"),
         "host_certified": _host_point(dev_derive_on, "host_certified"),
+        "host_certified_model_read": _host_point(dev_derive_on, "host_certified_model_read"),
+        "host_certified_prefetched": _host_point(dev_derive_on, "host_certified_prefetched"),
         "union": _host_point(union_cells, "_host_union"),
         "intersection": _host_point(union_cells, "_host_inter"),
     }
 
     return report
+
+
+def _by_model_points_with_pooled(pool, key, host_point, by_model_points) -> Dict[str, Any]:
+    """``{**pooled operating point, "by_model": {...}}`` for one acceptance flag."""
+    return {**host_point(pool, key), "by_model": by_model_points(pool, key)}
 
 
 def print_report(report: Dict[str, Any]) -> None:
@@ -1673,6 +1753,25 @@ def print_report(report: Dict[str, Any]) -> None:
     _print_host_point("pooled", point)
     for key, row in point["by_model"].items():
         _print_host_point(key, row)
+    print("  ... split by page provenance (same denominator; accepted counts sum to the above):")
+    for label in ("model_read", "prefetched"):
+        sub = point.get(label) or {}
+        if "n" in sub:
+            _print_host_point(f"pooled/{label}", sub)
+            for key, row in (sub.get("by_model") or {}).items():
+                _print_host_point(f"{key}/{label}", row)
+
+    pfa = report.get("host_prefetch_availability") or {}
+    if pfa:
+        print("  host_prefetch availability by model (dev derive-ON cells):")
+        print(f"    {'model':22s} {'n':>4} {'with_pf':>7} {'reg_any':>7} {'pages':>5} "
+              f"{'used':>4} {'cert':>4}  statuses")
+        rows = [("pooled", pfa["pooled"])] + list(pfa["by_model"].items())
+        for key, row in rows:
+            print(f"    {key:22s} {row['n']:4d} {row['n_with_prefetch']:7d} "
+                  f"{row['n_registered_any']:7d} {row['pages_registered']:5d} "
+                  f"{row['n_used_prefetched']:4d} {row['n_certified_prefetched']:4d}  "
+                  f"{row['statuses']}")
 
     print("  negative control (availability only, no agreement test):")
     _print_host_point("available", report["host_availability_only_baseline"])
@@ -1694,7 +1793,8 @@ def print_report(report: Dict[str, Any]) -> None:
               f"agrees_any={_fmt_pct(row['rate_any'])}")
 
     print("  host vs chain (same dev derive-ON cells):")
-    for label in ("chain_certified", "host_certified", "union", "intersection"):
+    for label in ("chain_certified", "host_certified", "host_certified_model_read",
+                  "host_certified_prefetched", "union", "intersection"):
         _print_host_point(label, report["host_vs_chain"][label])
 
 

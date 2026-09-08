@@ -12,6 +12,7 @@ No network, no model calls, no GPU: every assertion is arithmetic over files thi
 from __future__ import annotations
 
 import importlib
+import os
 import json
 from pathlib import Path
 
@@ -516,3 +517,262 @@ def test_summary_stratifies_by_host(mixed_results_dir: Path):
     for host in hosts:
         assert summary["availability"]["by_host"]["hand_rule"][host]["computed"] == 1
     assert "(g) PER-HOST" in HDR.format_report(summary)
+
+
+# ---------------------------------------------------------------------------------------------
+# --prefetch: no_pages cells become replay subjects via an injected prefetcher
+# ---------------------------------------------------------------------------------------------
+
+class _FakePrefetcher:
+    """Registers the two 210 pages on whatever kit it is handed, using the EXTENDED
+    ``register_page`` kwargs (``source``/``max_chars``/``structured``) the host_prefetch contract
+    specifies, and returns a contract-shaped summary. Counts its calls."""
+
+    def __init__(self, pages=None, fail: bool = False):
+        self.calls = []
+        self.fail = fail
+        self.pages = pages if pages is not None else [
+            ("https://en.wikipedia.org/wiki/GRES-2_Power_Station", GRES2_PAGE),
+            ("https://en.wikipedia.org/wiki/Inco_Superstack", INCO_PAGE),
+        ]
+
+    def __call__(self, kit, mandate):
+        self.calls.append((kit, mandate))  # keep the kit ALIVE: id() of a collected kit recycles
+        if self.fail:
+            raise RuntimeError("search backend down")
+        entities = []
+        for url, text in self.pages:
+            kit.register_page(url, text, source="host_prefetch", max_chars=len(text),
+                              structured=[])
+            entities.append({"entity": url.rsplit("/", 1)[-1], "field_phrase": "height",
+                             "status": "prefetched", "url": url, "chars": len(text),
+                             "elapsed_ms": 1})
+        return {"entities": entities, "searches": len(entities), "fetches": len(entities),
+                "registered": len(entities), "elapsed_s": 0.01, "error": None}
+
+
+def _no_pages_file(results_dir: Path) -> Path:
+    return results_dir / "synth_f_210_qwen_sequential_react_cfg1_r1.json"
+
+
+def test_prefetch_replays_the_no_pages_cell(results_dir: Path):
+    fake = _FakePrefetcher()
+    rows, skips = HDR.replay(_files(results_dir), ["hand_rule", "document_order"], ["synth"],
+                             prefetcher=fake)
+    assert skips["no_pages"] == 0
+    assert skips["pages_prefetched"] == 1 and skips["synth|pages_prefetched"] == 1
+    assert skips["replayed"] == 4  # a, b, c and the formerly-skipped f
+    f_rows = [r for r in rows if r["file"] == _no_pages_file(results_dir).name]
+    assert len(f_rows) == 2
+    for row in f_rows:
+        assert row["page_source"] == "prefetched"
+        assert row["n_pages"] == 0 and row["n_prefetched"] == 2
+        assert row["prefetch"]["registered"] == 2
+        assert row["prefetched_page_ids"] == ["p1", "p2"]
+    hand = next(r for r in f_rows if r["ranker"] == "hand_rule")
+    assert hand["reason"] == "computed" and hand["value_correct"] is True
+    assert hand["prefetch_used"] is True
+
+
+def test_prefetcher_is_called_once_per_cell_even_with_two_rankers(results_dir: Path):
+    fake = _FakePrefetcher()
+    rows, skips = HDR.replay(_files(results_dir), ["hand_rule", "document_order"], ["synth"],
+                             prefetcher=fake)
+    assert len(fake.calls) == skips["replayed"] == 4
+    kits = [kit for kit, _ in fake.calls]
+    assert all(a is not b for i, a in enumerate(kits) for b in kits[i + 1:])  # fresh kit per cell
+    assert all(mandate for _, mandate in fake.calls)
+    assert len(rows) == 8
+
+
+def test_prefetch_keeps_stored_page_source_on_cells_that_had_pages(results_dir: Path):
+    rows, _ = HDR.replay(_files(results_dir), ["hand_rule"], ["synth"],
+                         prefetcher=_FakePrefetcher())
+    stored = [r for r in rows if r["file"] != _no_pages_file(results_dir).name]
+    assert stored and all(r["page_source"] == "output" for r in stored)
+    # Prefetched pages land AFTER the stored ones, so a stored cell's selected slots still
+    # resolve on the stored pages and prefetch_used stays False there.
+    a = next(r for r in stored if r["file"].startswith("synth_a_"))
+    assert a["prefetched_page_ids"] == ["p3", "p4"]
+    assert a["prefetch_used"] is False
+
+
+def test_prefetch_failure_is_a_row_fact_not_a_crash(results_dir: Path):
+    rows, _ = HDR.replay([_no_pages_file(results_dir)], ["hand_rule"], ["synth"],
+                         prefetcher=_FakePrefetcher(fail=True))
+    (row,) = rows
+    assert row["prefetch"]["error"].startswith("RuntimeError")
+    assert row["n_prefetched"] == 0 and row["prefetch_used"] is False
+    assert row["reason"] == "no_pages" and row["page_source"] == "prefetched"
+
+
+def test_run_prefetch_restores_the_class_register_page():
+    from agent.app.ledger_tools import LedgerToolkit
+
+    kit = LedgerToolkit()
+    summary, captured = HDR.run_prefetch(kit, "mandate", _FakePrefetcher())
+    assert "register_page" not in vars(kit)
+    assert [url for url, _, _ in captured] == [u for u, _ in _FakePrefetcher().pages]
+    assert summary["registered"] == 2
+    assert [p["url"] for p in kit.artifact()["pages"]] == [u for u, _ in _FakePrefetcher().pages]
+
+
+def test_without_prefetch_rows_and_summary_carry_no_prefetch_keys(results_dir: Path):
+    rows, skips = _replay(results_dir)
+    assert not any(k in r for r in rows for k in ("prefetch", "n_prefetched", "prefetch_used",
+                                                   "prefetched_page_ids"))
+    assert skips["no_pages"] == 1 and "pages_prefetched" not in skips
+    summary = HDR.build_summary(rows, skips=skips, prefixes=["synth"],
+                                ranker_names=["hand_rule", "document_order"], results_dir="r",
+                                out_dir="o", wall_seconds=0.0)
+    assert "prefetch" not in summary and "prefetched_wrong_page" not in summary
+    assert "prefetch" not in summary["meta"]
+    assert "by_prefetch_used" not in summary["availability"]
+    assert "denominators" not in summary["counts"]
+    assert "prefetched" not in summary["counts"]["page_source"]
+    assert "PREFETCH" not in HDR.format_report(summary)
+
+
+def test_prefetch_summary_states_both_denominators_and_splits(results_dir: Path):
+    rows, skips = HDR.replay(_files(results_dir), ["hand_rule", "document_order"], ["synth"],
+                             prefetcher=_FakePrefetcher())
+    summary = HDR.build_summary(rows, skips=skips, prefixes=["synth"],
+                                ranker_names=["hand_rule", "document_order"], results_dir="r",
+                                out_dir="o", wall_seconds=0.0, prefetch=True)
+    den = summary["counts"]["denominators"]
+    assert den["all_cells_incl_no_pages"] == 4 and den["stored_page_cells"] == 3
+    assert den["rows_all"] == 8 and den["rows_stored_page_cells"] == 6
+    assert summary["counts"]["page_source"]["prefetched"] == 1
+    assert summary["counts"]["by_prefix"]["synth"]["pages_prefetched"] == 1
+    by_used = summary["availability"]["by_prefetch_used"]["hand_rule"]
+    assert set(by_used) == {"True", "False"}
+    assert by_used["True"]["n"] == 1 and by_used["True"]["computed"] == 1
+    assert summary["value_correct"]["by_prefetch_used"]["hand_rule"]["True"]["correct"] == 1
+    assert summary["availability"]["stored_page_cells"]["hand_rule"]["n"] == 3
+    assert summary["prefetch"]["status_counts"] == {"prefetched": 8}  # 2 entities x 4 cells
+    assert summary["prefetch"]["rows_prefetch_used"] >= 1
+    report = HDR.format_report(summary)
+    assert "all cells incl. no_pages = 4" in report and "stored-page cells = 3" in report
+    assert "(h) PREFETCH" in report and "availability by prefetch_used" in report
+
+
+def test_prefetched_wrong_page_flags_a_slug_that_does_not_name_the_entity(results_dir: Path):
+    # The prefetcher fetched the Inco page under a slug that names NEITHER entity, plus the
+    # GRES-2 page under its own slug: only a slot selected on the mis-slugged page is flagged.
+    fake = _FakePrefetcher(pages=[
+        ("https://en.wikipedia.org/wiki/GRES-2_Power_Station", GRES2_PAGE),
+        ("https://example.org/wiki/List_of_tall_things", INCO_PAGE),
+    ])
+    rows, skips = HDR.replay([_no_pages_file(results_dir)], ["hand_rule"], ["synth"],
+                             prefetcher=fake)
+    wrong = HDR.prefetched_wrong_page(rows)
+    (row,) = rows
+    selected = [s for s in row["slots"] if s["reason"] == "selected"]
+    if row["reason"] == "computed":
+        assert selected
+    assert [w["url"] for w in wrong] == ["https://example.org/wiki/List_of_tall_things"]
+    assert wrong[0]["entity"] == "Inco Superstack" and wrong[0]["slug_coverage"] == 0.0
+    assert wrong[0]["page_id"] in row["prefetched_page_ids"]
+    # Partial self-coverage on the entity's own article is NOT flagged (GRES-2 slug covers 3 of
+    # the 4 significant tokens of "GRES-2 Power Station chimney").
+    assert HDR.slug_coverage("GRES-2 Power Station chimney",
+                             "https://en.wikipedia.org/wiki/GRES-2_Power_Station") == 0.75
+
+
+def test_prefetched_wrong_page_flags_a_rival_entity_slug():
+    row = {"file": "f", "ranker": "hand_rule", "test_id": "t", "model": "m", "host": "h",
+           "prefetched_page_ids": ["p1", "p2"], "value_correct": False, "reason": "computed",
+           "slots": [
+               {"entity": "Lake Baikal", "url": "https://en.wikipedia.org/wiki/Lake_Tanganyika",
+                "page_id": "p2", "reason": "selected"},
+               {"entity": "Lake Tanganyika",
+                "url": "https://en.wikipedia.org/wiki/Lake_Tanganyika", "page_id": "p2",
+                "reason": "selected"},
+           ]}
+    wrong = HDR.prefetched_wrong_page([row])
+    assert [(w["entity"], w["slug_coverage"], w["rival_slug_coverage"]) for w in wrong] == \
+        [("Lake Baikal", 0.5, 1.0)]
+
+
+def test_slug_coverage_matches_the_toolkit_rule():
+    assert HDR.slug_coverage("Lake Baikal", "https://en.wikipedia.org/wiki/Lake_Baikal") == 1.0
+    assert HDR.slug_coverage("Lake Baikal", "https://en.wikipedia.org/wiki/Lake_Tanganyika") == 0.5
+    assert HDR.slug_coverage("Lake Baikal", "https://example.org/x/Nothing") == 0.0
+    assert HDR.slug_coverage("", "https://example.org/x") is None
+
+
+def test_register_page_compat_falls_back_to_the_two_arg_signature():
+    class OldKit:
+        def __init__(self):
+            self.seen = []
+
+        def register_page(self, url, text):
+            self.seen.append((url, text))
+            return f"p{len(self.seen)}"
+
+    class NewKit(OldKit):
+        def register_page(self, url, text, *, source="", max_chars=None, structured=None):
+            self.seen.append((url, text, source, max_chars, structured))
+            return f"p{len(self.seen)}"
+
+    old, new = OldKit(), NewKit()
+    assert HDR.register_page_compat(old, "u", "t", source="host_prefetch", max_chars=1,
+                                    structured=[]) == "p1"
+    assert old.seen == [("u", "t")]
+    assert HDR.register_page_compat(new, "u", "t", source="host_prefetch", max_chars=1,
+                                    structured=[]) == "p1"
+    assert new.seen == [("u", "t", "host_prefetch", 1, [])]
+
+
+def test_main_prefetch_flag_uses_an_injected_live_prefetcher(results_dir: Path, tmp_path: Path,
+                                                             monkeypatch, capsys):
+    """``--prefetch`` wires connectors and forces the fixture mode; both are stubbed here so the
+    test never touches the network, while the pipeline below the flag is the real one."""
+    fake = _FakePrefetcher()
+    monkeypatch.delenv("IDEA_TEST_FIXTURES", raising=False)
+    monkeypatch.setattr(HDR, "make_live_prefetcher", lambda loop, *, http, search: fake)
+
+    class _Http:
+        def __init__(self, config):
+            self.closed = False
+
+        async def __aexit__(self, *exc):
+            self.closed = True
+
+    import agent.app.connector_http as connector_http
+    import agent.app.connector_search as connector_search
+    monkeypatch.setattr(connector_http, "ConnectorHttp", _Http)
+    monkeypatch.setattr(connector_search, "create_search_backend", lambda config: object())
+    out_dir = tmp_path / "out"
+    rc = HDR.main(["--results-dir", str(results_dir), "--prefixes", "synth", "--out-dir",
+                   str(out_dir), "--rankers", "hand_rule", "--prefetch"])
+    assert rc == 0
+    assert os.environ.get("IDEA_TEST_FIXTURES") == "replay"
+    assert len(fake.calls) == 4
+    summary = json.loads((out_dir / "summary.json").read_text(encoding="utf-8"))
+    assert summary["meta"]["prefetch"] is True
+    assert summary["counts"]["denominators"]["all_cells_incl_no_pages"] == 4
+    assert "forcing 'replay'" in capsys.readouterr().err
+
+
+def test_main_prefetch_respects_an_explicit_fixture_mode(results_dir: Path, tmp_path: Path,
+                                                         monkeypatch):
+    monkeypatch.setenv("IDEA_TEST_FIXTURES", "replay_strict")
+    monkeypatch.setattr(HDR, "make_live_prefetcher",
+                        lambda loop, *, http, search: _FakePrefetcher())
+
+    class _Http:
+        def __init__(self, config):
+            pass
+
+        async def __aexit__(self, *exc):
+            pass
+
+    import agent.app.connector_http as connector_http
+    import agent.app.connector_search as connector_search
+    monkeypatch.setattr(connector_http, "ConnectorHttp", _Http)
+    monkeypatch.setattr(connector_search, "create_search_backend", lambda config: object())
+    rc = HDR.main(["--results-dir", str(results_dir), "--prefixes", "synth", "--out-dir",
+                   str(tmp_path / "out"), "--rankers", "hand_rule", "--prefetch"])
+    assert rc == 0
+    assert os.environ["IDEA_TEST_FIXTURES"] == "replay_strict"

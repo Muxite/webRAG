@@ -167,8 +167,26 @@ def test_factory_picks_searxng_explicitly(monkeypatch):
     assert backend.url == "http://searxng.test:8080/search"
 
 
-def test_factory_falls_back_to_serper_on_unknown_provider(monkeypatch):
+def test_factory_fails_closed_on_unknown_provider(monkeypatch):
+    """An explicit unknown provider must RAISE, naming the valid set, rather than fall through
+    to the paid Serper backend (a typo on a '$0 local' run used to bill the Serper key)."""
+    import pytest
+
     monkeypatch.setenv("SEARCH_PROVIDER", "bing")
+    with pytest.raises(ValueError) as excinfo:
+        create_search_backend(ConnectorConfig())
+    message = str(excinfo.value)
+    assert "bing" in message
+    for name in ("serper", "brave", "searxng", "corpus"):
+        assert name in message
+
+
+def test_factory_unset_and_empty_provider_still_default_to_serper(monkeypatch):
+    monkeypatch.delenv("SEARCH_PROVIDER", raising=False)
+    assert isinstance(create_search_backend(ConnectorConfig()), ConnectorSearchSerper)
+    monkeypatch.setenv("SEARCH_PROVIDER", "")
+    assert isinstance(create_search_backend(ConnectorConfig()), ConnectorSearchSerper)
+    monkeypatch.setenv("SEARCH_PROVIDER", "  SERPER ")
     assert isinstance(create_search_backend(ConnectorConfig()), ConnectorSearchSerper)
 
 

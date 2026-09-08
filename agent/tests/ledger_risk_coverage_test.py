@@ -1612,3 +1612,160 @@ def test_print_report_renders_the_host_section(capsys):
     out = capsys.readouterr().out
     assert "host derive" in out
     assert "host_value_correct" in out
+
+
+# ==============================================================================================
+# host_certified split by page provenance (host_prefetch pages vs model-read pages)
+# ==============================================================================================
+
+def _graph_with_page_sources(sources):
+    """A graph dict whose pages carry the given ``source`` values (``None`` = no key at all,
+    the shape every pre-prefetch cell has on disk)."""
+    graph = _build_plain_graph().to_dict()
+    pages = []
+    for i, source in enumerate(sources, start=1):
+        page = {"page_id": f"p{i}", "url": f"https://example.org/{i}",
+                "content_hash": f"h{i}", "chars": 10, "text": "The height is 38.7 metres."}
+        if source is not None:
+            page["source"] = source
+        pages.append(page)
+    graph["pages"] = pages
+    return graph
+
+
+def _selected(page_id, entity="X"):
+    return {"index": 0, "entity": entity, "field_phrase": "height", "page_id": page_id,
+            "url": f"https://example.org/{page_id[1:]}", "entry": {}, "score": 0.99,
+            "reason": "selected"}
+
+
+class TestHostCertifiedProvenanceSplit:
+    def test_selected_slot_on_a_prefetched_page_is_certified_prefetched(self, tmp_path):
+        raw = _make_cell_raw(_graph_with_page_sources([None, "host_prefetch"]),
+                             deliverable="The answer is 38.7 metres.")
+        raw["execution"]["output"]["host_derive"] = _host(slots=[_selected("p1"), _selected("p2")])
+        raw["execution"]["output"]["host_prefetch"] = {
+            "entities": [{"entity": "X", "status": "prefetched"},
+                         {"entity": "Y", "status": "no_hit"}],
+            "searches": 2, "fetches": 1, "registered": 1, "elapsed_s": 0.5, "error": None}
+        result = lrc.classify_cell(tmp_path / "cell.json", raw)
+        assert result["host_certified"] is True
+        assert result["host_used_prefetched"] is True
+        assert result["host_certified_prefetched"] is True
+        assert result["host_certified_model_read"] is False
+        assert result["host_prefetch_present"] is True
+        assert result["host_prefetch_registered"] == 1
+        assert result["host_prefetch_status_counts"] == {"no_hit": 1, "prefetched": 1}
+        assert result["n_pages_prefetched"] == 1
+
+    def test_cell_without_any_source_keeps_old_behaviour(self, tmp_path):
+        raw = _make_cell_raw(_graph_with_page_sources([None, None]),
+                             deliverable="The answer is 38.7 metres.")
+        raw["execution"]["output"]["host_derive"] = _host(slots=[_selected("p1"), _selected("p2")])
+        result = lrc.classify_cell(tmp_path / "cell.json", raw)
+        assert result["host_certified"] is True
+        assert result["host_used_prefetched"] is False
+        assert result["host_certified_model_read"] is True
+        assert result["host_certified_prefetched"] is False
+        assert result["host_prefetch_present"] is False
+        assert result["host_prefetch_registered"] is None
+        assert result["host_prefetch_status_counts"] == {}
+        assert result["n_pages_prefetched"] == 0
+
+    def test_prefetched_page_only_counts_when_a_slot_is_selected_on_it(self, tmp_path):
+        # The prefetched page exists but the host selected only the model-read page; a
+        # ``no_candidate_page``-style slot pointing at it must not flip the flag.
+        raw = _make_cell_raw(_graph_with_page_sources([None, "host_prefetch"]),
+                             deliverable="The answer is 38.7 metres.")
+        rejected = dict(_selected("p2"), reason="below_min_score")
+        raw["execution"]["output"]["host_derive"] = _host(slots=[_selected("p1"), rejected])
+        result = lrc.classify_cell(tmp_path / "cell.json", raw)
+        assert result["host_used_prefetched"] is False
+        assert result["host_certified_model_read"] is True
+        assert result["n_pages_prefetched"] == 1
+
+    def test_uncertified_cell_is_neither_split(self, tmp_path):
+        raw = _make_cell_raw(_graph_with_page_sources(["host_prefetch"]),
+                             deliverable="The answer is 99 metres.")
+        raw["execution"]["output"]["host_derive"] = _host(slots=[_selected("p1")])
+        result = lrc.classify_cell(tmp_path / "cell.json", raw)
+        assert result["host_certified"] is False
+        assert result["host_used_prefetched"] is True
+        assert result["host_certified_model_read"] is False
+        assert result["host_certified_prefetched"] is False
+
+
+def _provenance_cell(file, model, host_certified, prefetched, wrong=False, registered=None,
+                     statuses=None):
+    cell = _host_cell(file, "210", model, wrong=wrong, host_certified=host_certified,
+                      host_available=True, reason="computed", value_correct=not wrong)
+    cell.update({
+        "host_used_prefetched": prefetched,
+        "host_certified_model_read": host_certified and not prefetched,
+        "host_certified_prefetched": host_certified and prefetched,
+        "host_prefetch_present": registered is not None,
+        "host_prefetch_registered": registered,
+        "host_prefetch_status_counts": statuses or {},
+        "n_pages_prefetched": registered or 0,
+    })
+    return cell
+
+
+class TestBuildReportProvenanceSplit:
+    def _pool(self):
+        return [
+            _provenance_cell("a.json", "m1", True, False),
+            _provenance_cell("b.json", "m1", True, True, registered=1,
+                             statuses={"prefetched": 1, "covered": 1}),
+            _provenance_cell("c.json", "m2", True, True, wrong=True, registered=2,
+                             statuses={"prefetched": 2}),
+            _provenance_cell("d.json", "m2", False, False, registered=0,
+                             statuses={"no_hit": 2}),
+        ]
+
+    def test_split_points_sum_to_host_certified(self):
+        point = lrc.build_report(self._pool())["host_derive_dev_derive_on"]
+        assert point["n"] == 4 and point["accepted"] == 3
+        assert point["model_read"]["n"] == 4 and point["model_read"]["accepted"] == 1
+        assert point["prefetched"]["n"] == 4 and point["prefetched"]["accepted"] == 2
+        assert point["prefetched"]["wrong"] == 1 and point["model_read"]["wrong"] == 0
+        assert point["prefetched"]["by_model"]["m2"]["accepted"] == 1
+        assert point["model_read"]["by_model"]["m1"]["accepted"] == 1
+
+    def test_host_vs_chain_carries_both_new_operating_points(self):
+        hvc = lrc.build_report(self._pool())["host_vs_chain"]
+        assert hvc["host_certified_model_read"]["accepted"] == 1
+        assert hvc["host_certified_prefetched"]["accepted"] == 2
+        assert hvc["host_certified"]["accepted"] == 3
+
+    def test_prefetch_availability_table_by_model(self):
+        pfa = lrc.build_report(self._pool())["host_prefetch_availability"]
+        pooled = pfa["pooled"]
+        assert pooled == {"n": 4, "n_with_prefetch": 3, "n_registered_any": 2,
+                          "pages_registered": 3, "n_used_prefetched": 2,
+                          "n_certified_prefetched": 2,
+                          "statuses": {"covered": 1, "no_hit": 2, "prefetched": 3}}
+        assert pfa["by_model"]["m2"]["n_with_prefetch"] == 2
+        assert pfa["by_model"]["m2"]["statuses"] == {"no_hit": 2, "prefetched": 2}
+        assert pfa["by_model"]["m1"]["pages_registered"] == 1
+
+    def test_cells_lacking_the_new_keys_still_build_and_print(self, capsys):
+        # Pre-provenance classified cells (no host_used_prefetched etc.) must aggregate as
+        # all-model-read/no-prefetch rather than crash.
+        pool = [_host_cell("h1.json", "210", "m1", wrong=False, host_certified=True,
+                           host_available=True, reason="computed", value_correct=True)]
+        report = lrc.build_report(pool)
+        assert report["host_derive_dev_derive_on"]["prefetched"]["accepted"] == 0
+        assert report["host_derive_dev_derive_on"]["model_read"]["accepted"] == 0  # key absent
+        assert report["host_prefetch_availability"]["pooled"]["n_with_prefetch"] == 0
+        lrc.print_report(report)
+        out = capsys.readouterr().out
+        assert "split by page provenance" in out
+        assert "host_prefetch availability by model" in out
+        assert "host_certified_prefetched" in out
+
+    def test_print_report_renders_the_split(self, capsys):
+        lrc.print_report(lrc.build_report(self._pool()))
+        out = capsys.readouterr().out
+        assert "pooled/model_read" in out and "pooled/prefetched" in out
+        assert "m2/prefetched" in out

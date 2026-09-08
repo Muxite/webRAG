@@ -3,7 +3,7 @@ from agent.app.connector_http import ConnectorHttp
 from agent.app.connector_llm import is_infra_llm_failure
 from shared.connector_config import ConnectorConfig
 from shared.request_result import RequestResult
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Tuple
 
 # Brave Web Search hard limits: the `q` param is capped at 400 chars / 50 words and count at 20.
 # Exceeding them returns HTTP 422 (Unprocessable Entity), which is a NON-retried permanent error
@@ -353,6 +353,11 @@ class ConnectorSearch(ConnectorHttp):
             raise RuntimeError(f"Search parse failed: {data} ({exc})")
 
 
+#: Every name ``create_search_backend`` dispatches on. Anything else raises, it does not fall
+#: through to the paid default.
+SEARCH_PROVIDERS: Tuple[str, ...] = ("serper", "brave", "searxng", "corpus")
+
+
 def create_search_backend(config: ConnectorConfig) -> ConnectorSearch:
     """
     Factory for search backends from ``ConnectorConfig.search_provider``.
@@ -371,6 +376,14 @@ def create_search_backend(config: ConnectorConfig) -> ConnectorSearch:
     :returns: Concrete ``ConnectorSearch`` subclass.
     """
     provider = (config.search_provider or "serper").strip().lower()
+    if provider not in SEARCH_PROVIDERS:
+        # Fail CLOSED. This used to log a warning and fall through to Serper, which is the PAID
+        # backend: a typo in SEARCH_PROVIDER on a "$0 local" run silently billed the Serper key
+        # (see memory: search-provider paid-default trap). Unset/empty still defaults to serper
+        # above -- that is the documented default -- but an explicit unknown name is an error.
+        raise ValueError(
+            f"Unknown SEARCH_PROVIDER={provider!r}; valid providers: "
+            f"{', '.join(SEARCH_PROVIDERS)}")
     if provider == "brave":
         return ConnectorSearch(config)
     if provider == "searxng":
@@ -384,8 +397,6 @@ def create_search_backend(config: ConnectorConfig) -> ConnectorSearch:
         from agent.app.connector_search_corpus import ConnectorSearchCorpus
 
         return ConnectorSearchCorpus(config)
-    if provider != "serper":
-        config.logger.warning("Unknown SEARCH_PROVIDER=%s; using serper", provider)
     # Lazy import: connector_search_serper.py imports FROM this module (ConnectorSearch, _collect),
     # so importing it back at module load time would be circular. Importing here, inside the
     # function body, defers it until first call — both modules are already fully loaded by then.

@@ -36,6 +36,17 @@ Usage (from the repo root)::
     PYTHONPATH=.:services:agent ./.venv/bin/python scripts/host_derive_replay.py \
         --prefixes mint02 --rankers hand_rule --out-dir /tmp/hd
 
+``--prefetch`` (the availability drive, ``docs/handoffs/AVAILABILITY_DRIVE_HANDOFF_2026-09-08.md``)
+runs ``agent.app.host_prefetch.host_prefetch`` ONCE per cell before the rankers, so the cells the
+model never fetched a page for -- mint03's ``no_pages`` bucket, which the plain replay SKIPS --
+become replay subjects. Prefetched pages are registered on every ranker's kit with
+``source=host_prefetch``, and every row records whether a selected slot landed on one
+(``prefetch_used``). It goes to the network (search + page visits) through the web-fixture cache:
+``IDEA_TEST_FIXTURES`` is forced to ``replay`` (load-or-fetch-and-save) when unset, so a rerun
+is $0 and deterministic; ``record`` is never forced because it never loads and would re-bill.
+The report then states BOTH denominators: every cell including ``no_pages``, and the
+stored-page cells the plain replay is defined over.
+
 Outputs (under ``--out-dir``): ``rows.jsonl`` (one row per (cell, ranker), the full record
 including per-slot operand choices), ``summary.json`` (every table the report prints), and
 ``report.txt`` (the printed report). Deterministic: files are processed in sorted order and
@@ -44,7 +55,9 @@ nothing here samples.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
+import os
 import sys
 import time
 from collections import Counter, defaultdict
@@ -91,6 +104,15 @@ FORENSICS_PRINT_CAP = 40
 #: sequential_react cell as ``no_pages`` -- see the doc's "§15 Correction".
 PAGE_SOURCES: Tuple[str, ...] = ("output", "evidence_graph", "none")
 
+#: ``page_source`` value for a cell that had NO stored pages and was replayed only because
+#: ``--prefetch`` fetched some. Distinct from the two storage locations above on purpose: an
+#: availability number on these cells is a claim about the prefetcher, not about the run.
+PREFETCHED_PAGE_SOURCE = "prefetched"
+
+#: The ``source`` tag prefetched pages carry on a kit (mirrors ``host_prefetch.PREFETCH_SOURCE``;
+#: read from the module when it is importable so the two can never drift silently).
+PREFETCH_SOURCE_FALLBACK = "host_prefetch"
+
 
 def cell_pages(raw: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], str]:
     """``(pages, page_source)`` for one loaded cell dict.
@@ -116,8 +138,11 @@ def cell_pages(raw: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], str]:
     return [], "none"
 
 
-def skip_reason(raw: Dict[str, Any]) -> Optional[str]:
+def skip_reason(raw: Dict[str, Any], *, allow_no_pages: bool = False) -> Optional[str]:
     """Why this cell cannot be replayed, or ``None`` when it can.
+
+    ``allow_no_pages`` is the ``--prefetch`` switch: a cell with no stored pages is exactly the
+    cell the prefetcher exists for, so under prefetch it is a replay subject, not a skip.
 
     Precedence is fixed so the counters partition the skipped set: ``infra_failed`` (the run did
     not really happen), then ``no_run_config`` (arm undeterminable -- ``run_config`` is null on
@@ -129,7 +154,7 @@ def skip_reason(raw: Dict[str, Any]) -> Optional[str]:
         return "infra_failed"
     if not (raw.get("run_config") or {}):
         return "no_run_config"
-    if not cell_pages(raw)[0]:
+    if not allow_no_pages and not cell_pages(raw)[0]:
         return "no_pages"
     return None
 
@@ -169,9 +194,116 @@ def task_statement(test_id: str) -> Optional[str]:
         return None
 
 
+# ---------------------------------------------------------------------------------------------
+# --prefetch support
+# ---------------------------------------------------------------------------------------------
+
+def prefetch_source() -> str:
+    """The ``source`` tag prefetched pages are registered under."""
+    try:
+        from agent.app.host_prefetch import PREFETCH_SOURCE  # lazy: Lane-2 module, optional
+        return str(PREFETCH_SOURCE)
+    except Exception:  # noqa: BLE001 -- module absent or mid-landing: use the agreed literal
+        return PREFETCH_SOURCE_FALLBACK
+
+
+def register_page_compat(toolkit: Any, url: str, text: str, **kwargs: Any) -> str:
+    """``toolkit.register_page`` with the provenance kwargs when the toolkit accepts them.
+
+    The kwargs (``source``/``max_chars``/``structured``) are the extended signature; a toolkit
+    predating it takes ``(url, text)`` only. Falling back keeps the page registered either way --
+    provenance is then simply not recorded on the artifact, which the replay row still carries
+    through its own ``prefetched_page_ids``.
+    """
+    if not kwargs:
+        return str(toolkit.register_page(url, text))
+    try:
+        return str(toolkit.register_page(url, text, **kwargs))
+    except TypeError:
+        return str(toolkit.register_page(url, text))
+
+
+def register_stored_pages(toolkit: Any, pages: Sequence[Dict[str, Any]]) -> None:
+    for page in pages:
+        toolkit.register_page(str(page.get("url") or ""), str(page.get("text") or ""))
+
+
+def run_prefetch(toolkit: Any, statement: str, prefetcher: Any
+                 ) -> Tuple[Dict[str, Any], List[Tuple[str, str, Any]]]:
+    """Run ``prefetcher(toolkit, statement)`` once and capture every page it registered.
+
+    The capture is an INSTANCE-level wrapper around ``toolkit.register_page`` (delegating to the
+    bound original), so it records ``(url, text, structured)`` exactly as the prefetcher handed
+    them over -- independent of how the toolkit stores pages internally, and without a second
+    accessor that could disagree with the kit's own ``registered_urls()``/artifact view. The
+    summary the prefetcher returns is passed through untouched; an exception becomes an
+    ``{"error": ...}`` summary rather than aborting the cell.
+    """
+    captured: List[Tuple[str, str, Any]] = []
+    original = toolkit.register_page
+
+    def capturing_register_page(url: str, text: str, **kwargs: Any) -> str:
+        captured.append((str(url or ""), str(text or ""), kwargs.get("structured")))
+        return register_page_compat(_Original(original), url, text, **kwargs)
+
+    toolkit.register_page = capturing_register_page
+    try:
+        summary = prefetcher(toolkit, statement)
+    except Exception as exc:  # noqa: BLE001 -- a prefetch failure is a row fact, not a crash
+        summary = {"error": f"{type(exc).__name__}: {exc}", "registered": len(captured)}
+    finally:
+        del toolkit.register_page  # restore the class method
+    if not isinstance(summary, dict):
+        summary = {"error": f"prefetcher returned {type(summary).__name__}",
+                   "registered": len(captured)}
+    return summary, captured
+
+
+class _Original:
+    """Adapter so :func:`register_page_compat` can call a captured bound method."""
+
+    def __init__(self, bound: Any) -> None:
+        self.register_page = bound
+
+
+def make_live_prefetcher(loop: asyncio.AbstractEventLoop, *, http: Any, search: Any) -> Any:
+    """A ``prefetcher(kit, mandate) -> summary`` bound to real connectors on ``loop``.
+
+    ``host_prefetch`` is imported lazily and per call so the replay's plain mode never depends
+    on it and a missing module surfaces as a per-cell ``error`` summary, not an import error at
+    startup.
+    """
+    def prefetcher(kit: Any, mandate: str) -> Dict[str, Any]:
+        from agent.app.host_prefetch import host_prefetch
+        return loop.run_until_complete(host_prefetch(kit, mandate, http=http, search=search))
+    return prefetcher
+
+
+def slug_coverage(entity: Any, url: str) -> Optional[float]:
+    """Fraction of ``entity``'s significant tokens the URL slug of ``url`` carries.
+
+    Local re-implementation of ``LedgerToolkit._host_derive_slug_coverage`` (same tokeniser,
+    same slug rule) so the forensics can run over a stored row's ``url`` without a toolkit.
+    ``None`` when the entity has no significant token to match on.
+    """
+    from urllib.parse import unquote, urlparse
+    from agent.app.operand_attribution import _significant_tokens, _tokens
+    wanted = set(_significant_tokens(entity))
+    if not wanted:
+        return None
+    slug = unquote(urlparse(str(url or "")).path).rsplit("/", 1)[-1].replace("_", " ")
+    return len(wanted & set(_tokens(slug))) / len(wanted)
+
+
 def replay_cell(path: Path, raw: Dict[str, Any], ranker_names: Sequence[str],
-                prefixes: Sequence[str]) -> List[Dict[str, Any]]:
+                prefixes: Sequence[str], *, prefetcher: Any = None) -> List[Dict[str, Any]]:
     """One JSONL row per ranker for a single cell (never raises).
+
+    With ``prefetcher`` set (``--prefetch``), it is called ONCE per cell -- against a scratch kit
+    holding the stored pages, so it sees what the run had and does not refetch it -- and the
+    pages it registered are re-registered on every ranker's kit after the stored ones, tagged
+    with the prefetch source. Rankers must not share the prefetch call: a second call would
+    repeat the network round-trips and could register a different page set per ranker.
 
     The toolkit is rebuilt per ranker because ``host_derive`` MINTS nodes into the toolkit's
     graph: reusing one across rankers would let the first ranker's nodes exist while the second
@@ -188,6 +320,18 @@ def replay_cell(path: Path, raw: Dict[str, Any], ranker_names: Sequence[str],
     )
     test_id = classified["test_id"]
     statement = task_statement(test_id)
+
+    prefetch_summary: Optional[Dict[str, Any]] = None
+    prefetched: List[Tuple[str, str, Any]] = []
+    if prefetcher is not None:
+        if statement is not None:
+            scratch = LedgerToolkit()
+            register_stored_pages(scratch, pages)
+            prefetch_summary, prefetched = run_prefetch(scratch, statement, prefetcher)
+        else:
+            prefetch_summary = {"error": "no_task_module", "registered": 0}
+        if not pages:
+            page_source = PREFETCHED_PAGE_SOURCE
 
     rows: List[Dict[str, Any]] = []
     for ranker_name in ranker_names:
@@ -206,6 +350,9 @@ def replay_cell(path: Path, raw: Dict[str, Any], ranker_names: Sequence[str],
             "n_pages": len(pages),
             "page_source": page_source,
         }
+        if prefetcher is not None:
+            base.update({"prefetch": prefetch_summary, "n_prefetched": len(prefetched),
+                         "prefetch_used": False, "prefetched_page_ids": []})
         if statement is None:
             rows.append({**base, "reason": "no_task_module", "value": None, "unit": "",
                          "winner_entity": None, "agrees_final": False, "agrees_any": False,
@@ -215,10 +362,19 @@ def replay_cell(path: Path, raw: Dict[str, Any], ranker_names: Sequence[str],
                          "slots": []})
             continue
         toolkit = LedgerToolkit()
-        for page in pages:
-            toolkit.register_page(str(page.get("url") or ""), str(page.get("text") or ""))
+        register_stored_pages(toolkit, pages)
+        prefetched_ids: List[str] = []
+        for url, text, entries in prefetched:
+            prefetched_ids.append(register_page_compat(
+                toolkit, url, text, source=prefetch_source(), max_chars=len(text),
+                structured=entries))
         hd = toolkit.host_derive(statement, ranker=_make_ranker(ranker_name),
                                  min_score=_min_score_for(ranker_name))
+        if prefetcher is not None:
+            used = {str(s.get("page_id")) for s in (hd.get("slots") or [])
+                    if s.get("reason") == "selected"}
+            base["prefetched_page_ids"] = prefetched_ids
+            base["prefetch_used"] = bool(used & set(prefetched_ids))
         agreement = LRC.host_agrees(hd, deliverable, final_numbers, test_id)
         detail = LRC.host_value_correct_detail(hd, test_id)
         host_certified = bool(agreement["available"] and agreement["agrees_final"]
@@ -248,8 +404,12 @@ def replay_cell(path: Path, raw: Dict[str, Any], ranker_names: Sequence[str],
 
 
 def replay(files: Sequence[Path], ranker_names: Sequence[str],
-           prefixes: Sequence[str]) -> Tuple[List[Dict[str, Any]], Counter]:
+           prefixes: Sequence[str], *, prefetcher: Any = None
+           ) -> Tuple[List[Dict[str, Any]], Counter]:
     """Replay every file; returns ``(rows, skip_counter)``.
+
+    With ``prefetcher`` set, ``no_pages`` cells are replayed (counted under
+    ``pages_prefetched`` / ``<prefix>|pages_prefetched``) instead of skipped.
 
     ``skip_counter`` also carries ``files``, ``unreadable``, ``replayed`` and one
     ``pages_<source>`` key per :data:`PAGE_SOURCES` entry so the report can
@@ -268,7 +428,7 @@ def replay(files: Sequence[Path], ranker_names: Sequence[str],
             skips["unreadable"] += 1
             skips[f"{prefix}|unreadable"] += 1
             continue
-        reason = skip_reason(raw)
+        reason = skip_reason(raw, allow_no_pages=prefetcher is not None)
         if reason is not None:
             skips[reason] += 1
             skips[f"{prefix}|{reason}"] += 1
@@ -276,9 +436,11 @@ def replay(files: Sequence[Path], ranker_names: Sequence[str],
         skips["replayed"] += 1
         skips[f"{prefix}|replayed"] += 1
         source = cell_pages(raw)[1]
+        if prefetcher is not None and source == "none":
+            source = PREFETCHED_PAGE_SOURCE
         skips[f"pages_{source}"] += 1
         skips[f"{prefix}|pages_{source}"] += 1
-        rows.extend(replay_cell(path, raw, ranker_names, prefixes))
+        rows.extend(replay_cell(path, raw, ranker_names, prefixes, prefetcher=prefetcher))
     return rows, skips
 
 
@@ -399,10 +561,52 @@ def forensics(rows: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return out
 
 
+def prefetched_wrong_page(rows: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Selected slots that landed on a PREFETCHED page whose URL slug does not name the slot's
+    entity -- the prefetcher fetched *a* page, not necessarily the entity's page.
+
+    Same two-part rule as the toolkit's candidate filter (``_host_derive_candidate_pages``): the
+    slug carries NONE of the entity's significant tokens, or it names one of the row's OTHER
+    entities strictly better ("Lake_Tanganyika" for a "Lake Baikal" slot covers 0.5 of the
+    entity but 1.0 of its rival). Partial self-coverage alone ("GRES-2_Power_Station" for
+    "GRES-2 Power Station chimney") is the page's own article and is not flagged.
+    """
+    out = []
+    for row in rows:
+        prefetched_ids = set(row.get("prefetched_page_ids") or [])
+        if not prefetched_ids:
+            continue
+        slots = row.get("slots") or []
+        for slot in slots:
+            if slot.get("reason") != "selected" or str(slot.get("page_id")) not in prefetched_ids:
+                continue
+            url = str(slot.get("url") or "")
+            cover = slug_coverage(slot.get("entity"), url)
+            if cover is None:
+                continue
+            rival_cover = max((slug_coverage(other.get("entity"), url) or 0.0)
+                              for other in slots if other is not slot) if len(slots) > 1 else 0.0
+            if cover > 0 and rival_cover <= cover:
+                continue
+            out.append({"file": row["file"], "ranker": row["ranker"], "test_id": row["test_id"],
+                        "model": row["model"], "host": row["host"],
+                        "entity": slot.get("entity"), "url": slot.get("url"),
+                        "page_id": slot.get("page_id"), "slug_coverage": cover,
+                        "rival_slug_coverage": rival_cover,
+                        "value_correct": row.get("value_correct"),
+                        "reason": row.get("reason")})
+    return out
+
+
 def build_summary(rows: Sequence[Dict[str, Any]], *, skips: Counter, prefixes: Sequence[str],
                   ranker_names: Sequence[str], results_dir: str, out_dir: str,
-                  wall_seconds: float) -> Dict[str, Any]:
-    """Every table the report prints, as plain JSON (the gate artifact for Phase 3)."""
+                  wall_seconds: float, prefetch: bool = False) -> Dict[str, Any]:
+    """Every table the report prints, as plain JSON (the gate artifact for Phase 3).
+
+    ``prefetch`` adds the ``--prefetch`` tables (both denominators, the ``by_prefetch_used``
+    splits and the ``prefetched_wrong_page`` forensics); when False the summary is byte-identical
+    to the pre-prefetch script's.
+    """
     by_ranker = _by_ranker(rows)
     dev = [r for r in rows if r.get("split") == "dev"]
     holdout = [r for r in rows if r.get("split") == "holdout"]
@@ -427,7 +631,7 @@ def build_summary(rows: Sequence[Dict[str, Any]], *, skips: Counter, prefixes: S
                            for host, hsub in _group(sub, "host").items()}
                     for name, sub in _by_ranker(rows).items()}
 
-    return {
+    summary = {
         "meta": {
             "prefixes": list(prefixes), "rankers": list(ranker_names),
             "results_dir": results_dir, "out_dir": out_dir,
@@ -495,6 +699,59 @@ def build_summary(rows: Sequence[Dict[str, Any]], *, skips: Counter, prefixes: S
         },
         "forensics": forensics(rows),
     }
+    if prefetch:
+        stored_rows = [r for r in rows if r.get("page_source") != PREFETCHED_PAGE_SOURCE]
+        summary["meta"]["prefetch"] = True
+        summary["meta"]["prefetch_source"] = prefetch_source()
+        summary["counts"]["page_source"][PREFETCHED_PAGE_SOURCE] = \
+            skips.get(f"pages_{PREFETCHED_PAGE_SOURCE}", 0)
+        for prefix in prefixes:
+            summary["counts"]["by_prefix"][prefix][f"pages_{PREFETCHED_PAGE_SOURCE}"] = \
+                skips.get(f"{prefix}|pages_{PREFETCHED_PAGE_SOURCE}", 0)
+        # The two denominators, stated once and named: every rate elsewhere in this summary is
+        # over ALL replayed cells (incl. the no_pages bucket); ``stored_page_cells`` is the plain
+        # replay's population, so the two runs are comparable on it.
+        summary["counts"]["denominators"] = {
+            "all_cells_incl_no_pages": skips.get("replayed", 0),
+            "stored_page_cells": skips.get("replayed", 0)
+                                 - skips.get(f"pages_{PREFETCHED_PAGE_SOURCE}", 0),
+            "rows_all": len(rows), "rows_stored_page_cells": len(stored_rows),
+        }
+        summary["availability"]["by_prefetch_used"] = {
+            name: {used: availability(sub2) for used, sub2 in _group(sub, "prefetch_used").items()}
+            for name, sub in by_ranker.items()}
+        summary["availability"]["stored_page_cells"] = {
+            name: availability(sub) for name, sub in _by_ranker(stored_rows).items()}
+        summary["value_correct"]["by_prefetch_used"] = {
+            name: {used: value_correct(sub2)
+                   for used, sub2 in _group(sub, "prefetch_used").items()}
+            for name, sub in by_ranker.items()}
+        summary["value_correct"]["stored_page_cells"] = {
+            name: value_correct(sub) for name, sub in _by_ranker(stored_rows).items()}
+        summary["prefetch"] = {
+            "rows_prefetch_used": sum(1 for r in rows if r.get("prefetch_used")),
+            "cells_with_prefetched_pages": len({r["file"] for r in rows
+                                                if r.get("n_prefetched")}),
+            "status_counts": _prefetch_status_counts(rows),
+            "errors": sorted({str((r.get("prefetch") or {}).get("error"))
+                              for r in rows if (r.get("prefetch") or {}).get("error")}),
+        }
+        summary["prefetched_wrong_page"] = prefetched_wrong_page(rows)
+    return summary
+
+
+def _prefetch_status_counts(rows: Sequence[Dict[str, Any]]) -> Dict[str, int]:
+    """Entity-level ``status`` histogram from the per-cell prefetch summaries (one per cell,
+    not per row: the summary is shared across a cell's rankers)."""
+    seen = set()
+    counts: Counter = Counter()
+    for row in rows:
+        if row["file"] in seen:
+            continue
+        seen.add(row["file"])
+        for ent in ((row.get("prefetch") or {}).get("entities") or []):
+            counts[str(ent.get("status"))] += 1
+    return dict(sorted(counts.items()))
 
 
 # ---------------------------------------------------------------------------------------------
@@ -538,6 +795,13 @@ def format_report(summary: Dict[str, Any]) -> str:
                f"skipped={counts['skipped']}")
     out.append(f"page_source={counts.get('page_source', {})}  "
                "(evidence_graph = sequential_react cells, invisible before the §15 correction)")
+    if meta.get("prefetch"):
+        den = counts.get("denominators", {})
+        out.append(f"PREFETCH ON (source={meta.get('prefetch_source')}): denominators -- "
+                   f"all cells incl. no_pages = {den.get('all_cells_incl_no_pages')} "
+                   f"({den.get('rows_all')} rows); stored-page cells = "
+                   f"{den.get('stored_page_cells')} ({den.get('rows_stored_page_cells')} rows). "
+                   "Every rate below is over ALL cells unless the block says stored_page_cells.")
     out.append(f"  {'campaign':<16}{'files':>7}{'replayed':>10}{'src:output':>12}"
                f"{'src:ev_graph':>14}{'no_pages':>10}{'infra_failed':>14}{'no_run_config':>15}")
     for prefix, row in counts.get("by_prefix", {}).items():
@@ -564,6 +828,14 @@ def format_report(summary: Dict[str, Any]) -> str:
                                    summary["availability"]["by_host"].get(name, {}))
         out += _availability_block(f"  availability by page_source [{name}]",
                                    summary["availability"]["by_page_source"].get(name, {}))
+        if meta.get("prefetch"):
+            out += _availability_block(
+                f"  availability by prefetch_used [{name}]",
+                summary["availability"].get("by_prefetch_used", {}).get(name, {}))
+            out += _availability_block(
+                f"  availability, stored-page cells only [{name}]",
+                {"stored_page_cells": summary["availability"]["stored_page_cells"][name]}
+                if name in summary["availability"].get("stored_page_cells", {}) else {})
 
     out.append("")
     out.append("(b) host_value_correct AMONG COMPUTED (primary metric)")
@@ -575,8 +847,10 @@ def format_report(summary: Dict[str, Any]) -> str:
                    f"of n={pooled.get('n')}; argmax entity-correct "
                    f"{pooled.get('argmax_correct')}/{pooled.get('argmax_assessed')} "
                    f"({_pct(pooled.get('argmax_rate')).strip()})")
-        for label, key in (("by model", "by_model"), ("by test_id", "by_test_id"),
-                           ("by host", "by_host")):
+        splits = [("by model", "by_model"), ("by test_id", "by_test_id"), ("by host", "by_host")]
+        if meta.get("prefetch"):
+            splits.append(("by prefetch_used", "by_prefetch_used"))
+        for label, key in splits:
             out.append(f"  {label} [{name}]")
             out.append(f"    {'key':<28}{'n':>6}{'computed':>10}{'assessed':>10}"
                        f"{'correct':>9}{'rate':>9}")
@@ -643,6 +917,26 @@ def format_report(summary: Dict[str, Any]) -> str:
                 for signal in SIGNALS:
                     out.append(_point_line(signal, table[signal]))
 
+    if meta.get("prefetch"):
+        pf = summary.get("prefetch", {})
+        out.append("")
+        out.append("(h) PREFETCH -- entity statuses across cells (one summary per cell)")
+        out.append(f"  cells_with_prefetched_pages={pf.get('cells_with_prefetched_pages')}  "
+                   f"rows_prefetch_used={pf.get('rows_prefetch_used')}  "
+                   f"status_counts={pf.get('status_counts')}")
+        if pf.get("errors"):
+            out.append(f"  errors ({len(pf['errors'])} distinct): "
+                       + "; ".join(pf["errors"][:FORENSICS_PRINT_CAP]))
+        wrong = summary.get("prefetched_wrong_page", [])
+        out.append(f"  prefetched_wrong_page ({len(wrong)} selected slots on a prefetched page "
+                   f"whose slug does not name the entity; first "
+                   f"{min(len(wrong), FORENSICS_PRINT_CAP)} shown)")
+        for row in wrong[:FORENSICS_PRINT_CAP]:
+            out.append(f"    {row['test_id']} {row['ranker']:<14}{row['model']:<16}"
+                       f"entity={row['entity']!r} slug_cover={row['slug_coverage']:.2f} "
+                       f"rival={row['rival_slug_coverage']:.2f} "
+                       f"value_correct={row['value_correct']} url={row['url']}")
+
     rows = summary["forensics"]
     out.append("")
     out.append(f"FORENSICS -- computed but value_correct=False ({len(rows)} rows; "
@@ -679,6 +973,41 @@ def write_outputs(out_dir: Path, rows: Sequence[Dict[str, Any]], summary: Dict[s
     return paths
 
 
+def _replay_with_prefetch(files: Sequence[Path], ranker_names: Sequence[str],
+                          prefixes: Sequence[str]) -> Tuple[List[Dict[str, Any]], Counter]:
+    """:func:`replay` behind live connectors and one event loop for the whole run.
+
+    Fixture mode follows ``scripts/prewarm_fixtures.py``: ``replay`` is forced only when
+    ``IDEA_TEST_FIXTURES`` is unset/unknown. ``record`` never loads the cache and would re-bill,
+    so it is never forced -- but an explicit setting is respected. Connectors are the prewarm
+    set minus LLM/Chroma/AgentIO: ``host_prefetch`` reads the mandate and pages, never a model.
+    """
+    mode = (os.environ.get("IDEA_TEST_FIXTURES") or "").strip().lower()
+    if mode not in ("record", "replay", "replay_strict"):
+        os.environ["IDEA_TEST_FIXTURES"] = "replay"
+        print("IDEA_TEST_FIXTURES not set to record/replay[_strict]; forcing 'replay' for "
+              "--prefetch (load-or-fetch-and-save).", file=sys.stderr)
+    from shared.connector_config import ConnectorConfig
+    from agent.app.connector_http import ConnectorHttp
+    from agent.app.connector_search import create_search_backend
+
+    config = ConnectorConfig()
+    search = create_search_backend(config)  # raises on an unknown provider: no silent paid path
+    http = ConnectorHttp(config)
+    loop = asyncio.new_event_loop()
+    try:
+        asyncio.set_event_loop(loop)
+        prefetcher = make_live_prefetcher(loop, http=http, search=search)
+        return replay(files, ranker_names, prefixes, prefetcher=prefetcher)
+    finally:
+        try:
+            loop.run_until_complete(http.__aexit__(None, None, None))
+        except Exception:  # noqa: BLE001 -- session teardown must not mask the result
+            pass
+        asyncio.set_event_loop(None)
+        loop.close()
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--prefixes", default=DEFAULT_PREFIXES,
@@ -690,6 +1019,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     help=f"comma-separated ranker names from {sorted(RANKERS)}")
     ap.add_argument("--limit", type=int, default=0,
                     help="replay only the first N cell files (smoke runs); 0 = all")
+    ap.add_argument("--prefetch", action="store_true",
+                    help="run agent.app.host_prefetch once per cell (live search + visits via the "
+                         "web-fixture cache; IDEA_TEST_FIXTURES forced to 'replay' when unset) "
+                         "and replay no_pages cells too")
     args = ap.parse_args(argv)
 
     prefixes = [p.strip() for p in args.prefixes.split(",") if p.strip()]
@@ -705,12 +1038,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         files = files[:args.limit]
 
     started = time.time()
-    rows, skips = replay(files, ranker_names, prefixes)
+    if args.prefetch:
+        rows, skips = _replay_with_prefetch(files, ranker_names, prefixes)
+    else:
+        rows, skips = replay(files, ranker_names, prefixes)
     wall = time.time() - started
 
     summary = build_summary(rows, skips=skips, prefixes=prefixes, ranker_names=ranker_names,
                             results_dir=str(results_dir), out_dir=str(args.out_dir),
-                            wall_seconds=wall)
+                            wall_seconds=wall, prefetch=bool(args.prefetch))
     report = format_report(summary)
     paths = write_outputs(Path(args.out_dir), rows, summary, report)
     print(report)
