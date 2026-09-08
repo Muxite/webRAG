@@ -41,7 +41,8 @@ from agent.app.mandate_slots import parse_slots
 # to keep in sync. Same borrowing `mandate_slots` does from `candidate_coverage`.
 from agent.app.operand_attribution import (_significant_tokens, _tokens, _unit_hints,
                                            default_ranker)
-from agent.app.quantity_index import QuantityRef, build_index, lookup, render_index
+from agent.app.quantity_index import (QuantityRef, build_index, lookup, normalize_for_match,
+                                      render_index)
 from agent.app.testing.evidence_graph import (KIND_DERIVED, DerivationError, EvidenceGraph,
                                               UnitMismatch, UnknownOperation, WrongArity,
                                               _numbers_agree, canonical_unit, canonicalize_url,
@@ -439,7 +440,14 @@ class LedgerToolkit:
             if source:
                 page["source"] = str(source)
         if structured:
-            entries = list(structured) + build_index(text or "", limit=None)
+            # A structured entry is authoritative for its number: the text scan re-reads the
+            # same rendered cell with a unit it cannot parse (`795,000 km²` -> `795,000 km`), so
+            # every scanned entry whose normalized value a structured entry already carries is
+            # dropped. Entries for OTHER numbers are kept.
+            owned = {normalize_for_match(entry.value) for entry in structured}
+            entries = list(structured) + [
+                entry for entry in build_index(text or "", limit=None)
+                if normalize_for_match(entry.value) not in owned]
         else:
             entries = build_index(text or "")
         self._indexes[page_id] = entries
@@ -1381,6 +1389,21 @@ class LedgerToolkit:
         taken.add((page_id, entry.start, entry.end))
         return row, (page_id, entry)
 
+    def _host_derive_mint(self, page_id: str, entry: Any) -> Optional[Any]:
+        """A host-tagged SOURCE node for ``entry`` carrying the CANONICAL spelling of its unit.
+
+        The graph builds a derived node's unit string from its operands' unit strings, so two
+        copies of one page -- the model's flattened window indexing `km2` and the host's rendered
+        copy indexing `km²` -- used to mint `km/km2` and `km/km²` ratios that the extremum then
+        refused as a unit mismatch. Spelling is not dimension; canonicalising it here (the same
+        :func:`canonical_unit` every unit comparison in this module already applies) means no
+        spelling ever decides a refusal. Still no conversion: `km2` and `km²` are one unit.
+        """
+        return self._mint_source_from_entry(
+            page_id, dataclasses.replace(entry, unit=canonical_unit(entry.unit) if entry.unit
+                                         else entry.unit),
+            minted_by=HOST_DERIVE_TAG)
+
     def _host_derive_compatible(self, operation: str, unit_a: str, unit_b: str) -> bool:
         """The existing per-op unit rule :meth:`audit_answer` uses, applied to a host-picked pair."""
         if operation in ("sum", "difference"):
@@ -1482,8 +1505,7 @@ class LedgerToolkit:
             values = [self._entry_numeric(entry) for _, entry in operands]
             if None not in values and values[0] < values[1]:
                 operands.reverse()
-        nodes = [self._mint_source_from_entry(page_id, entry, minted_by=HOST_DERIVE_TAG)
-                 for page_id, entry in operands]
+        nodes = [self._host_derive_mint(page_id, entry) for page_id, entry in operands]
         if any(node is None for node in nodes):
             result["reason"] = "operand_not_found"
             return result
@@ -1596,7 +1618,7 @@ class LedgerToolkit:
         ratios: List[Tuple[Any, Any]] = []
         unit_pairs: set = set()
         for slot, numerator, denominator in resolved:
-            nodes = [self._mint_source_from_entry(page_id, entry, minted_by=HOST_DERIVE_TAG)
+            nodes = [self._host_derive_mint(page_id, entry)
                      for page_id, entry in (numerator, denominator)]
             if any(node is None for node in nodes):
                 continue

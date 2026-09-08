@@ -190,13 +190,6 @@ def test_218_with_only_mekong_registered_prefetches_all_five_and_host_derive_com
     assert result["reason"] not in ("incomplete_roster", "operand_not_found", "no_pages")
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "Mixed spellings of one unit across entities: the model's flattened Mekong window indexes "
-    "its basin as `km2` while the host copies index `km²`. `_host_derive_argmax` compares them "
-    "canonically, but the per-entity RATIO nodes carry a unit string built from the raw source "
-    "units (`km/km2` vs `km/km²`) and `add_extremum` refuses them as a UnitMismatch. Fix belongs "
-    "to the ratio-unit / extremum comparison (ledger_tools / evidence_graph), not this lane; "
-    "flip this test to a plain assertion when it lands."))
 def test_218_mixed_model_window_and_host_copies_computes_the_right_winner():
     kit = LedgerToolkit()
     name, slug, length, basin = RIVERS[0]
@@ -208,7 +201,7 @@ def test_218_mixed_model_window_and_host_copies_computes_the_right_winner():
     result = kit.host_derive(statement("218"))
     assert result["reason"] == "computed"
     assert result["winner_entity"] == "Mekong"
-    assert result["value"] == pytest.approx(4909 * 1000 / 795_000, rel=1e-6)
+    assert result["value"] == pytest.approx(4909 / 795_000, abs=1e-6)  # host rounds to 6 dp
 
 
 def test_the_stored_page_is_the_full_text_and_its_hash_matches():

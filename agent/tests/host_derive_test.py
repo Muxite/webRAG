@@ -867,3 +867,31 @@ def test_the_shared_unit_never_admits_an_entry_below_the_ranker_floor(kit):
 
     assert result["reason"] == "unit_inconsistent_across_entities"
     assert all(row["score"] >= 0.93 for row in _selected(result))
+
+
+# --------------------------------------------------------------------------------------------
+# Unit SPELLING never decides: the model's window and the host's prefetched copy of one page
+# index the same unit as `km2` and `km²`.
+# --------------------------------------------------------------------------------------------
+
+
+def test_two_copies_of_one_page_spelling_a_unit_differently_still_compute(kit):
+    """218 with Mekong registered TWICE -- the model's flattened window (`km\\n2` -> km2) and the
+    host's rendered copy (`km²`). Both canonicalise to km2, so the per-entity ratio units must
+    agree whichever copy each slot read from; spelling used to leak into the ratio node's unit
+    string (`km/km2` vs `km/km²`) and the extremum refused."""
+    for name, slug, length, basin in RIVERS[1:]:
+        kit.register_page(_wiki(slug), _river_page(name, length, basin))
+    name, slug, length, basin = RIVERS[0]
+    kit.register_page(_wiki(slug), _river_page(name, length, basin))
+    kit.register_page(_wiki(slug) + "?copy=host", f"{name}\n{name} is a major river.\n"
+                      f"Length\n{length}\nkm\nBasin size\n{basin}\nkm²\n")
+
+    result = kit.host_derive(statement("218"))
+
+    assert result["reason"] == "computed"
+    assert result["winner_entity"] == "Mekong"
+    ratios = [_node(kit, node_id) for node_id in _node(kit, result["node_id"])["input_ids"]]
+    assert {node["unit"] for node in ratios} == {"km/km2"}
+    assert all(node["unit"] in ("km", "km2") for node in kit.artifact()["nodes"]
+               if node["kind"] == "source")

@@ -1015,24 +1015,26 @@ def test_source_is_recorded_on_the_artifact_page_only_when_given():
 def test_structured_entries_come_first_in_the_pages_index_and_resolve_by_id():
     """Entries a prefetcher extracted structurally (an infobox table) are PREPENDED to the
     text-scan entries, and the run-wide ``q`` numbering counts them, so an id names the same
-    quantity in the rendered index, in `_resolve_id`, and in a `derive` call."""
+    quantity in the rendered index, in `_resolve_id`, and in a `derive` call. The text scan's own
+    reading of the SAME number (`Floor count 94`) is dropped in favour of the structured one;
+    a number only the scan saw (`12 m`) is kept after it."""
     kit = LedgerToolkit()
     kit.register_page("https://example.com/first", PAGE)  # q1, q2 from the text scan
-    text = "Tower\nHeight\n12\nm\n"
-    structured = [QuantityRef(label="Floor count", value="12", unit="count",
-                              start=text.index("12"), end=text.index("12") + 2,
+    text = "Tower\nFloor count\n94\nHeight\n12\nm\n"
+    structured = [QuantityRef(label="Floor count", value="94", unit="count",
+                              start=text.index("94"), end=text.index("94") + 2,
                               source="structured")]
 
     page_id = kit.register_page("https://example.com/tower", text, structured=structured)
 
     entries = kit._indexes[page_id]
     assert entries[0] is structured[0]
-    assert [entry.unit for entry in entries] == ["count", "m"]
-    assert kit.page_index_text(page_id).startswith("q3: Floor count = 12 count")
+    assert [(entry.value, entry.unit) for entry in entries] == [("94", "count"), ("12", "m")]
+    assert kit.page_index_text(page_id).startswith("q3: Floor count = 94 count")
     assert kit._resolve_id("q3") == (page_id, structured[0])
     assert kit._resolve_id("q4")[1].unit == "m"
     observation = kit.derive("sum", ["q3", "q3"])
-    assert "24" in observation and "count" in observation
+    assert "188" in observation and "count" in observation
     source = next(node for node in kit.artifact()["nodes"]
                   if node["kind"] == "source" and node.get("unit") == "count")
     assert source["quote_verified"] is True
@@ -1053,3 +1055,35 @@ def test_registered_urls_are_the_canonical_form_of_every_registered_page():
 
     assert kit.registered_urls() == {"https://en.wikipedia.org/wiki/Lake_Baikal",
                                      "https://example.com/a?x=1"}
+
+
+def test_structured_entries_are_authoritative_for_the_numbers_they_carry():
+    """A rendered infobox line is scanned by the text pass too, which re-reads `795,000 km²` as
+    a wrong-unit `795,000 km` prose entry. A structured entry owns its number: every text-scan
+    entry with the same normalized value is dropped, the rest are kept."""
+    from agent.app.quantity_index import normalize_for_match
+    from agent.app.testing.evidence_graph import canonical_unit
+
+    text = "Mekong\nBasin size: 795,000 km² (307,000 mi²)\nThe river is 4,909 km long.\n"
+    structured = [
+        QuantityRef(label="Basin size", value="795,000", unit="km²", start=text.index("795,000"),
+                    end=text.index("795,000") + 7, source="infobox"),
+        QuantityRef(label="Basin size", value="307,000", unit="mi²", start=text.index("307,000"),
+                    end=text.index("307,000") + 7, source="infobox"),
+    ]
+    kit = LedgerToolkit()
+    page_id = kit.register_page("https://en.wikipedia.org/wiki/Mekong", text,
+                                structured=structured)
+
+    entries = kit._indexes[page_id]
+    by_value = {}
+    for entry in entries:
+        by_value.setdefault(normalize_for_match(entry.value), []).append(entry)
+    assert len(by_value[normalize_for_match("795,000")]) == 1
+    assert canonical_unit(by_value[normalize_for_match("795,000")][0].unit) == "km2"
+    assert canonical_unit(by_value[normalize_for_match("307,000")][0].unit) == "mi2"
+    assert [e.value for e in entries[:2]] == ["795,000", "307,000"]
+    assert any(e.value == "4,909" and e.unit == "km" for e in entries), "the rest is kept"
+    assert kit._resolve_id("q1") == (page_id, structured[0])
+    assert kit._resolve_id(f"q{len(entries)}")[0] == page_id
+    assert "REFUSED" not in kit.derive("sum", ["q1", "q1"])
