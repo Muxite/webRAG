@@ -35,9 +35,9 @@ candidates from the API are ordered structurally (slug coverage of the entity's 
 tokens, un-parenthesised first, then API rank, then field-phrase tokens in the snippet), and
 then EVERY acceptable candidate is fetched and read: for each field phrase the mandate asks of
 the entity (218 asks Mississippi for a length AND a basin area), the page's quantity-bearing
-infobox labels (:func:`infobox_quantities`) are scored by how many of that phrase's tokens they
-cover between them; the candidate with the highest sum wins, an exact title breaking ties before
-API rank. A candidate with no infobox, or none of whose rows share a token with any phrase, is
+infobox labels and section headers (:func:`infobox_quantities`) are scored by how many of that
+phrase's tokens they cover between them; the candidate covering the most phrases wins, then the
+most tokens, then the exact title, then API rank. A candidate with no infobox, or none of whose rows share a token with any phrase, is
 out. There is deliberately NO exact-title early accept: the live replay resolved "Mississippi"
 to the STATE that way, because its ``Area • Total`` row shares the token ``area`` -- the river's
 ``Length`` + ``Basin size`` only wins when both pages are read and compared. No entity type is
@@ -133,7 +133,9 @@ def _candidates(hits: Sequence[Tuple[str, str]], entity: str, field_phrase: str)
             title=clean_title, snippet=plain_snippet, rank=rank, coverage=coverage,
             parenthetical=bool(_PARENTHETICAL.search(clean_title)),
             snippet_hits=len(field_tokens & set(_tokens(plain_snippet))),
-            exact=(slug == set(_tokens(entity)) and not _PARENTHETICAL.search(clean_title)),
+            # Case-, underscore- and punctuation-insensitive (token sets), and a trailing
+            # parenthetical is already stripped by `_slug_tokens`.
+            exact=(slug == set(_tokens(entity))),
         ))
     out.sort(key=_Candidate.sort_key)
     return out
@@ -168,12 +170,20 @@ def _parsed(html: str) -> _ParsedPage:
     return hit
 
 
-def _field_coverage(html: str, field_phrases: Sequence[str]) -> int:
-    """The verification score: summed over ``field_phrases``, how many of each phrase's content
-    tokens the page's quantity-bearing infobox labels cover between them. ``0`` for a page with
-    no row sharing a token with any phrase (no infobox included)."""
-    labels = [_content_tokens(entry.label) for entry in _parsed(html).entries]
-    score = 0
+def _field_coverage(html: str, field_phrases: Sequence[str]) -> Tuple[int, int]:
+    """The verification score as ``(phrases covered, tokens covered)``.
+
+    A row's label AND its infobox section header (:attr:`QuantityRef.section`, read with a
+    default so older entries still score) both count -- the same reading the ranker's
+    ``_label_feature`` applies -- so a real page's nested ``Architectural`` row under a
+    ``Height`` header is not out-scored by a lesser page's flat ``Height`` row (the 221 replay
+    resolved Burj Khalifa to Burj Azizi and Shanghai Tower to Jin Mao Tower that way). The first
+    element is how many of ``field_phrases`` have ANY covered token, the second the summed token
+    count; ``(0, 0)`` for a page with no row sharing a token with any phrase.
+    """
+    labels = [_content_tokens(f"{getattr(entry, 'section', '') or ''} {entry.label}")
+              for entry in infobox_quantities(html)]
+    phrases_hit = tokens_hit = 0
     for phrase in field_phrases:
         field_tokens = _content_tokens(phrase)
         if not field_tokens:
@@ -181,8 +191,10 @@ def _field_coverage(html: str, field_phrases: Sequence[str]) -> int:
         covered: Set[str] = set()
         for label_tokens in labels:
             covered |= label_tokens & field_tokens
-        score += len(covered)
-    return score
+        if covered:
+            phrases_hit += 1
+            tokens_hit += len(covered)
+    return phrases_hit, tokens_hit
 
 
 def _as_text(data: Any) -> str:
@@ -259,22 +271,30 @@ async def _web_hits(search: Any, entity: str, field_phrase: str) -> List[Tuple[s
 
 async def _verify(http: Any, candidates: Sequence[_Candidate],
                   field_phrases: Sequence[str]) -> Tuple[Optional[Tuple[str, str]], int]:
-    """Fetch every candidate and pick the :func:`_field_coverage` argmax.
+    """Fetch EVERY candidate (an exact-title one is never pruned before it is read) and pick by
+    :func:`_field_coverage`: most field phrases covered first, then most tokens, then the
+    exact-title candidate, then API rank.
 
-    :returns: ``((url, html) or None, fetches)``. Ties go to an exact-title candidate, then to
-        the earlier one in ``candidates`` order (API rank). A zero score is never picked.
+    The structural title rule this encodes: an exact-title candidate with any coverage wins
+    unless another candidate covers strictly MORE of the mandate's field phrases (or, on a tie,
+    more of their tokens). Mississippi (state, ``Area``) vs Mississippi River (``Length``,
+    ``Basin size``): the river covers more -> river. Burj Khalifa (exact; ``Height`` section over
+    ``Architectural``, ``Floor count``) vs Burj Azizi (flat ``Height``, ``Floor count``): equal
+    coverage -> the exact title.
+
+    :returns: ``((url, html) or None, fetches)``. A zero score is never picked.
     """
-    best: Optional[Tuple[Tuple[int, int, int], str, str]] = None
+    best: Optional[Tuple[Tuple[int, int, int, int], str, str]] = None
     fetches = 0
     for order, candidate in enumerate(candidates):
         html = await _fetch(http, candidate.url)
         fetches += 1
         if html is None:
             continue
-        score = _field_coverage(html, field_phrases)
-        if score <= 0:
+        phrases_hit, tokens_hit = _field_coverage(html, field_phrases)
+        if phrases_hit <= 0:
             continue
-        key = (score, int(candidate.exact), -order)
+        key = (phrases_hit, tokens_hit, int(candidate.exact), -order)
         if best is None or key > best[0]:
             best = (key, candidate.url, html)
     if best is None:

@@ -552,3 +552,52 @@ def test_trimming_stops_at_two_tokens_then_falls_back_to_the_web_search():
     assert [parse_qs(urlparse(u).query)["srsearch"][0] for u in http.api_calls] == [
         "GRES-2 Power Station chimney", "GRES-2 Power Station", "GRES-2 Power"]
     assert resolved.searches == 4 and len(search.calls) == 1
+
+
+# -- 221 replay: nested rows on the real page vs flat rows on a lesser page -------------------
+
+def _tower_html(title, nested):
+    height = ("<tr><th colspan='2'>Height</th></tr><tr><th>Architectural</th><td>828 m (2,717 ft)</td></tr>"
+              "<tr><th>Tip</th><td>829.8 m</td></tr>" if nested else
+              "<tr><th>Height</th><td>725 m (2,379 ft)</td></tr>")
+    return (f"<html><body><table class='infobox'><tr><th class='infobox-above' colspan='2'>{title}</th></tr>"
+            f"{height}<tr><th colspan='2'>Technical details</th></tr>"
+            f"<tr><th>Floor count</th><td>163</td></tr></table><p>{title} is a skyscraper.</p></body></html>")
+
+
+def test_burj_khalifa_exact_title_with_nested_height_beats_burj_azizi_flat_height():
+    hits = [("Burj Azizi", "tower"), ("Burj Khalifa", "tower")]
+    http = FakeHttp(api={"Burj Khalifa": hits},
+                    pages={_article("Burj Azizi"): _tower_html("Burj Azizi", nested=False),
+                           _article("Burj Khalifa"): _tower_html("Burj Khalifa", nested=True)})
+    resolved = _run(hp.resolve_entity_page(
+        "Burj Khalifa", http=http, search=FakeSearch(),
+        field_phrases=["its ARCHITECTURAL HEIGHT, in metres", "its FLOOR COUNT"]))
+    assert resolved.url == _article("Burj Khalifa")
+    assert resolved.fetches == 2   # the exact-title candidate is read, never pruned
+
+
+def test_shanghai_tower_exact_title_beats_jin_mao_tower_with_a_flat_height_row():
+    hits = [("Jin Mao Tower", "tower"), ("Shanghai Tower", "tower"), ("Shanghai World Financial Center", "x")]
+    http = FakeHttp(api={"Shanghai Tower": hits},
+                    pages={_article("Jin Mao Tower"): _tower_html("Jin Mao Tower", nested=False),
+                           _article("Shanghai Tower"): _tower_html("Shanghai Tower", nested=True),
+                           _article("Shanghai World Financial Center"): _tower_html("SWFC", nested=False)})
+    resolved = _run(hp.resolve_entity_page(
+        "Shanghai Tower", http=http, search=FakeSearch(),
+        field_phrases=["its ARCHITECTURAL HEIGHT, in metres", "its FLOOR COUNT"]))
+    assert resolved.url == _article("Shanghai Tower")
+
+
+def test_a_candidate_covering_strictly_more_field_phrases_beats_the_exact_title():
+    """The Mississippi rule, spelled out on the phrase count: the state covers only the `area`
+    phrase, the river covers both."""
+    hits = [("Mississippi", "state"), ("Mississippi River", "river")]
+    http = FakeHttp(api={"Mississippi": hits},
+                    pages={_article("Mississippi"): STATE_HTML,
+                           _article("Mississippi River"): MS_RIVER_HTML})
+    assert hp._field_coverage(STATE_HTML, ["length in METRES", "basin area in km^2"]) == (1, 1)
+    assert hp._field_coverage(MS_RIVER_HTML, ["length in METRES", "basin area in km^2"]) == (2, 2)
+    resolved = _run(hp.resolve_entity_page("Mississippi", http=http, search=FakeSearch(),
+                                           field_phrases=["length in METRES", "basin area in km^2"]))
+    assert resolved.url == _article("Mississippi River")
