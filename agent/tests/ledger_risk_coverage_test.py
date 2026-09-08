@@ -1201,7 +1201,8 @@ class TestHostAgreesAvailability:
 
     @pytest.mark.parametrize("reason", [
         "no_unambiguous_shape", "fewer_than_two_slots", "operand_not_found", "unit_mismatch",
-        "unit_inconsistent_across_entities", "argmax_formula_unparsed", "no_pages", "error",
+        "unit_inconsistent_across_entities", "argmax_formula_unparsed", "incomplete_roster",
+        "scale_unresolved", "no_pages", "error",
     ])
     def test_every_refusal_reason_is_unavailable_but_recorded(self, reason):
         out = lrc.host_agrees(_host(reason=reason, value=None), "The answer is 38.7 m.", [38.7])

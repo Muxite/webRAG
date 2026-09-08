@@ -512,7 +512,7 @@ def answer_audit_sweep(cells: Sequence[Dict[str, Any]], wrong_key: str = "wrong"
 HOST_DERIVE_REASONS: Tuple[str, ...] = (
     "computed", "no_unambiguous_shape", "fewer_than_two_slots", "operand_not_found",
     "unit_mismatch", "unit_inconsistent_across_entities", "argmax_formula_unparsed",
-    "no_pages", "error",
+    "incomplete_roster", "scale_unresolved", "no_pages", "error",
 )
 
 #: Accepted-cell count below which the risk figure in ``host_derive_dev_derive_on`` is REPORTED
