@@ -214,6 +214,13 @@ async def run_offtheshelf_execution(
     shape_derive = solver_result.get("shape_derive")
     if shape_derive is not None:
         output["shape_derive"] = shape_derive
+    # `host_derive`: same passthrough again. The mint03 smoke's langgraph cell ran the hook
+    # (the solver writes the key at its exit) and this missing line dropped it -- the third
+    # time this exact bug has shipped on this seam, which is why the passthrough is pinned by
+    # `execution_langgraph_ledger_passthrough_test.py` rather than only by solver-level tests.
+    host_derive = solver_result.get("host_derive")
+    if host_derive is not None:
+        output["host_derive"] = host_derive
     telemetry.finish(success=output["success"])
     tracer.close()
 
