@@ -108,6 +108,11 @@ quantity in a cell emitted). A fourth family, the resolver choosing Burj Azizi /
 fixed by verifying candidates against all of an entity's fields with the exact title winning ties, and by the forensics line
 that now flags partial slug coverage.
 
+**Post-analysis note (same day):** `mint04_gq15_221` shows the resolver still registered `wiki/Burj_Azizi` for
+"Burj Khalifa" live; the cell was REFUSED (`incomplete_roster`), so correctness held, but the miss is real and is item 1
+of the run-2 handoff. `mint04_gl3b_215` refused with `unit_mismatch` on a composed ratio the other seven cells computed —
+a one-cell bug, also listed there.
+
 ## 6. Holdout block (213 / 217 / 221) — sealed readout, decides nothing
 
 Availability 20/24 (213 8, 217 8, 221 4), `host_value_correct` 20/20. Nothing here supports or mitigates the primary.

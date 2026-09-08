@@ -9,6 +9,9 @@
 > `docs/handoffs/MINT04_PREREG_2026-09-08.md`. Gate artefacts: `agent/idea_test_results/mint04_analysis/gates/`.
 > Two standing rules from the user govern all further work here: no numeric caps on mechanism
 > behaviour, and build LLM-agnostic components rather than prompts.
+> **Next session starts at `docs/handoffs/AVAILABILITY_DRIVE_HANDOFF_RUN2_2026-09-08.md`** — the 26
+> remaining dev losses are five named families (resolver misses, nested rows, prose-only operands,
+> qualifier-blind ranking, one bug), ranked with offline gates and a mint05 shape targeting ≥ 80%.
 
 > **Start here (2026-09-08): the adversarial-review cycle.** Both 2026-09-07 plans were
 > superseded after a four-panel review (`docs/superpowers/reviews/2026-09-08-ledger-dag-adversarial-review.md`)
