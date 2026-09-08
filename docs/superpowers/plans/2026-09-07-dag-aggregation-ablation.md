@@ -1,5 +1,8 @@
 # DAG Aggregation Ablation Implementation Plan
 
+> **SUPERSEDED (2026-09-08)** by `docs/superpowers/plans/2026-09-08-ledger-dag-replan.md` after the adversarial review in
+> `docs/superpowers/reviews/2026-09-08-ledger-dag-adversarial-review.md`. Kept unedited as the record of what was planned and why it failed review.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Decide, with a preregistered $0 experiment on the 23 aggregation-shaped tasks, whether DAG v2 is repairable by configuration and whether the deterministic coverage executor beats the linear arm on the shape where the graph loses −0.461.

@@ -254,6 +254,8 @@ held-out certification. Replaces the one remaining judge the graph arm depends o
 
 ## Part E. Proposed sequence (replaces roadmap step 2 and sharpens step 5)
 
+> **Superseded (2026-09-08):** this sequence is replaced by `docs/superpowers/plans/2026-09-08-ledger-dag-replan.md`; see the review at `docs/superpowers/reviews/2026-09-08-ledger-dag-adversarial-review.md`. Parts A–D stay the design reference.
+
 | Order | Item | Size | Gate to proceed |
 |---|---|---|---|
 | 1 | L5 hygiene + refusal bug | Small | tests green; refusals visible in `ledger_trace` |
