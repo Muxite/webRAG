@@ -1,3 +1,15 @@
+> **Start here (2026-09-08, later): the availability drive, run 1 — mint04 PASSED both primaries.**
+> The host now fetches every slot entity's page itself at finish time (`host_prefetch`, 5th
+> `LEDGER_HOST_MODULES` token, model-invisible, structural budget, no caps) with structured infobox
+> extraction, shared-unit selection, scale folding and a field-phrase dimension gate. Live on 96
+> cells (2 h 05, 157 Serper calls ≈ $0.16): `host_derive` availability over all 72 dev cells
+> **46/72 = 63.9%** (from 27.8%), `host_value_correct` **66/66**, identical to the pre-launch
+> `--prefetch` replay. Read `docs/handoffs/MINT04_RESULTS_2026-09-08.md` (verdicts, forensics, the
+> prose-operand residual and the LLM-agnostic component niches for the next cycle) and
+> `docs/handoffs/MINT04_PREREG_2026-09-08.md`. Gate artefacts: `agent/idea_test_results/mint04_analysis/gates/`.
+> Two standing rules from the user govern all further work here: no numeric caps on mechanism
+> behaviour, and build LLM-agnostic components rather than prompts.
+
 > **Start here (2026-09-08): the adversarial-review cycle.** Both 2026-09-07 plans were
 > superseded after a four-panel review (`docs/superpowers/reviews/2026-09-08-ledger-dag-adversarial-review.md`)
 > by `docs/superpowers/plans/2026-09-08-ledger-dag-replan.md`. Outcomes that day, all from
