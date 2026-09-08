@@ -575,3 +575,110 @@ def test_slices_and_structured_selection_still_work_without_variant(tmp_path, ca
     assert rc == 0
     out = capsys.readouterr().out
     assert "good_adaptive vs good_adaptive_breadth" in out
+
+
+# ---------------------------------------------------------------------------
+# --shapes metadata keys (`_rule`, `_written`) must not become shapes
+# ---------------------------------------------------------------------------
+
+def test_shapes_loader_skips_underscore_prefixed_metadata_keys(tmp_path, capsys):
+    # scripts/task_shapes.py writes provenance keys (`_rule`, `_written`) alongside the
+    # {task_id: shape} entries; treating them as shapes prints garbage rows with n=0.
+    for r in range(1, 3):
+        _write_cell(tmp_path, "armA", r, "100", score=0.9, searches_ok=3, visits=2)
+        _write_cell(tmp_path, "armB", r, "100", score=0.5, searches_ok=3, visits=2)
+    shapes_path = tmp_path / "shapes.json"
+    with open(shapes_path, "w") as fh:
+        json.dump({"100": "aggregation", "_rule": "validator-shape v1",
+                   "_written": "2026-09-08"}, fh)
+    rc = ca.main(["armA:armA", "armB:armB", "--results-dir", str(tmp_path),
+                  "--shapes", str(shapes_path)])
+    assert rc == 0
+    out = capsys.readouterr().out
+    shape_table = out.split("PER-SHAPE BREAKDOWN")[1]
+    assert "aggregation" in shape_table
+    assert "validator-shape v1" not in shape_table
+    assert "2026-09-08" not in shape_table
+
+
+# ---------------------------------------------------------------------------
+# --cluster-by task
+# ---------------------------------------------------------------------------
+
+def test_group_rows_by_task_means_numeric_fields():
+    rows = [_row(100, 1, score=0.8, visits=2), _row(100, 2, score=0.4, visits=4),
+            _row(101, 1, score=1.0, visits=6)]
+    grouped = ca.group_rows_by_task(rows)
+    by_task = {r["test_id"]: r for r in grouped}
+    assert len(grouped) == 2
+    assert math.isclose(by_task["100"]["score"], 0.6, rel_tol=1e-9)
+    assert math.isclose(by_task["100"]["visits"], 3.0, rel_tol=1e-9)
+    assert math.isclose(by_task["101"]["score"], 1.0, rel_tol=1e-9)
+    assert by_task["100"]["n_reps"] == 2
+    assert by_task["100"]["infra_failed"] is False
+
+
+def test_group_rows_by_task_keeps_task_alive_when_one_rep_is_infra_failed():
+    rows = [_row(100, 1, score=0.1, infra_failed=True), _row(100, 2, score=0.9)]
+    grouped = ca.group_rows_by_task(rows)
+    assert len(grouped) == 1
+    # the infra-failed rep contributes nothing: the surviving rep's score is the task score
+    assert math.isclose(grouped[0]["score"], 0.9, rel_tol=1e-9)
+    assert grouped[0]["infra_failed"] is False
+    assert grouped[0]["n_usable_reps"] == 1
+
+
+def test_group_rows_by_task_marks_infra_failed_only_when_every_rep_failed():
+    rows = [_row(100, 1, score=0.1, infra_failed=True),
+            _row(100, 2, score=0.2, infra_failed=True)]
+    grouped = ca.group_rows_by_task(rows)
+    assert grouped[0]["infra_failed"] is True
+
+
+def test_compare_pair_cluster_by_task_collapses_reps():
+    rows_a = [_row(t, r, score=0.8) for t in (100, 101, 102) for r in (1, 2)]
+    rows_b = [_row(t, r, score=0.5) for t in (100, 101, 102) for r in (1, 2)]
+    unclustered = ca.compare_pair("a", rows_a, "b", rows_b)
+    clustered = ca.compare_pair("a", rows_a, "b", rows_b, cluster_by="task")
+    assert unclustered["n_usable"] == 6
+    assert clustered["n_usable"] == 3
+    # identical per-rep scores -> identical means, only n changes
+    assert math.isclose(clustered["score_mean_delta"],
+                        unclustered["score_mean_delta"], rel_tol=1e-9)
+    assert clustered["only_a"] == [] and clustered["only_b"] == []
+
+
+def test_compare_pair_cluster_by_task_survives_a_single_infra_failed_rep():
+    rows_a = [_row(100, 1, score=0.1, infra_failed=True), _row(100, 2, score=0.9)]
+    rows_b = [_row(100, 1, score=0.5), _row(100, 2, score=0.5)]
+    res = ca.compare_pair("a", rows_a, "b", rows_b, cluster_by="task")
+    assert res["n_paired_keys"] == 1
+    assert res["n_infra_dropped"] == 0
+    assert res["n_usable"] == 1
+    assert math.isclose(res["mean_a"], 0.9, rel_tol=1e-9)
+
+
+def test_main_cluster_by_task_prints_effective_n(tmp_path, capsys):
+    for r in range(1, 3):
+        for t in ("100", "101"):
+            _write_cell(tmp_path, "armA", r, t, score=0.9, searches_ok=3, visits=2)
+            _write_cell(tmp_path, "armB", r, t, score=0.5, searches_ok=3, visits=2)
+    rc = ca.main(["armA:armA", "armB:armB", "--results-dir", str(tmp_path),
+                  "--cluster-by", "task"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "clustered by task" in out
+    assert "effective n = 2 task" in out
+    assert "(n=2)" in out
+
+
+def test_main_without_cluster_by_is_unchanged(tmp_path, capsys):
+    for r in range(1, 3):
+        for t in ("100", "101"):
+            _write_cell(tmp_path, "armA", r, t, score=0.9, searches_ok=3, visits=2)
+            _write_cell(tmp_path, "armB", r, t, score=0.5, searches_ok=3, visits=2)
+    rc = ca.main(["armA:armA", "armB:armB", "--results-dir", str(tmp_path)])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "clustered by task" not in out
+    assert "(n=4)" in out

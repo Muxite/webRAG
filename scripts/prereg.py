@@ -50,6 +50,7 @@ DEFAULT_RESULTS_DIR = "agent/idea_test_results"
 #: through ``write``/``validate`` first.
 KNOWN_ABORT_CONDITIONS = frozenset({
     "min_completion_rate", "max_infra_failed_rate", "max_live_fallbacks",
+    "min_usable_paired_n",
 })
 
 
@@ -206,8 +207,54 @@ def _live_fallbacks(landed_paths: Sequence[Path]) -> Tuple[int, int]:
     return total, missing
 
 
+def _per_arm_completion(cell_paths: Sequence[Tuple[Dict[str, Any], Any]]) -> Dict[str, Dict[str, Any]]:
+    """Completion broken out by arm, in the spec's arm order.
+
+    A run-wide rate averages a dead arm away: on gpu0831 ``langgraph_react`` lost 6-7 of its 48
+    cells while the run as a whole still read ~95% complete. The per-arm denominator is the one
+    that catches "this arm never ran", so ``min_completion_rate`` is evaluated against the WORST
+    arm rather than the pooled rate.
+
+    :param cell_paths: ``(cell, path_or_None)`` pairs, one per designed cell.
+    :returns: ``{arm: {expected, found, missing, completion_rate}}``.
+    """
+    per_arm: Dict[str, Dict[str, Any]] = {}
+    for cell, path in cell_paths:
+        entry = per_arm.setdefault(str(cell["arm"]),
+                                   {"expected": 0, "found": 0, "missing": 0,
+                                    "completion_rate": 0.0})
+        entry["expected"] += 1
+        if path is None:
+            entry["missing"] += 1
+        else:
+            entry["found"] += 1
+    for entry in per_arm.values():
+        entry["completion_rate"] = (entry["found"] / entry["expected"]) if entry["expected"] else 0.0
+    return per_arm
+
+
+def _usable_paired_n(cell_paths: Sequence[Tuple[Dict[str, Any], Any]], arms: Sequence[Any]) -> int:
+    """How many tasks landed at least one cell for EVERY arm.
+
+    This is the real n of a paired comparison: a task present for one arm and missing for another
+    contributes nothing to a paired delta, so a run can be "90% complete" and still have almost
+    no pairable tasks if the losses concentrate on distinct tasks. Reps are irrelevant here --
+    one landed cell makes the (task, arm) side of the pair exist.
+    """
+    wanted = {str(a) for a in arms}
+    if not wanted:
+        return 0
+    landed_arms: Dict[str, set] = {}
+    for cell, path in cell_paths:
+        if path is not None:
+            landed_arms.setdefault(str(cell["task"]), set()).add(str(cell["arm"]))
+    return sum(1 for arms_seen in landed_arms.values() if wanted <= arms_seen)
+
+
 def _evaluate_abort_conditions(spec: Dict[str, Any], completion_rate: float,
-                                landed_paths: List[Path]) -> Dict[str, Dict[str, Any]]:
+                                landed_paths: List[Path],
+                                per_arm: Dict[str, Dict[str, Any]] = None,
+                                usable_paired_n: int = None) -> Dict[str, Dict[str, Any]]:
     """Evaluate each declared ``abort_conditions`` entry against the cells that actually landed.
 
     Three statuses, never conflated:
@@ -220,17 +267,47 @@ def _evaluate_abort_conditions(spec: Dict[str, Any], completion_rate: float,
       written into the cell's JSON) or a key ``audit()`` does not recognise at all. Unknown must
       never be reported as, or folded into, a pass -- a gate that always appears to pass when it
       was never actually checked is worse than no gate.
+
+    :param per_arm: per-arm completion from :func:`_per_arm_completion`. When given,
+        ``min_completion_rate`` is applied to EVERY arm, so a single dead arm cannot be averaged
+        away by the others. Omitted (``None``) falls back to the run-wide rate alone.
+    :param usable_paired_n: tasks present for every arm, from :func:`_usable_paired_n`. Required
+        to evaluate ``min_usable_paired_n``; ``None`` makes that gate ``"unknown"``.
     """
     gates: Dict[str, Dict[str, Any]] = {}
     for key, threshold in (spec.get("abort_conditions") or {}).items():
         if key == "min_completion_rate":
             passed = completion_rate >= threshold
+            detail = f"completion_rate={completion_rate:.3f} vs min {threshold}"
+            if per_arm:
+                worst_arm = min(per_arm, key=lambda a: per_arm[a]["completion_rate"])
+                worst_rate = per_arm[worst_arm]["completion_rate"]
+                if worst_rate < threshold:
+                    passed = False
+                detail += (f"; worst arm '{worst_arm}'={worst_rate:.3f} "
+                           f"({per_arm[worst_arm]['found']}/{per_arm[worst_arm]['expected']})")
             gates[key] = {
                 "status": "pass" if passed else "fail",
                 "threshold": threshold,
                 "value": completion_rate,
-                "detail": f"completion_rate={completion_rate:.3f} vs min {threshold}",
+                "detail": detail,
             }
+        elif key == "min_usable_paired_n":
+            if usable_paired_n is None:
+                gates[key] = {
+                    "status": "unknown",
+                    "threshold": threshold,
+                    "value": None,
+                    "detail": "usable paired n was not supplied to this evaluation",
+                }
+            else:
+                gates[key] = {
+                    "status": "pass" if usable_paired_n >= threshold else "fail",
+                    "threshold": threshold,
+                    "value": usable_paired_n,
+                    "detail": (f"usable_paired_n={usable_paired_n} (tasks landed for ALL "
+                               f"{len(spec.get('arms') or [])} arms) vs min {threshold}"),
+                }
         elif key == "max_infra_failed_rate":
             rate = _infra_failed_rate(landed_paths)
             passed = rate <= threshold
@@ -283,7 +360,13 @@ def audit(spec: Dict[str, Any], results_dir: str = DEFAULT_RESULTS_DIR) -> Dict[
     it. This now evaluates every declared condition against the cells that actually landed; see
     :func:`_evaluate_abort_conditions` for the pass/fail/unknown contract.
 
+    Completion is reported **per arm** as well as run-wide: a pooled rate averages a dead arm
+    away, which is the exact failure this module was written for. ``min_completion_rate`` is
+    therefore applied to every arm (see :func:`_per_arm_completion`), and ``usable_paired_n``
+    (:func:`_usable_paired_n`) reports how many tasks are actually pairable across all arms.
+
     :returns: the original ``{expected, found, missing, complete, completion_rate}`` plus
+        ``per_arm`` (``{arm: {expected, found, missing, completion_rate}}``), ``usable_paired_n``,
         ``gates`` (per-condition ``{status, threshold, value, detail}``) and ``gates_passed``
         (``True`` iff every declared gate's status is ``"pass"`` -- unknown counts as not-passed).
     """
@@ -293,7 +376,10 @@ def audit(spec: Dict[str, Any], results_dir: str = DEFAULT_RESULTS_DIR) -> Dict[
     landed_paths = [path for _, path in cell_paths if path is not None]
     found = len(cells) - len(missing)
     completion_rate = (found / len(cells)) if cells else 0.0
-    gates = _evaluate_abort_conditions(spec, completion_rate, landed_paths)
+    per_arm = _per_arm_completion(cell_paths)
+    usable_paired_n = _usable_paired_n(cell_paths, spec.get("arms") or [])
+    gates = _evaluate_abort_conditions(spec, completion_rate, landed_paths,
+                                       per_arm=per_arm, usable_paired_n=usable_paired_n)
     return {
         "run_id": spec.get("run_id", ""),
         "expected": len(cells),
@@ -301,6 +387,8 @@ def audit(spec: Dict[str, Any], results_dir: str = DEFAULT_RESULTS_DIR) -> Dict[
         "missing": missing,
         "complete": not missing and bool(cells),
         "completion_rate": completion_rate,
+        "per_arm": per_arm,
+        "usable_paired_n": usable_paired_n,
         "gates": gates,
         "gates_passed": all(gate["status"] == "pass" for gate in gates.values()),
     }
@@ -359,6 +447,13 @@ def main() -> int:
             print(f"  task={cell['task']} arm={cell['arm']} rep={cell['rep']}")
     else:
         print("complete: every designed cell landed")
+
+    if report["per_arm"]:
+        print("per-arm completion (a pooled rate hides an arm that never ran):")
+        for arm, entry in report["per_arm"].items():
+            print(f"  arm {arm}: {entry['found']}/{entry['expected']} "
+                  f"({entry['completion_rate']:.1%})")
+        print(f"  usable paired n: {report['usable_paired_n']} task(s) landed for every arm")
 
     ok = True
     for name, gate in report["gates"].items():

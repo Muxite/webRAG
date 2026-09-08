@@ -1025,3 +1025,82 @@ def test_derive_arm_detection_is_token_membership_not_string_equality():
         raw = dict(base, run_config={"LEDGER_HOST_MODULES": modules})
         cell = classify_cell(Path("fake_210_m_sequential_react_r1.json"), raw)
         assert cell["arm"] == expected, (modules, cell["arm"])
+
+
+# ==============================================================================================
+# Phase-0 tooling: comma-separated --prefix, and the per-(model, task) stratum
+# ==============================================================================================
+
+class TestDiscoverCellFilesMultiPrefix:
+    def _write(self, tmp_path, names):
+        for name in names:
+            (tmp_path / name).write_text("{}")
+
+    def test_single_prefix_behaviour_is_unchanged(self, tmp_path):
+        self._write(tmp_path, [
+            "ladder03_a_210_m_v_cfg1_r1.json",
+            "gpu0831b_el_s0_211_m_v_cfg1_r1.json",
+        ])
+        found = [p.name for p in lrc.discover_cell_files(tmp_path)]
+        assert found == ["ladder03_a_210_m_v_cfg1_r1.json"]
+
+    def test_comma_separated_prefixes_match_any_of_them(self, tmp_path):
+        self._write(tmp_path, [
+            "ladder03_a_210_m_v_cfg1_r1.json",
+            "gpu0831b_el_s0_211_m_v_cfg1_r1.json",
+            "mint02_a_212_m_v_cfg1_r1.json",
+            "other_a_213_m_v_cfg1_r1.json",
+        ])
+        found = [p.name for p in lrc.discover_cell_files(tmp_path, prefix="ladder03,mint02")]
+        assert found == ["ladder03_a_210_m_v_cfg1_r1.json", "mint02_a_212_m_v_cfg1_r1.json"]
+
+    def test_comma_list_still_excludes_summary_and_report_v3(self, tmp_path):
+        self._write(tmp_path, [
+            "mint02_a_210_m_v_cfg1_r1.json",
+            "mint02_a_summary.json",
+            "mint02_a_210_m_v_cfg1_r1_report_v3.json",
+            "mint02_a_210_m_v_cfg1_r1.jsonl",
+        ])
+        found = [p.name for p in lrc.discover_cell_files(tmp_path, prefix="ladder03,mint02")]
+        assert found == ["mint02_a_210_m_v_cfg1_r1.json"]
+
+    def test_a_file_matching_two_prefixes_is_listed_once(self, tmp_path):
+        self._write(tmp_path, ["mint02_a_210_m_v_cfg1_r1.json"])
+        found = [p.name for p in lrc.discover_cell_files(tmp_path, prefix="mint02,mint0")]
+        assert found == ["mint02_a_210_m_v_cfg1_r1.json"]
+
+    def test_blank_and_whitespace_padded_entries_are_ignored(self, tmp_path):
+        self._write(tmp_path, ["mint02_a_210_m_v_cfg1_r1.json"])
+        found = [p.name for p in lrc.discover_cell_files(tmp_path, prefix=" mint02 , ")]
+        assert found == ["mint02_a_210_m_v_cfg1_r1.json"]
+
+
+class TestStrataByModelTask:
+    def _pool(self):
+        # model m1 / task 210 has 6 dev derive-ON cells (>= the n>=6 guard); task 211 has 2.
+        cells = [_synthetic_cell(f"a{i}.json", "210", "m1", wrong=(i % 2 == 0),
+                                  n_derived_nodes=1, backed_only_flag=False)
+                 for i in range(6)]
+        cells += [_synthetic_cell(f"b{i}.json", "211", "m1", wrong=False,
+                                   n_derived_nodes=1, backed_only_flag=False)
+                  for i in range(2)]
+        return cells
+
+    def test_stratum_is_present_and_keyed_by_model_and_task(self):
+        report = lrc.build_report(self._pool())
+        rows = report["strata_by_model_task_dev_derive_on"]
+        assert set(rows) == {"m1/210", "m1/211"}
+        assert rows["m1/210"]["n"] == 6
+        assert rows["m1/211"] == {"n": 2}          # small group: count only, same as existing strata
+
+    def test_large_enough_group_carries_the_operating_point(self):
+        rows = lrc.build_report(self._pool())["strata_by_model_task_dev_derive_on"]
+        big = rows["m1/210"]
+        assert "coverage" in big and "risk" in big
+        assert big["wrong_rate_05"] == pytest.approx(0.5)
+        assert big["wrong_rate_09"] == pytest.approx(0.5)
+
+    def test_existing_strata_keys_are_untouched(self):
+        report = lrc.build_report(self._pool())
+        assert report["strata_by_model_dev_derive_on"]["m1"]["n"] == 8
+        assert report["strata_by_host_dev_derive_on"]["sequential_react"]["n"] == 8

@@ -345,3 +345,101 @@ def test_live_fallback_gate_is_unknown_when_any_cell_predates_the_field(tmp_path
 
     assert gates["max_live_fallbacks"]["status"] == "unknown"
     assert "1" in gates["max_live_fallbacks"]["detail"]
+
+
+# ---------------------------------------------------------------------------
+# per-arm completion + min_usable_paired_n
+# ---------------------------------------------------------------------------
+
+def test_audit_reports_completion_per_arm(tmp_path):
+    """A run-wide rate hides a dead arm: 8 of 8 minus one whole arm still reads 50%."""
+    for task in ("122", "130"):
+        for rep in (1, 2):
+            _result(tmp_path, "ledger001", task, "qwen2.5:7b", "evidence_loop", rep)
+    _result(tmp_path, "ledger001", "122", "qwen2.5:7b", "langgraph_react", 1)
+    report = prereg.audit(SPEC, str(tmp_path))
+    per_arm = report["per_arm"]
+    assert per_arm["evidence_loop"] == {"expected": 4, "found": 4, "missing": 0,
+                                        "completion_rate": 1.0}
+    assert per_arm["langgraph_react"]["found"] == 1
+    assert per_arm["langgraph_react"]["completion_rate"] == 0.25
+
+
+def test_min_completion_rate_gate_fails_when_one_arm_is_short(tmp_path):
+    """Run-wide completion 0.75 clears a 0.7 threshold; the dead arm's 0.5 must not."""
+    spec = dict(SPEC, abort_conditions={"min_completion_rate": 0.7})
+    for task in ("122", "130"):
+        for rep in (1, 2):
+            _result(tmp_path, "ledger001", task, "qwen2.5:7b", "evidence_loop", rep)
+    _result(tmp_path, "ledger001", "122", "qwen2.5:7b", "langgraph_react", 1)
+    _result(tmp_path, "ledger001", "130", "qwen2.5:7b", "langgraph_react", 1)
+    report = prereg.audit(spec, str(tmp_path))
+    assert report["completion_rate"] == 0.75
+    gate = report["gates"]["min_completion_rate"]
+    assert gate["status"] == "fail"
+    assert "langgraph_react" in gate["detail"]
+    assert report["gates_passed"] is False
+
+
+def test_min_completion_rate_gate_passes_when_every_arm_clears(tmp_path):
+    spec = dict(SPEC, abort_conditions={"min_completion_rate": 0.7})
+    for arm in ("evidence_loop", "langgraph_react"):
+        for task in ("122", "130"):
+            for rep in (1, 2):
+                _result(tmp_path, "ledger001", task, "qwen2.5:7b", arm, rep)
+    report = prereg.audit(spec, str(tmp_path))
+    assert report["gates"]["min_completion_rate"]["status"] == "pass"
+    assert report["gates_passed"] is True
+
+
+def test_min_usable_paired_n_is_a_known_abort_condition():
+    spec = dict(SPEC, abort_conditions={"min_usable_paired_n": 2})
+    assert prereg.validate(spec) == []
+
+
+def test_validate_still_rejects_unknown_abort_conditions():
+    spec = dict(SPEC, abort_conditions={"min_usable_pared_n": 2})
+    errors = prereg.validate(spec)
+    assert any("unknown abort_conditions key" in e for e in errors)
+
+
+def test_min_usable_paired_n_counts_tasks_present_for_every_arm(tmp_path):
+    # task 122 landed for both arms; task 130 only for evidence_loop -> 1 usable paired task.
+    spec = dict(SPEC, abort_conditions={"min_usable_paired_n": 2})
+    for task in ("122", "130"):
+        for rep in (1, 2):
+            _result(tmp_path, "ledger001", task, "qwen2.5:7b", "evidence_loop", rep)
+    _result(tmp_path, "ledger001", "122", "qwen2.5:7b", "langgraph_react", 1)
+    report = prereg.audit(spec, str(tmp_path))
+    assert report["usable_paired_n"] == 1
+    gate = report["gates"]["min_usable_paired_n"]
+    assert gate["status"] == "fail"
+    assert gate["value"] == 1
+
+
+def test_min_usable_paired_n_passes_when_every_task_is_paired(tmp_path):
+    spec = dict(SPEC, abort_conditions={"min_usable_paired_n": 2})
+    for arm in ("evidence_loop", "langgraph_react"):
+        for task in ("122", "130"):
+            _result(tmp_path, "ledger001", task, "qwen2.5:7b", arm, 1)
+    report = prereg.audit(spec, str(tmp_path))
+    assert report["usable_paired_n"] == 2
+    assert report["gates"]["min_usable_paired_n"]["status"] == "pass"
+
+
+def test_audit_cli_prints_the_per_arm_table(tmp_path, capsys, monkeypatch):
+    prereg_dir = tmp_path / "prereg"
+    results_dir = tmp_path / "results"
+    results_dir.mkdir()
+    prereg.write(str(prereg_dir), SPEC)
+    for arm in ("evidence_loop", "langgraph_react"):
+        for task in ("122", "130"):
+            for rep in (1, 2):
+                _result(results_dir, "ledger001", task, "qwen2.5:7b", arm, rep)
+    monkeypatch.setattr(sys, "argv", ["prereg.py", "audit", "--run-id", "ledger001",
+                                      "--prereg-dir", str(prereg_dir),
+                                      "--results-dir", str(results_dir)])
+    assert prereg.main() == 0
+    out = capsys.readouterr().out
+    assert "per-arm completion" in out
+    assert "evidence_loop" in out and "langgraph_react" in out

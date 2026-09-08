@@ -353,10 +353,69 @@ def sanity_check(arms, override=False):
 # Pairing + stats
 # ---------------------------------------------------------------------------
 
-def index_by_key(rows):
+CLUSTER_NUMERIC_FIELDS = ("score", "prompt_tokens", "total_tokens", "llm_calls", "visits",
+                          "searches_ok")
+
+
+def group_rows_by_task(rows):
+    """Collapse every rep of a test_id into ONE row whose numeric fields are rep means.
+
+    This is what `--cluster-by task` feeds to `compare_pair`: reps of the same task are not
+    independent observations (same mandate, same ground truth, and under a process-global
+    `LLM_SEED` often the same trajectory), so pairing on `(test_id, rep)` inflates n -- and
+    every t with it -- by roughly sqrt(reps). Clustering makes the task the unit of analysis.
+
+    Aggregation rules:
+    - numeric fields (`CLUSTER_NUMERIC_FIELDS`) become the mean over the task's USABLE reps,
+      ignoring non-numeric/missing values; a field with no numeric value anywhere stays None;
+    - `infra_failed` is True only if EVERY rep of the task is infra-failed. A provider outage
+      on one rep measures the provider, not the arm, so the remaining reps still speak for the
+      task; the task is only dropped when nothing is left. "Usable reps" are therefore the
+      non-infra-failed ones, falling back to all reps when they all failed (so the row still
+      carries its scores for reporting, while being flagged infra_failed for the drop);
+    - `auth_marker` is True if ANY usable rep tripped a marker (the sanity block is a
+      pessimistic screen);
+    - `rep` becomes None -- the key is `(test_id,)`, see `index_by_key`.
+
+    Args:
+        rows: per-cell rows as produced by `load_arm`.
+
+    Returns:
+        One row per test_id, sorted by test_id, each additionally carrying `n_reps` (reps seen)
+        and `n_usable_reps` (reps the means were taken over).
+    """
+    by_task = {}
+    for r in rows:
+        by_task.setdefault(r["test_id"], []).append(r)
+    out = []
+    for tid in sorted(by_task):
+        reps = by_task[tid]
+        usable = [r for r in reps if not r.get("infra_failed")]
+        all_failed = not usable
+        if all_failed:
+            usable = reps
+        row = {
+            "file": ",".join(str(r.get("file")) for r in reps),
+            "test_id": tid,
+            "rep": None,
+            "n_reps": len(reps),
+            "n_usable_reps": len(usable),
+            "infra_failed": all_failed,
+            "auth_marker": any(bool(r.get("auth_marker")) for r in usable),
+            "variant": usable[0].get("variant"),
+        }
+        for field in CLUSTER_NUMERIC_FIELDS:
+            vals = [r.get(field) for r in usable]
+            vals = [v for v in vals if isinstance(v, (int, float)) and not isinstance(v, bool)]
+            row[field] = (sum(vals) / len(vals)) if vals else None
+        out.append(row)
+    return out
+
+
+def index_by_key(rows, cluster_by=None):
     m = {}
     for r in rows:
-        m[(r["test_id"], r["rep"])] = r
+        m[(r["test_id"],) if cluster_by == "task" else (r["test_id"], r["rep"])] = r
     return m
 
 
@@ -369,8 +428,18 @@ def _paired_metric_deltas(idx_a, idx_b, keys, field):
     return out
 
 
-def compare_pair(label_a, rows_a, label_b, rows_b):
-    idx_a, idx_b = index_by_key(rows_a), index_by_key(rows_b)
+def compare_pair(label_a, rows_a, label_b, rows_b, cluster_by=None):
+    """Paired comparison of two arms.
+
+    Args:
+        cluster_by: None (default -- pair on `(test_id, rep)`, unchanged behaviour) or
+            "task" (collapse reps per `group_rows_by_task` and pair on `(test_id,)`).
+            Everything downstream of the pairing -- deltas, t, sign-flip p, Holm, printing --
+            is field-agnostic and untouched by this.
+    """
+    if cluster_by == "task":
+        rows_a, rows_b = group_rows_by_task(rows_a), group_rows_by_task(rows_b)
+    idx_a, idx_b = index_by_key(rows_a, cluster_by), index_by_key(rows_b, cluster_by)
     keys_a, keys_b = set(idx_a), set(idx_b)
     paired_keys = sorted(keys_a & keys_b)
     only_a = sorted(keys_a - keys_b)
@@ -582,7 +651,14 @@ def main(argv=None):
                          "with --run-id/--tag/--arm structured specs)")
     ap.add_argument("--results-dir", default=RESULTS_DIR)
     ap.add_argument("--shapes", default=None,
-                    help="JSON file mapping {task_id: shape_name} for a per-shape breakdown")
+                    help="JSON file mapping {task_id: shape_name} for a per-shape breakdown; "
+                         "`_`-prefixed keys (e.g. `_rule`, `_written`) are provenance metadata "
+                         "and are skipped")
+    ap.add_argument("--cluster-by", choices=("task",), default=None,
+                    help="unit of analysis for the paired comparison. Default (omitted) pairs "
+                         "on (task, rep). `task` collapses every rep of a task into one row of "
+                         "rep means first, so n is the number of TASKS rather than cells "
+                         "(reps of one task are not independent observations).")
     ap.add_argument("--i-know-the-data-is-suspect", action="store_true", dest="override",
                     help="print comparisons even if the mandatory sanity block refuses")
     ap.add_argument("--exact", action="store_true",
@@ -638,7 +714,10 @@ def main(argv=None):
     shapes = None
     if args.shapes:
         with open(args.shapes) as fh:
-            shapes = {str(k): v for k, v in json.load(fh).items()}
+                # `_`-prefixed keys are the writer's provenance metadata (`_rule`, `_written`),
+            # not task ids -- without this filter per_shape_breakdown prints them as shapes.
+            shapes = {str(k): v for k, v in json.load(fh).items()
+                      if not str(k).startswith("_")}
 
     # ---- all arm-pairs, Holm-corrected across the family ----
     import itertools
@@ -646,12 +725,16 @@ def main(argv=None):
     pair_results = []
     for i, j in pairs:
         (la, ra, _), (lb, rb, _) = arms[i], arms[j]
-        pair_results.append(compare_pair(la, ra, lb, rb))
+        pair_results.append(compare_pair(la, ra, lb, rb, cluster_by=args.cluster_by))
     p_holm = holm([r["p"] for r in pair_results])
 
     print("\n" + "=" * 78)
     print(f"ARM-PAIR COMPARISONS ({len(pairs)} pair(s) from {len(arms)} arms, "
           f"Holm-corrected across the family)")
+    if args.cluster_by == "task":
+        n_tasks = len({r["test_id"] for _, rows, _ in arms for r in rows})
+        print(f"  clustered by task: reps collapsed to per-task means, "
+              f"effective n = {n_tasks} tasks (before pairing/infra drops)")
     for res, ph in zip(pair_results, p_holm):
         print_pair_report(res, p_holm=ph)
 

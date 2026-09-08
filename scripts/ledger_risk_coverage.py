@@ -493,17 +493,29 @@ def discover_cell_files(results_dir: Path, prefix: str = "ladder03") -> List[Pat
     """Every ``<prefix>_*.json`` CELL file in ``results_dir`` -- excludes ``*_summary.json``,
     ``*_report_v3.json`` and ``*.jsonl`` siblings. The prereg'd corpus is ``ladder03`` (the
     default); other prefixes exist so a probe campaign can be read without silently matching
-    zero files."""
-    cell_re = re.compile(rf"^{re.escape(prefix)}_.+_r\d+\.json$")
+    zero files.
+
+    ``prefix`` may be a COMMA-SEPARATED list (``"ladder03,mint02"``), matching
+    ``compare_arms.load_arm``'s comma-joined run-ids: a file is kept if it matches ANY of them.
+    A single prefix behaves exactly as before. Blank entries are ignored, and a file matched by
+    two prefixes is returned once, in sorted order.
+    """
+    prefixes = [p.strip() for p in str(prefix).split(",") if p.strip()]
+    seen = set()
     out = []
-    for path in sorted(results_dir.glob(f"{prefix}_*.json")):
-        name = path.name
-        if name.endswith("_summary.json") or "_report_v3" in name:
-            continue
-        if not cell_re.match(name):
-            continue
-        out.append(path)
-    return out
+    for pref in prefixes:
+        cell_re = re.compile(rf"^{re.escape(pref)}_.+_r\d+\.json$")
+        for path in results_dir.glob(f"{pref}_*.json"):
+            name = path.name
+            if name.endswith("_summary.json") or "_report_v3" in name:
+                continue
+            if not cell_re.match(name):
+                continue
+            if path in seen:
+                continue
+            seen.add(path)
+            out.append(path)
+    return sorted(out)
 
 
 def load_cell(path: Path) -> Optional[Dict[str, Any]]:
@@ -713,8 +725,12 @@ def build_report(cells: List[Dict[str, Any]]) -> Dict[str, Any]:
     report["inversions_dev"] = inversions(dev_derive_on)
     report["inversions_holdout"] = inversions(holdout_derive_on)
 
-    # 5. Strata: per-model / per-host tables where n>=6, dev derive-ON.
-    for keys, label in ((["model"], "model"), (["host"], "host")):
+    # 5. Strata: per-model / per-host / per-(model, task) tables where n>=6, dev derive-ON.
+    # The model x test_id table is what a per-task read of the campaign needs (which tasks carry
+    # the coverage, and on which model) -- pooling over tasks hides a signal that only fires on
+    # one shape. Same n>=6 guard as the other strata: a smaller group emits its count only.
+    for keys, label in ((["model"], "model"), (["host"], "host"),
+                        (["model", "test_id"], "model_task")):
         rows = {}
         for key, group in stratify(dev_derive_on, keys).items():
             entry = {"n": len(group)}
@@ -1062,8 +1078,9 @@ def main() -> int:
     ap.add_argument("--provisional", action="store_true",
                      help="label output as provisional (mid-sweep corpus)")
     ap.add_argument("--prefix", default="ladder03",
-                     help="campaign filename prefix to read (default ladder03, the prereg'd "
-                          "corpus; anything else is off-prereg and should be labeled as such)")
+                     help="campaign filename prefix to read, or a comma-separated list of them "
+                          "(default ladder03, the prereg'd corpus; anything else is off-prereg "
+                          "and should be labeled as such)")
     args = ap.parse_args()
 
     results_dir = Path(args.results_dir) if args.results_dir else _default_results_dir()
@@ -1076,7 +1093,7 @@ def main() -> int:
         print(f"no {args.prefix}_*_rN.json cell files in {results_dir} -- wrong --prefix or dir?",
               file=sys.stderr)
         return 1
-    print(f"discovered {len(files)} ladder03 cell files in {results_dir}")
+    print(f"discovered {len(files)} {args.prefix} cell files in {results_dir}")
 
     cells: List[Dict[str, Any]] = []
     n_parse_failed = 0
