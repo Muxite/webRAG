@@ -126,9 +126,13 @@ _HOST_DERIVE_PHRASE_DIMENSIONS: Dict[str, frozenset] = {
     "time": frozenset({"time", "duration", "hours", "minutes", "seconds"}),
     "currency": frozenset({"cost", "costs", "price", "budget", "revenue", "euro", "euros",
                            "dollar", "dollars"} | {code.lower() for code in _CURRENCY_CODES}),
-    "count": frozenset({"capacity", "seat", "seats", "seating", "count", "floors",
-                        "population", "attendance"}),
+    "count": frozenset({"seat", "seats", "seating", "count", "floors", "population",
+                        "attendance"}),
 }
+# "capacity" alone is deliberately NOT a cue: it names a count ("seating capacity"), a power
+# ("installed capacity, in MW") or a volume ("reservoir capacity") depending on the field, and a
+# cue that guessed one of them would exclude a correct operand of another. The unit hint in the
+# phrase decides those cases ("in MW" -> power); with no unit word the gate stays open.
 
 #: Qualifier tokens that make two same-dimension index labels name DIFFERENT measurements, mapped
 #: to a canonical form so a page that abbreviates ("Max. depth") and one that does not ("and a

@@ -993,6 +993,15 @@ def test_a_time_field_with_no_duration_on_the_page_refuses_rather_than_reading_t
     assert result["value"] is None
 
 
+def test_capacity_alone_implies_no_dimension_so_a_power_operand_is_never_excluded():
+    """"capacity" is a count in "seating capacity" and a power in "installed capacity"; a cue that
+    picked one would exclude the other's correct operand. Only the unit word decides."""
+    assert LedgerToolkit._host_derive_phrase_dimensions("its total installed capacity") == set()
+    assert "power" in LedgerToolkit._host_derive_phrase_dimensions(
+        "its total installed capacity, in MW")
+    assert LedgerToolkit._host_derive_phrase_dimensions("its seating capacity") == {"count"}
+
+
 def test_a_field_phrase_implying_no_dimension_gates_nothing(kit):
     """221's formula sides (`height`, `floor count`) imply nothing / count; 218's imply length
     and area. Both rosters compute exactly as before the gate existed."""
