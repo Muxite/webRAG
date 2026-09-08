@@ -1247,6 +1247,11 @@ class LedgerToolkit:
         rows were that one substitution. An unfetched entity has no number on disk, so the honest
         outcome is a refusal, not another entity's figure.
 
+        Slug coverage is decisive whenever it exists: if ANY (non-rival-owned) page's slug names
+        the entity, only pages tied at the best slug coverage are kept and lead text is not
+        consulted; lead-text coverage decides only when no page's slug names the entity at all
+        (a "List of tallest chimneys" page, claimed by nobody, still serves every slot).
+
         A page is dropped outright when its URL SLUG names one of ``rivals`` -- the mandate's other
         entities -- better than it names ``entity``. That is the second half of the same finding:
         removing the fallback alone moved nothing on the stored cells, because the real Inco
@@ -1270,20 +1275,41 @@ class LedgerToolkit:
         rival_slug = [self._host_derive_slug_coverage(tokens, page_ids)
                       for tokens in {frozenset(_significant_tokens(rival)) for rival in rivals}
                       if tokens and set(tokens) != wanted]
-        coverage: Dict[str, float] = {}
-        for page_id in page_ids:
-            _, text = self._host_derive_page(page_id)
-            lead_tokens = set(_tokens(text[:_HOST_DERIVE_PREFIX_CHARS]))
-            coverage[page_id] = max(slug_cover[page_id],
-                                    len(wanted & lead_tokens) / len(wanted))
         owned = {page_id for page_id in page_ids
                  if any(rival[page_id] > slug_cover[page_id] for rival in rival_slug)}
+        best_slug = max((slug_cover[page_id] for page_id in page_ids if page_id not in owned),
+                        default=0.0)
+        # Secondary slug measure over the entity's RAW token sequence, accent fragments included:
+        # the significant-token view of "Puskás Aréna" is the single token `pusk`, which the
+        # old stadium's slug (`Ferenc_Puskás_Stadium`) carries too. Over the raw tokens the
+        # Aréna's own slug covers 4/4 and the old stadium's 2/4. Only ever consulted to split a
+        # tie at the best significant coverage, so a slug that ties on both (`Mississippi` vs
+        # `Mississippi_River`) keeps both pages for the ranker, exactly as before.
+        raw_wanted = set(_tokens(entity))
+        raw_cover = self._host_derive_slug_coverage(raw_wanted, page_ids) if raw_wanted else {
+            page_id: 0.0 for page_id in page_ids}
+        coverage: Dict[str, float] = {}
+        for page_id in page_ids:
+            if best_slug > 0:
+                # Some page's slug names the entity: only slug-covering pages stay candidates.
+                # 215 live read the capacity off the OLD stadium's article, whose lead names the
+                # Aréna that replaced it -- lead coverage 1.0, tied with the real page. A lead
+                # mention is not a claim to be the entity's article; a slug is.
+                coverage[page_id] = slug_cover[page_id]
+                continue
+            _, text = self._host_derive_page(page_id)
+            lead_tokens = set(_tokens(text[:_HOST_DERIVE_PREFIX_CHARS]))
+            coverage[page_id] = len(wanted & lead_tokens) / len(wanted)
         best = max((coverage[page_id] for page_id in page_ids if page_id not in owned),
                    default=0.0)
         if best <= 0:
             return []
-        return [page_id for page_id in page_ids
+        kept = [page_id for page_id in page_ids
                 if page_id not in owned and coverage[page_id] >= best]
+        if best_slug > 0 and len(kept) > 1:
+            best_raw = max(raw_cover[page_id] for page_id in kept)
+            kept = [page_id for page_id in kept if raw_cover[page_id] >= best_raw]
+        return kept
 
     def _host_derive_slug_coverage(self, wanted: Any, page_ids: Sequence[str]) -> Dict[str, float]:
         """Fraction of the identifying tokens ``wanted`` that each page's URL SLUG carries."""

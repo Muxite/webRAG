@@ -1000,3 +1000,46 @@ def test_a_field_phrase_implying_no_dimension_gates_nothing(kit):
     other = LedgerToolkit()
     assert _buildings_kit(other).host_derive(statement("221"))["winner_entity"] == (
         "One World Trade Center")
+
+
+# --------------------------------------------------------------------------------------------
+# A page whose SLUG names the entity outranks one that merely mentions it in its lead.
+# --------------------------------------------------------------------------------------------
+
+FERENC_PUSKAS_URL = "https://en.wikipedia.org/wiki/Ferenc_Pusk%C3%A1s_Stadium"
+FERENC_PUSKAS_PAGE = """Ferenc Puskás Stadium
+The Ferenc Puskás Stadium was a football stadium in Budapest, demolished in 2016 and replaced by the Puskás Aréna.
+Capacity
+38,652
+Closed
+2016
+"""
+
+
+def test_a_slug_naming_the_entity_outranks_a_page_that_only_mentions_it_in_its_lead(kit):
+    """215 live (2 cells): Capacity was read off the OLD stadium's article, whose lead names the
+    Aréna that replaced it, giving it lead coverage 1.0 and a tie with the real page. A slug is
+    the page's own claim about whose article it is: once any page's slug names the entity, only
+    slug-covering pages stay candidates."""
+    kit.register_page(FERENC_PUSKAS_URL, FERENC_PUSKAS_PAGE)
+    kit.register_page(PUSKAS_URL, PUSKAS_PAGE_SCALED)
+
+    assert kit._host_derive_candidate_pages("Puskás Aréna") == ["p2"]
+    result = kit.host_derive(statement("215"))
+
+    assert result["reason"] == "computed"
+    assert [row["entry"]["value"] for row in _selected(result)] == ["€ 533", "67,215"]
+    assert result["value"] == pytest.approx(533_000_000 / 67_215, rel=1e-6)
+    assert {row["page_id"] for row in _selected(result)} == {"p2"}
+
+
+def test_lead_coverage_still_decides_when_no_slug_names_the_entity(kit):
+    """The comparison-page case: a slug naming nobody is claimed by nobody, so lead text decides
+    exactly as before; a page with a partial slug match beats a lead-only one."""
+    kit.register_page("https://en.wikipedia.org/wiki/List_of_tallest_chimneys",
+                      "List of tallest chimneys\nThe Inco Superstack and the GRES-2 chimney.\n"
+                      "Height\n380.0\nm\n")
+    assert kit._host_derive_candidate_pages("Inco Superstack") == ["p1"]
+    kit.register_page("https://en.wikipedia.org/wiki/Superstack_(disambiguation)",
+                      "Superstack\nA superstack is a tall chimney.\n")
+    assert kit._host_derive_candidate_pages("Inco Superstack") == ["p2"]
