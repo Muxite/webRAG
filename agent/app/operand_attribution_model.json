@@ -9,7 +9,8 @@
   "unit_present",
   "unit_hint_match",
   "is_trivial_bare_int",
-  "value_is_year_like"
+  "value_is_year_like",
+  "qualifier_conflict"
  ],
  "weights": {
   "label_token_overlap": 4.0,
@@ -19,7 +20,8 @@
   "unit_present": 0.0,
   "unit_hint_match": 1.5,
   "is_trivial_bare_int": -3.0,
-  "value_is_year_like": 0.0
+  "value_is_year_like": 0.0,
+  "qualifier_conflict": -4.0
  },
  "intercept": -2.0
 }

@@ -37,6 +37,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import unicodedata
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
@@ -68,6 +69,8 @@ FEATURE_NAMES: List[str] = [
     "is_trivial_bare_int",
     # A bare 1900-2099 integer is a date, not a measurement.
     "value_is_year_like",
+    # The phrase asks for a MAXIMUM and the label says "Average" (or min/mean/total/median).
+    "qualifier_conflict",
 ]
 
 #: The hand rule. Only five features carry weight; the other three are measured and reported but
@@ -84,6 +87,14 @@ HAND_WEIGHTS: Dict[str, float] = {
     "unit_hint_match": 1.5,
     "is_trivial_bare_int": -3.0,
     "value_is_year_like": 0.0,
+    # Large and negative: a qualifier disagreement is not a weak signal, it is the wrong number.
+    # `_HOST_DERIVE_LABEL_QUALIFIERS` already REFUSES such a pair after the fact, so 211 selected
+    # "Average depth" at 0.989 for a MAXIMUM-depth field and was then refused -- the refusal was
+    # right and the ranking was wrong, which cost every cell where a correctly-qualified label was
+    # also on the page. This feature is 0.0 for every entry that does not conflict, so it moves no
+    # existing score and the 0.93 floor's derivation (see `_HOST_DERIVE_MIN_SCORE`) is untouched;
+    # it only pushes a conflicting label DOWN, below any label that agrees or is unqualified.
+    "qualifier_conflict": -4.0,
 }
 HAND_INTERCEPT = -2.0
 
@@ -105,9 +116,36 @@ _STOPWORDS = frozenset({
 })
 
 
+#: Letters that carry no combining mark to strip, so NFKD alone leaves them out of ``[a-z0-9]+``
+#: and silently drops them from a token. Kept explicit and short rather than pulling in a
+#: transliteration dependency for a handful of characters.
+_FOLD_MAP = str.maketrans({"ø": "o", "Ø": "o", "đ": "d", "Đ": "d", "ł": "l", "Ł": "l",
+                           "ß": "ss", "æ": "ae", "Æ": "ae", "œ": "oe", "Œ": "oe",
+                           "ð": "d", "Ð": "d", "þ": "th", "Þ": "th"})
+
+
+def fold_diacritics(text: Any) -> str:
+    """``text`` with diacritics folded onto their ASCII base letters (``"Tōkaidō"`` -> ``"Tokaido"``).
+
+    :func:`_tokens` matches ``[a-z0-9]+``, so before this fold a macron did not merely fail to
+    compare equal -- it SPLIT the word: ``"Tōkaidō Shinkansen"`` tokenised to
+    ``["t", "kaid", "shinkansen"]``, both fragments then died in :func:`_content_tokens`'s
+    single-character filter, and the entity was left matching on ``"shinkansen"`` alone. That is
+    how ``host_prefetch`` resolved "Tōkaidō Shinkansen" to *San'yō Shinkansen*: the correct
+    article (returned by the API under its unaccented redirect title "Tokaido Shinkansen") scored
+    the same 0.5 coverage as every other Shinkansen page and lost the tie on token sums.
+
+    Wikipedia titles and their redirects differ in exactly this way, so folding is what makes an
+    entity name and its article title comparable at all.
+    """
+    stripped = "".join(ch for ch in unicodedata.normalize("NFKD", str(text or ""))
+                       if not unicodedata.combining(ch))
+    return stripped.translate(_FOLD_MAP)
+
+
 def _tokens(text: Any) -> List[str]:
-    """Lowercased alphanumeric tokens of ``text``, in order, stopwords kept."""
-    return _TOKEN_RE.findall(str(text or "").lower())
+    """Lowercased alphanumeric tokens of ``text``, in order, stopwords kept, diacritics folded."""
+    return _TOKEN_RE.findall(fold_diacritics(text).lower())
 
 
 def _content_tokens(text: Any) -> Set[str]:
@@ -210,6 +248,40 @@ def _bare_int(entry: QuantityRef) -> Optional[int]:
     return int(raw)
 
 
+#: Qualifier words whose presence changes WHICH number of a field a page states. Mirrors
+#: `ledger_tools._HOST_DERIVE_LABEL_QUALIFIERS`, which uses the same table for the post-hoc
+#: refusal; kept here rather than imported because `ledger_tools` imports this module.
+_QUALIFIERS: Dict[str, str] = {
+    "max": "max", "maximum": "max", "deepest": "max", "longest": "max", "highest": "max",
+    "min": "min", "minimum": "min", "shallowest": "min", "shortest": "min", "lowest": "min",
+    "avg": "avg", "average": "avg", "mean": "avg",
+    "total": "total", "median": "median",
+}
+
+
+def _qualifiers_of(text: Any) -> Set[str]:
+    """The distinct qualifier senses named by ``text`` ("MAXIMUM DEPTH" -> ``{"max"}``)."""
+    return {_QUALIFIERS[token] for token in _tokens(text) if token in _QUALIFIERS}
+
+
+def _qualifier_conflict(field_phrase: str, entry: Any) -> float:
+    """1.0 when the phrase and the entry's label both name a qualifier and they DISAGREE.
+
+    Only a disagreement counts. An unqualified label ("Depth") against "MAXIMUM DEPTH" scores
+    0.0: the page may simply not qualify its row, and refusing it here would cost availability
+    for no evidence -- exactly the reading `_host_derive_labels_compatible` already takes.
+    """
+    wanted = _qualifiers_of(field_phrase)
+    if not wanted:
+        return 0.0
+    label = str(getattr(entry, "label", "") or "")
+    section = str(getattr(entry, "section", "") or "")
+    found = _qualifiers_of(f"{section} {label}")
+    if not found:
+        return 0.0
+    return float(bool(found - wanted))
+
+
 def features(slot: Any, entry: QuantityRef, *, page_url: str = "",
              page_text: str = "") -> List[float]:
     """The :data:`FEATURE_NAMES` vector for one ``(slot, entry)`` pair on one page.
@@ -237,6 +309,7 @@ def features(slot: Any, entry: QuantityRef, *, page_url: str = "",
               if str(entry.unit or "").strip() else False),
         float(bare is not None and abs(bare) < 100),
         float(bare is not None and 1900 <= bare <= 2099),
+        _qualifier_conflict(field_phrase, entry),
     ]
 
 

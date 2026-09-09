@@ -639,18 +639,40 @@ def test_two_slots_reading_the_SAME_field_must_agree_on_their_index_LABEL(kit):
     `Average depth` row and Tanganyika's carried a maximum one; both are metres, so every unit
     check passed and the host summed 744.4 + 1,471 = 2,215.4 m -- two well-supported operands that
     are not comparable as a pair (`HOST_DERIVE_REPLAY_2026-09-08.md` section 15.5, family A). A
-    same-field mandate now requires the two LABELS to be compatible too."""
+    same-field mandate now requires the two LABELS to be compatible too.
+
+    2026-09-09: the REASON moved from `operand_field_mismatch` to `operand_not_found` when the
+    ranker gained `qualifier_conflict`. "Average depth" now scores BELOW the 0.93 floor against a
+    MAXIMUM-depth phrase, so it is never selected and there is no pair left to find incompatible.
+    That is the more accurate diagnosis of this page -- it carries no maximum depth at all -- and
+    the guarantee this test exists for is unchanged: no value, no node, nothing minted. The
+    post-hoc `_host_derive_labels_compatible` backstop still fires for the case the ranker cannot
+    see, where the PHRASE names no qualifier and the two LABELS disagree with each other."""
     kit.register_page(BAIKAL_URL, BAIKAL_PAGE_AVERAGE_ONLY)
     kit.register_page(TANGANYIKA_URL, TANGANYIKA_PAGE)
 
     result = kit.host_derive(statement("211"))
 
-    assert result["reason"] == "operand_field_mismatch"
+    assert result["reason"] == "operand_not_found"
     assert result["value"] is None and result["node_id"] is None
-    assert [row["entry"]["label"] for row in _selected(result)] == ["Average depth", "Max. depth"]
-    assert kit.artifact()["derivation_refusals"][-1]["code"] == "OPERAND_FIELD_MISMATCH"
     assert not [node for node in kit.artifact()["nodes"]
                 if node["minted_by"] == HOST_DERIVE_TAG], "nothing is minted for a refused cell"
+
+
+def test_a_maximum_depth_row_outranks_an_average_one_on_the_same_page(kit):
+    """The 211 fix itself. Before `qualifier_conflict`, "Average depth" scored 0.989 for a
+    MAXIMUM-depth field and was SELECTED, then refused after the fact -- the refusal was right and
+    the ranking was wrong, which lost every cell where the correctly-qualified row was also on the
+    page. Now the conflicting label ranks below the floor and the max row is taken."""
+    both = BAIKAL_PAGE_AVERAGE_ONLY + "Maximum depth\n1,642\nm\n"
+    kit.register_page(BAIKAL_URL, both)
+    kit.register_page(TANGANYIKA_URL, TANGANYIKA_PAGE)
+
+    result = kit.host_derive(statement("211"))
+
+    labels = [row["entry"]["label"] for row in _selected(result)]
+    assert labels and "Average depth" not in labels, labels
+    assert result["reason"] == "computed", result["reason"]
 
 
 def test_the_same_qualifier_spelled_two_ways_is_one_field_not_a_mismatch(kit):

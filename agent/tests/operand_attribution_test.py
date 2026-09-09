@@ -319,3 +319,38 @@ def test_a_tunnel_length_under_a_technical_header_outranks_a_prose_and_a_total_o
                          page_text=page)
     assert ranked[0][1] is infobox
     assert ranked[0][0] > ranked[1][0]
+
+
+# ---------------------------------------------------------------------------------------------
+# Diacritic folding (2026-09-09). `_TOKEN_RE` is `[a-z0-9]+`, so before the fold an accented
+# letter did not merely compare unequal -- it SPLIT the word and both fragments were then dropped
+# by `_content_tokens`'s single-character filter.
+# ---------------------------------------------------------------------------------------------
+
+def test_an_accented_name_tokenises_to_the_same_tokens_as_its_unaccented_redirect():
+    from agent.app.operand_attribution import _tokens, _content_tokens
+
+    assert _tokens("Tōkaidō Shinkansen") == ["tokaido", "shinkansen"]
+    assert _content_tokens("Tōkaidō Shinkansen") == _content_tokens("Tokaido Shinkansen")
+    # The pre-fold failure, stated as the thing that must never come back.
+    assert "kaid" not in _tokens("Tōkaidō Shinkansen")
+
+
+def test_folding_covers_letters_that_carry_no_combining_mark():
+    from agent.app.operand_attribution import _tokens
+
+    assert _tokens("Puskás Aréna") == ["puskas", "arena"]
+    assert _tokens("Øresund") == ["oresund"]
+    assert _tokens("Gdańsk Łódź") == ["gdansk", "lodz"]
+
+
+def test_an_accented_entity_now_matches_its_own_article_title_exactly():
+    """The 216 resolver bug: 'Tōkaidō Shinkansen' scored 0.5 against its own article and lost the
+    tie to San'yō Shinkansen, which merely shares the word 'Shinkansen'."""
+    from agent.app.host_prefetch import _candidates
+
+    hits = [("Tokaido Shinkansen", ""), ("San'yō Shinkansen", "")]
+    ranked = _candidates(hits, "Tōkaidō Shinkansen", "route length in km")
+    assert ranked[0].title == "Tokaido Shinkansen"
+    assert ranked[0].exact is True
+    assert ranked[0].coverage == 1.0

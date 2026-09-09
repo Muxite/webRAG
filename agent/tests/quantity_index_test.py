@@ -487,3 +487,81 @@ class TestRestatementAfterSuperscript:
         text = "Max.\ndepth\n1,642\nm\n(5,387\nft)\n"
         entries = build_index(text)
         assert [(e.value, e.unit) for e in entries] == [("1,642", "m"), ("5,387", "ft")]
+
+
+# =============================================================================================
+# Sentence-local labels for prose quantities (2026-09-09).
+#
+# `_scan_prose` minted `label=""` for every inline quantity. That zero is not neutral:
+# `label_token_overlap` is the ranker's heaviest feature (weight 4.0), so a label-less entry
+# cannot reach the 0.93 floor however plainly the sentence says what the number is. Measured on
+# the tier-5 suite before this: Dettifoss's "100 metres wide" 0.731, the Tokaido journey time
+# 0.818, the GRES-2 chimney 0.924 -- all three correct numbers, all three unusable.
+# =============================================================================================
+
+class TestSentenceLocalLabel:
+
+    def _label(self, text, needle):
+        from agent.app.quantity_index import sentence_local_label
+        start = text.index(needle)
+        return sentence_local_label(text, start, start + len(needle))
+
+    def test_a_trailing_adjective_names_the_measurement(self):
+        assert self._label("The falls are 100 metres wide and drop far.", "100") == "width"
+        assert self._label("The tunnel is 57.09 km long.", "57.09") == "length"
+
+    def test_a_preceding_noun_is_used_when_nothing_follows_the_quantity(self):
+        assert self._label("with a maximum depth of 1,642 m", "1,642") == "depth"
+
+    def test_a_cue_immediately_after_the_unit_words_is_still_found(self):
+        """`_scan_prose`'s match spans the UNIT words too, so a window opened at the match end
+        would miss the cue in "100 metres wide" -- the commonest shape there is."""
+        from agent.app.quantity_index import build_index
+
+        entries = build_index("The falls are 100 metres wide.")
+        assert [(e.value, e.label) for e in entries] == [("100", "width")]
+
+    def test_a_following_cue_wins_over_a_preceding_one(self):
+        """"...tallest stack at 419.7 metres tall" -- both cues agree here, but the rule must be
+        stated and pinned, because the nearest-following word is the one describing THIS number."""
+        text = "the world's tallest flue-gas stack at 419.7 metres (1,377 ft) wide."
+        assert self._label(text, "419.7") == "width"
+
+    def test_a_quantity_whose_clause_names_no_measurement_gets_no_label(self):
+        """Inventing a label the page did not use would be inventing evidence."""
+        assert self._label("It was commissioned in 1987 by the ministry.", "1987") == ""
+
+    def test_a_cue_beyond_the_sentence_end_does_not_leak_in(self):
+        assert self._label("It opened in 1987. The tower is tall.", "1987") == ""
+
+    def test_single_newlines_are_not_clause_boundaries(self):
+        """The flattened Wikipedia body puts a quantity's unit, its parenthetical restatement and
+        its cue on separate LINES; treating "\\n" as a boundary hid every cue this rule needs."""
+        text = "stack at\n419.7 metres (1,377\nft)\ntall. The reinforced chimney"
+        assert self._label(text, "419.7") == "height"
+
+    def test_a_paragraph_break_is_a_clause_boundary(self):
+        text = "It opened in 1987\n\nThe tower is tall."
+        assert self._label(text, "1987") == ""
+
+
+class TestCompoundDurationFragments:
+
+    def test_the_folded_duration_replaces_its_own_two_fragments(self):
+        """"2 hours 21 minutes" reaches `_scan_prose` as TWO quantities and `_scan_durations` as
+        one folded 2.35 h. Once prose carried labels, the "21 minutes" fragment out-ranked the
+        fold and task 216 computed a km/MIN speed -- a wrong value, not just a lost one."""
+        from agent.app.quantity_index import build_index
+
+        entries = build_index("The fastest journey takes 2 hours 21 minutes.")
+        assert [(e.value, e.unit) for e in entries] == [("2.35", "h")]
+        # Deliberately UNLABELLED: durations are excluded from `_MEASURE_CUES` (see the note
+        # there). Unlabelled it cannot clear the 0.93 floor, which is the honest outcome for a
+        # page that states several services' journey times.
+        assert entries[0].label == ""
+
+    def test_a_lone_duration_outside_a_compound_is_still_indexed(self):
+        from agent.app.quantity_index import build_index
+
+        entries = build_index("The journey takes 90 minutes.")
+        assert [(e.value, e.unit, e.label) for e in entries] == [("90", "minutes", "")]

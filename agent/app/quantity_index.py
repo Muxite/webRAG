@@ -60,7 +60,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from agent.app.testing.evidence_graph import Quantity as _ParsedQuantity
 from agent.app.testing.evidence_graph import normalize_for_match, parse_quantity
@@ -697,6 +697,75 @@ _PROSE_QUANTITY = re.compile(
 )
 
 
+#: Words a page uses to say WHAT it just measured, mapped to the noun the mandate would use.
+#: Adjectives fold to their noun ("100 metres wide" -> width); nouns map to themselves. The label
+#: emitted is always a word the PAGE used -- this table only canonicalises the adjective forms, it
+#: never invents a synonym the text does not contain.
+_MEASURE_CUES: Dict[str, str] = {
+    "wide": "width", "width": "width",
+    "tall": "height", "tallest": "height", "high": "height", "highest": "height",
+    "height": "height", "drop": "height", "deep": "depth", "depth": "depth",
+    "long": "length", "length": "length",
+    "thick": "thickness", "thickness": "thickness",
+    "span": "span", "elevation": "elevation", "diameter": "diameter",
+    "area": "area", "capacity": "capacity",
+}
+# DURATIONS ARE DELIBERATELY ABSENT. A width, height, length or depth is an attribute of the
+# ARTICLE'S SUBJECT -- a page about Dettifoss states one width -- so a cue beside the number
+# identifies it. A journey time is an attribute of a SERVICE, and one rail article states many
+# ("the fastest Nozomi ... 2 hours 21 minutes", "about 3 hours" for a Hikari, a whole timetable
+# of historical bests). Labelling those "journey" made all of them equally eligible for task
+# 216's "FASTEST scheduled Nozomi journey time" and the ranker picked by document order: six
+# stored cells computed 515.4 km / 3 h = 171.8 km/h. Attributing a duration to the right service
+# needs machinery this rule does not have, so it declines to guess.
+
+#: A clause ends at a sentence mark or a PARAGRAPH break. Neither commas nor single newlines are
+#: boundaries, and both exclusions are forced by the text this actually reads: the flattened
+#: Wikipedia body puts a quantity's unit, its parenthetical restatement and its cue on separate
+#: LINES -- "at\n419.7 metres (1,377\nft)\ntall." -- so a single "\n" boundary hides the very cue
+#: the label comes from, and a comma boundary is cut by the "(1,377" thousands separator.
+_CLAUSE_SPLIT = re.compile(r"[.;:!?]|\n[^\S\n]*\n")
+
+_CUE_WORD = re.compile(r"[A-Za-z]+")
+
+
+def sentence_local_label(text: str, start: int, end: int) -> str:
+    """The measurement word ``text`` uses for the quantity spanning ``[start, end)``, or ``""``.
+
+    ``_scan_prose`` mints ``label=""`` for every inline quantity, because a prose number carries
+    no infobox label. That zero is not neutral: ``operand_attribution.label_token_overlap`` is the
+    ranker's heaviest feature (weight 4.0), so a label-less entry cannot reach the 0.93 floor no
+    matter how plainly the sentence says what it is. Measured on the tier-5 suite: Dettifoss's
+    "100 metres wide" scored 0.731, the Tokaido journey time 0.818, and the GRES-2 chimney 0.924
+    -- three availability losses whose numbers were on the page, correct, and unlabelled.
+
+    The rule is deliberately literal: take the cue word NEAREST the quantity within its own
+    clause, preferring one that follows it ("100 metres wide") over one that precedes it, and
+    canonicalise only adjective-to-noun via :data:`_MEASURE_CUES`. Returning a word the page did
+    not use would be inventing evidence; returning ``""`` when the clause names no measurement is
+    the honest answer and leaves the entry exactly as unrankable as it is today.
+    """
+    if not text:
+        return ""
+    left = 0
+    right = len(text)
+    for match in _CLAUSE_SPLIT.finditer(text, 0, start):
+        left = match.end()
+    tail = _CLAUSE_SPLIT.search(text, end)
+    if tail:
+        right = tail.start()
+
+    after = [(m.start(), m.group(0).lower()) for m in _CUE_WORD.finditer(text, end, right)]
+    before = [(m.start(), m.group(0).lower()) for m in _CUE_WORD.finditer(text, left, start)]
+    for position, word in after:
+        if word in _MEASURE_CUES:
+            return _MEASURE_CUES[word]
+    for position, word in reversed(before):
+        if word in _MEASURE_CUES:
+            return _MEASURE_CUES[word]
+    return ""
+
+
 def _scan_prose(text: str) -> List[QuantityRef]:
     """Every inline ``NUMBER unit`` mention in ``text`` (see the module docstring)."""
     entries: List[QuantityRef] = []
@@ -726,7 +795,10 @@ def _scan_prose(text: str) -> List[QuantityRef]:
             continue
         start = match.start("value")
         entries.append(QuantityRef(
-            label="",
+            # The VALUE's span, not `match.end()`: the match extends over the unit words, and a
+            # cue sitting immediately after them ("100 metres wide") would then fall outside the
+            # window and be missed. Unit words inside the window are harmless -- none is a cue.
+            label=sentence_local_label(text, start, start + len(value_text)),
             value=value_text,
             unit=unit,
             start=start,
@@ -743,9 +815,14 @@ def _scan_prose(text: str) -> List[QuantityRef]:
 #: it, with no shared dimension between "hours" and "minutes" for anything downstream to combine.
 #: A rail-average-speed derivation needs a single duration in one unit (``distance / time``), so
 #: this idiom is recognized here and folded into one decimal-hours quantity.
+#: The connector is optional and may be a newline: pages write "2 hours 21 minutes", "2 hours and
+#: 30 minutes" and (flattened) "2 hours\n21 minutes" for the same idiom. Missing the spelled-out
+#: "and" form was not merely a lost fold -- it left the phrase's FIRST half, "2 hours", standing
+#: in the index as if it were a complete journey time, and once prose carried labels that fragment
+#: was selected for task 216 and computed 515.4 km / 2 h = 257.7 km/h on six stored cells.
 _COMPOUND_DURATION = re.compile(
-    r"(?<!\d)(?P<h>\d+(?:\.\d+)?)[^\S\n]*(?:hours?|hrs?|h)\b[^\S\n]*"
-    r"(?P<m>\d+(?:\.\d+)?)[^\S\n]*(?:minutes?|mins?|min)\b",
+    r"(?<!\d)(?P<h>\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)\b\s*(?:and\s+)?"
+    r"(?P<m>\d+(?:\.\d+)?)\s*(?:minutes?|mins?|min)\b",
     re.IGNORECASE,
 )
 
@@ -778,7 +855,7 @@ def _scan_durations(text: str) -> List[QuantityRef]:
             continue
         decimal_hours = hours + minutes / 60.0
         entries.append(QuantityRef(
-            label="",
+            label=sentence_local_label(text, match.start(), match.end()),
             value=_format_decimal(decimal_hours),
             unit="h",
             start=match.start(),
@@ -818,7 +895,17 @@ def build_index(page_text: Optional[str], *, limit: Optional[int] = 40) -> List[
     seen = set()
     seen_values = set()
     out: List[QuantityRef] = []
-    for entry in _scan_infobox(text) + _scan_prose(text) + _scan_durations(text):
+    durations = _scan_durations(text)
+    # "2 hours 21 minutes" reaches `_scan_prose` as TWO quantities ("2 h" and "21 min") and
+    # `_scan_durations` as one folded 2.35 h. The fragments are not independent readings of the
+    # page -- they are halves of the phrase the fold already represents -- so they are dropped
+    # here, where the scanners are reconciled. This mattered only once prose entries carried a
+    # `sentence_local_label`: unlabelled, the "21 minutes" fragment could never out-rank anything,
+    # and labelled "journey" it beat the folded duration and produced a km/MIN speed for task 216.
+    spans = [(d.start, d.end) for d in durations]
+    prose = [e for e in _scan_prose(text)
+             if not any(lo <= e.start and e.end <= hi for lo, hi in spans)]
+    for entry in _scan_infobox(text) + prose + durations:
         value_key = normalize_for_match(entry.value)
         key = (value_key, normalize_for_match(entry.unit))
         if key in seen:
