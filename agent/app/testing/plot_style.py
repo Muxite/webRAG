@@ -153,3 +153,76 @@ def square_fig(side_px: int = DEFAULT_SIDE_PX, dpi: int = 160, *,
 def savefig_square(fig, out_path, dpi: int = 160) -> None:
     fig.savefig(out_path, dpi=dpi, facecolor=SURFACE)
     plt.close(fig)
+
+
+# =========================================================================================
+# Dark instrument surface -- the second ground, shared by the ledger step-through deck.
+#
+# Two grounds, ONE identity. The gallery's charts stay on the frozen light paper above
+# (they land in docs, the README and posts); the run deck is dark, because it is read as
+# an instrument rather than as a document. Both draw their accents from the SAME magma
+# family, so a reader who has seen one recognises the other.
+#
+# These tokens live here rather than in the deck renderer for a specific reason: this repo
+# already carries two palettes (``CATEGORICAL`` above and ``dag_visualizer._WAVE_FILLS``),
+# and a third defined inside a renderer would be the one nobody could find. A surface that
+# wants house colours reads them from this module or it is not a house surface.
+# =========================================================================================
+
+DARK_GROUND = "#0b0c10"      # page behind everything
+DARK_PANEL = "#14161c"       # a panel sitting on the ground
+DARK_PANEL_HI = "#1b1e26"    # a raised/active panel
+DARK_HAIRLINE = "#242832"    # panel borders, rules, ribbon cells
+DARK_INK = "#eceef2"         # primary text on the dark ground
+DARK_INK_SECONDARY = "#a8adba"
+DARK_INK_MUTED = "#6c7280"   # labels, chrome, inactive ribbon segments
+
+#: The hot end of magma. Reserved for the ACTIVE span -- the one saturated area on a frame,
+#: so the eye lands on the evidence being read before it reads anything else.
+ACCENT_HOT = "#fca50a"
+#: The mid magma step, for handles and structural emphasis that must not compete with the span.
+ACCENT_MID = "#b63679"
+#: The cool magma step, for chrome that should register as "system", not as data.
+ACCENT_COOL = "#6a1c81"
+
+
+def dark_status_color(status: str) -> str:
+    """The reserved hue for one ``ledger_trace`` status, on the dark ground.
+
+    Status hues keep the meanings frozen at the top of this module and are NEVER reused for
+    series identity. ``unknown`` deliberately gets the warning hue rather than a neutral one:
+    a check that never ran is a caveat a reader must see, not an absence they can skip.
+    """
+    return {
+        "ok": STATUS_GOOD,
+        "error": STATUS_CRITICAL,
+        "refused": STATUS_SERIOUS,
+        "invalid": STATUS_CRITICAL,
+        "unknown": STATUS_WARNING,
+        "empty": INK_MUTED,
+    }.get(str(status or ""), DARK_INK_MUTED)
+
+
+def dark_tokens() -> Dict[str, str]:
+    """Every dark-surface token as a flat ``name -> hex`` map.
+
+    The HTML deck emits these as CSS custom properties and the matplotlib frame exporter reads
+    the same dict, which is the mechanism that keeps the two renderings of one storyboard from
+    drifting into two different-looking products.
+    """
+    return {
+        "ground": DARK_GROUND,
+        "panel": DARK_PANEL,
+        "panel-hi": DARK_PANEL_HI,
+        "hairline": DARK_HAIRLINE,
+        "ink": DARK_INK,
+        "ink-secondary": DARK_INK_SECONDARY,
+        "ink-muted": DARK_INK_MUTED,
+        "accent-hot": ACCENT_HOT,
+        "accent-mid": ACCENT_MID,
+        "accent-cool": ACCENT_COOL,
+        "ok": STATUS_GOOD,
+        "warning": STATUS_WARNING,
+        "serious": STATUS_SERIOUS,
+        "critical": STATUS_CRITICAL,
+    }
