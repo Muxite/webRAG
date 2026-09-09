@@ -122,9 +122,10 @@ def bench_task(test_id: str, *, ranker_name: str, prefetcher: Any) -> Dict[str, 
     started = time.perf_counter()
     toolkit = LedgerToolkit()
     prefetch_summary, prefetched = HDR.run_prefetch(toolkit, statement, prefetcher)
-    for url, text, entries in prefetched:
+    for url, text, kwargs in prefetched:
         HDR.register_page_compat(toolkit, url, text, source=HDR.prefetch_source(),
-                                 max_chars=len(text), structured=entries)
+                                 max_chars=len(text), structured=kwargs.get("structured"),
+                                 infobox_chars=kwargs.get("infobox_chars"))
     hd = toolkit.host_derive(statement, ranker=HDR._make_ranker(ranker_name),
                              min_score=HDR._min_score_for(ranker_name))
     detail = LRC.host_value_correct_detail(hd, test_id)

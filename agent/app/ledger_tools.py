@@ -454,7 +454,8 @@ class LedgerToolkit:
 
     def register_page(self, url: str, text: str, *, source: str = "",
                       max_chars: Optional[int] = None,
-                      structured: Optional[List[QuantityRef]] = None) -> str:
+                      structured: Optional[List[QuantityRef]] = None,
+                      infobox_chars: Optional[int] = None) -> str:
         """Freeze a page the host just fetched, making its values eligible as operands.
 
         A host calls this from wherever it already visits pages. Until a page is registered,
@@ -472,6 +473,10 @@ class LedgerToolkit:
             come before the text-scan entries', and a page that carries any is indexed uncapped
             -- the structured entries already tell the reader where to look, so the text scan is
             there for completeness, not for a prompt budget.
+        :param infobox_chars: length of the leading region of ``text`` that is the rendered
+            infobox, when the caller knows it. Forwarded to :func:`build_index` so its line-shape
+            infobox scan cannot claim body prose as a labelled row. ``None`` (a model's stored
+            window, whose structure nobody knows) keeps the previous behaviour.
         :returns: the page id operands will resolve against.
         """
         self._pages += 1
@@ -490,7 +495,8 @@ class LedgerToolkit:
             # dropped. Entries for OTHER numbers are kept.
             owned = {normalize_for_match(entry.value) for entry in structured}
             entries = list(structured) + [
-                entry for entry in build_index(text or "", limit=None)
+                entry for entry in build_index(text or "", limit=None,
+                                               infobox_chars=infobox_chars)
                 if normalize_for_match(entry.value) not in owned]
         else:
             entries = build_index(text or "")
@@ -1505,6 +1511,22 @@ class LedgerToolkit:
                       if canonical_unit(cand[2].unit) == unit and float(cand[0]) >= min_score]
             if within:
                 available = within
+        # Structured evidence outranks prose among candidates that ALREADY clear the floor.
+        # Prose is a fallback for what a page's infobox does not state, never a rival to a row
+        # that does state it: task 212 asks the Seikan Tunnel's line length, whose infobox says
+        # `Line length 53.85 km`, and the body says "...the Channel Tunnel (although the latter
+        # has a longer undersea section at 37.9 kilometres ... for the Seikan Tunnel)". That
+        # sentence names Seikan inside the entry's window, so `entity_in_window` (2.0) outweighed
+        # `is_infobox` (1.0) and a Channel Tunnel measurement was selected on Seikan's page.
+        # Applied as a SELECTION rule rather than a bigger `is_infobox` weight on purpose: a
+        # weight large enough to dominate would also lift a LABEL-LESS infobox row over the 0.93
+        # floor, and that floor's whole content is "an entry whose label says nothing about the
+        # field is never an operand" (`_HOST_DERIVE_MIN_SCORE`). Admission stays the floor's
+        # decision; only the order among the admitted changes.
+        admitted = [cand for cand in available if float(cand[0]) >= min_score]
+        structured = [cand for cand in admitted if cand[2].source == "infobox"]
+        if structured:
+            available = structured + [cand for cand in available if cand not in structured]
         score, page_id, entry = available[0]
         row.update(page_id=page_id, url=self._host_derive_page(page_id)[0], score=float(score))
         if score < min_score:

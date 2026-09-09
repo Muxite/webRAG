@@ -471,11 +471,16 @@ async def host_prefetch(kit: Any, mandate: str, *, http: Any, search: Any,
                     row["status"] = "fetch_failed"
                     continue
                 text = f"{parsed.infobox_text}\n{body}"
+                # The rendered infobox is exactly this prefix, so the toolkit's line-shape scan
+                # can be confined to it and the body read as prose. Without the boundary the scan
+                # claims body sentences as infobox rows ("...stack\nat\n419.7\nmetres" -> label
+                # "at") and masks the prose entry for the same number.
+                infobox_chars = len(parsed.infobox_text)
                 entries = list(parsed.entries)
                 # `max_chars=None` would mean the toolkit's default window; the host page is
                 # stored in FULL, so the explicit length is passed -- no constant anywhere.
                 kit.register_page(url, text, source=PREFETCH_SOURCE, max_chars=len(text),
-                                  structured=entries)
+                                  structured=entries, infobox_chars=infobox_chars)
                 registered_here.add(canonical)
                 result["registered"] += 1
                 row["status"] = "prefetched"

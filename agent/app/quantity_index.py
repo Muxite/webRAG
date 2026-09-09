@@ -865,7 +865,8 @@ def _scan_durations(text: str) -> List[QuantityRef]:
     return entries
 
 
-def build_index(page_text: Optional[str], *, limit: Optional[int] = 40) -> List[QuantityRef]:
+def build_index(page_text: Optional[str], *, limit: Optional[int] = 40,
+                infobox_chars: Optional[int] = None) -> List[QuantityRef]:
     """Every quantity :func:`_scan_infobox` / :func:`_scan_prose` can extract from ``page_text``.
 
     Deterministic and stable: pure sequential scans, no dict/set governs ORDER (a ``set`` is used
@@ -886,6 +887,22 @@ def build_index(page_text: Optional[str], *, limit: Optional[int] = 40) -> List[
 
     :param page_text: the raw page text, or ``None``/``""``.
     :param limit: maximum entries returned, or ``None`` for no cap.
+    :param infobox_chars: length of the leading region of ``page_text`` that is the rendered
+        INFOBOX, when the caller knows it (``host_prefetch`` builds its text as
+        ``infobox_text + "\n" + body``). :func:`_scan_infobox` is then confined to that prefix and
+        the body is read as prose only.
+
+        This matters because ``_scan_infobox`` recognises a label/value/unit LINE SHAPE, and the
+        flattened body prints that shape wherever a number sits on its own line -- so it claimed
+        body sentences as infobox rows and handed them the preceding line as a label:
+        "...flue-gas stack\nat\n419.7\nmetres" became label ``"at"`` (task 210) and "The falls
+        are\n100 metres (330\nft)\nwide" became ``"The falls are"`` (task 219). Such an entry
+        scores 0 on label overlap while still collecting the ``is_infobox`` weight, and because
+        ``build_index`` de-duplicates by value it also MASKED the prose entry for the same number
+        -- the one :func:`sentence_local_label` can actually name.
+
+        ``None`` keeps the whole text eligible for the line-shape scan, which is the right
+        behaviour for a page whose structure the caller does not know (a model's stored window).
     :returns: a list of :class:`QuantityRef`, possibly empty. Never raises on absence — a page
         with nothing extractable returns ``[]``, not a sentinel.
     """
@@ -905,7 +922,10 @@ def build_index(page_text: Optional[str], *, limit: Optional[int] = 40) -> List[
     spans = [(d.start, d.end) for d in durations]
     prose = [e for e in _scan_prose(text)
              if not any(lo <= e.start and e.end <= hi for lo, hi in spans)]
-    for entry in _scan_infobox(text) + prose + durations:
+    # Offsets are preserved: the infobox region is a PREFIX, so a match's start/end index the
+    # full text either way and any quote built from them stays a literal substring.
+    scanned = _scan_infobox(text if infobox_chars is None else text[:int(infobox_chars)])
+    for entry in scanned + prose + durations:
         value_key = normalize_for_match(entry.value)
         key = (value_key, normalize_for_match(entry.unit))
         if key in seen:

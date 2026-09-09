@@ -174,9 +174,18 @@ def _make_ranker(name: str):
     return getattr(OA, factory)()
 
 
+#: Set by ``--min-score`` to override the hand rule's floor for a sweep. The floor encodes "an
+#: entry whose label says nothing about the field is never an operand" (see
+#: ``ledger_tools._HOST_DERIVE_MIN_SCORE``), so lowering it deliberately buys availability with
+#: correctness -- an exploratory operating-point curve, never a default.
+_MIN_SCORE_OVERRIDE: Optional[float] = None
+
+
 def _min_score_for(name: str) -> float:
     from agent.app.ledger_tools import _HOST_DERIVE_MIN_SCORE
     floor = RANKERS[name][1]
+    if floor is None and _MIN_SCORE_OVERRIDE is not None:
+        return float(_MIN_SCORE_OVERRIDE)
     return float(_HOST_DERIVE_MIN_SCORE if floor is None else floor)
 
 
@@ -234,7 +243,7 @@ def run_prefetch(toolkit: Any, statement: str, prefetcher: Any
     """Run ``prefetcher(toolkit, statement)`` once and capture every page it registered.
 
     The capture is an INSTANCE-level wrapper around ``toolkit.register_page`` (delegating to the
-    bound original), so it records ``(url, text, structured)`` exactly as the prefetcher handed
+    bound original), so it records ``(url, text, kwargs)`` exactly as the prefetcher handed
     them over -- independent of how the toolkit stores pages internally, and without a second
     accessor that could disagree with the kit's own ``registered_urls()``/artifact view. The
     summary the prefetcher returns is passed through untouched; an exception becomes an
@@ -244,7 +253,10 @@ def run_prefetch(toolkit: Any, statement: str, prefetcher: Any
     original = toolkit.register_page
 
     def capturing_register_page(url: str, text: str, **kwargs: Any) -> str:
-        captured.append((str(url or ""), str(text or ""), kwargs.get("structured")))
+        # The WHOLE kwargs dict, not just `structured`: the prefetcher also passes
+        # `infobox_chars` (the rendered-infobox boundary), and dropping it here would silently
+        # re-register the page without it and re-admit the body-prose-as-infobox rows.
+        captured.append((str(url or ""), str(text or ""), dict(kwargs)))
         return register_page_compat(_Original(original), url, text, **kwargs)
 
     toolkit.register_page = capturing_register_page
@@ -363,10 +375,11 @@ def replay_cell(path: Path, raw: Dict[str, Any], ranker_names: Sequence[str],
         toolkit = LedgerToolkit()
         register_stored_pages(toolkit, pages)
         prefetched_ids: List[str] = []
-        for url, text, entries in prefetched:
+        for url, text, kwargs in prefetched:
             prefetched_ids.append(register_page_compat(
                 toolkit, url, text, source=prefetch_source(), max_chars=len(text),
-                structured=entries))
+                structured=kwargs.get("structured"),
+                infobox_chars=kwargs.get("infobox_chars")))
         hd = toolkit.host_derive(statement, ranker=_make_ranker(ranker_name),
                                  min_score=_min_score_for(ranker_name))
         if prefetcher is not None:
@@ -429,7 +442,7 @@ _WORKER: Dict[str, Any] = {}
 
 
 def _worker_init(ranker_names: Sequence[str], prefixes: Sequence[str], prefetching: bool,
-                 results_dir: str, fixtures_mode: str) -> None:
+                 results_dir: str, fixtures_mode: str, min_score: Optional[float] = None) -> None:
     """Build this worker's OWN connectors and event loop.
 
     Connectors and an asyncio loop are not picklable, so the pool cannot be handed a prefetcher
@@ -438,6 +451,8 @@ def _worker_init(ranker_names: Sequence[str], prefixes: Sequence[str], prefetchi
     so concurrent workers reading it race only to write identical bytes.
     """
     os.environ["IDEA_TEST_FIXTURES"] = fixtures_mode
+    global _MIN_SCORE_OVERRIDE
+    _MIN_SCORE_OVERRIDE = min_score  # a spawned worker does not inherit module globals
     _WORKER.update(ranker_names=list(ranker_names), prefixes=list(prefixes),
                    prefetching=prefetching, results_dir=results_dir, prefetcher=None)
     if not prefetching:
@@ -516,7 +531,8 @@ def replay_parallel(files: Sequence[Path], ranker_names: Sequence[str], prefixes
     with context.Pool(processes=workers, initializer=_worker_init,
                       initargs=(list(ranker_names), list(prefixes), prefetching,
                                 str(results_dir),
-                                os.environ.get("IDEA_TEST_FIXTURES", "replay"))) as pool:
+                                os.environ.get("IDEA_TEST_FIXTURES", "replay"),
+                                _MIN_SCORE_OVERRIDE)) as pool:
         for cell_rows, keys in pool.imap(_worker_replay, names, chunksize=1):
             rows.extend(cell_rows)
             for key in keys:
@@ -1138,6 +1154,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     help=f"comma-separated ranker names from {sorted(RANKERS)}")
     ap.add_argument("--limit", type=int, default=0,
                     help="replay only the first N cell files (smoke runs); 0 = all")
+    ap.add_argument("--min-score", type=float, default=None,
+                    help="override the hand rule's 0.93 floor (exploratory availability/"
+                         "correctness sweep; the control ranker keeps its own 0.0)")
     ap.add_argument("--workers", type=int, default=1,
                     help="replay cells across N processes (default 1 = serial). Cells are "
                          "independent, so this is a pure speedup: --workers N must produce the "
@@ -1161,6 +1180,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         files = files[:args.limit]
 
     started = time.time()
+    global _MIN_SCORE_OVERRIDE
+    _MIN_SCORE_OVERRIDE = args.min_score
     workers = max(1, int(args.workers))
     if workers > 1:
         if args.prefetch:
