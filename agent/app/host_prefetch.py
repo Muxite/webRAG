@@ -282,9 +282,20 @@ async def _verify(http: Any, candidates: Sequence[_Candidate],
     ``Architectural``, ``Floor count``) vs Burj Azizi (flat ``Height``, ``Floor count``): equal
     coverage -> the exact title.
 
-    :returns: ``((url, html) or None, fetches)``. A zero score is never picked.
+    Field coverage RANKS candidates; it does not veto them. :func:`_field_coverage` reads infobox
+    rows only, so a page whose asked-for fact is written in prose scores ``(0, 0)`` however
+    plainly it is the right article -- *Ekibastuz GRES-2 Power Station* states its chimney height
+    as "the world's tallest flue-gas stack at 419.7 metres" in body text and carries three
+    infobox quantities, none of them the chimney. Requiring coverage rejected that page and
+    returned ``no_hit`` for every task-210 cell. So when NO candidate shows coverage, the
+    best-named candidate is taken instead of nothing: the fallback changes only cases that
+    previously resolved to nothing at all, and whether its page yields an operand is still the
+    0.93 floor's decision, not this function's.
+
+    :returns: ``((url, html) or None, fetches)``.
     """
     best: Optional[Tuple[Tuple[int, int, int, int], str, str]] = None
+    uncovered: Optional[Tuple[Tuple[int, float, int], str, str]] = None
     fetches = 0
     for order, candidate in enumerate(candidates):
         html = await _fetch(http, candidate.url)
@@ -293,13 +304,28 @@ async def _verify(http: Any, candidates: Sequence[_Candidate],
             continue
         phrases_hit, tokens_hit = _field_coverage(html, field_phrases)
         if phrases_hit <= 0:
+            # Name strength only -- the same order `_candidates` already sorted by.
+            name_key = (int(candidate.exact), candidate.coverage, -order)
+            if uncovered is None or name_key > uncovered[0]:
+                uncovered = (name_key, candidate.url, html)
             continue
-        key = (phrases_hit, tokens_hit, int(candidate.exact), -order)
+        # NAME coverage outranks the token SUM. How much of the entity's name the title accounts
+        # for is evidence about WHICH entity a page is; a token sum is evidence about how verbosely
+        # it labels its rows, which is a different question. Burj Khalifa (slug coverage 1.00,
+        # nested `Height -> Architectural` rows, 3 tokens) lost to Burj Azizi (0.50, flat `Height`
+        # plus `Observatory height`, 4 tokens) on that sum alone, and "Shanghai Tower" resolved to
+        # Jin Mao Tower the same way -- both then computed task 221 off the wrong building.
+        # Phrases COVERED still comes first, so a page carrying strictly more of the asked-for
+        # fields still wins; and two titles that both account for the whole name (Mississippi the
+        # state and Mississippi River) tie here and are still separated by the token sum below.
+        key = (phrases_hit, candidate.coverage, tokens_hit, int(candidate.exact), -order)
         if best is None or key > best[0]:
             best = (key, candidate.url, html)
-    if best is None:
-        return None, fetches
-    return (best[1], best[2]), fetches
+    if best is not None:
+        return (best[1], best[2]), fetches
+    if uncovered is not None:
+        return (uncovered[1], uncovered[2]), fetches
+    return None, fetches
 
 
 async def resolve_entity_page(entity: str, field_phrase: str = "", *, http: Any,

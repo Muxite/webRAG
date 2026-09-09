@@ -601,3 +601,96 @@ def test_a_candidate_covering_strictly_more_field_phrases_beats_the_exact_title(
     resolved = _run(hp.resolve_entity_page("Mississippi", http=http, search=FakeSearch(),
                                            field_phrases=["length in METRES", "basin area in km^2"]))
     assert resolved.url == _article("Mississippi River")
+
+
+# ---------------------------------------------------------------------------------------------
+# Field coverage ranks candidates; it must not veto them (2026-09-09, task 210).
+# `_field_coverage` reads INFOBOX rows only, so an article whose asked-for fact is prose scores
+# (0, 0) however plainly it is the right page. Requiring coverage returned `no_hit` for every
+# task-210 cell even though `Ekibastuz GRES-2 Power Station` was the top-ranked candidate.
+# ---------------------------------------------------------------------------------------------
+
+_PROSE_ONLY_HTML = (
+    "<html><body><p>The Ekibastuz GRES-2 Power Station has the world's tallest flue-gas "
+    "stack at 419.7 metres (1,377 ft) tall.</p></body></html>"
+)
+_COVERED_HTML = (
+    "<html><body><table class='infobox'><tr><th>Height</th><td>380 m</td></tr></table>"
+    "<p>A smokestack.</p></body></html>"
+)
+
+
+def _fake_http(pages):
+    class _Http:
+        async def request(self, method, url, **kwargs):
+            return type("R", (), {"status": 200, "text": pages.get(url, "")})()
+    return _Http()
+
+
+def test_the_best_named_candidate_is_taken_when_no_candidate_shows_field_coverage(monkeypatch):
+    """The 210 fix: a prose-only right page beats returning nothing at all."""
+    import asyncio
+    from agent.app import host_prefetch as HP
+
+    cands = HP._candidates([("Ekibastuz GRES-2 Power Station", "")],
+                           "GRES-2 Power Station", "the height of its flue-gas chimney, in meters")
+    assert cands, "candidate list must be non-empty for this test to mean anything"
+
+    async def fake_fetch(http, url):
+        return _PROSE_ONLY_HTML
+
+    monkeypatch.setattr(HP, "_fetch", fake_fetch)
+    picked, _fetches = asyncio.run(
+        HP._verify(None, cands, ["the height of its flue-gas chimney, in meters"]))
+    assert picked is not None, "a prose-only page must resolve, not return no_hit"
+    assert "Ekibastuz" in picked[0]
+
+
+def test_a_candidate_with_field_coverage_still_beats_one_without(monkeypatch):
+    """The fallback must change ONLY the all-zero case: coverage still decides when it exists."""
+    import asyncio
+    from agent.app import host_prefetch as HP
+
+    covered = HP._Candidate(title="Inco Superstack", snippet="", rank=1, coverage=1.0,
+                            parenthetical=False, snippet_hits=0, exact=True)
+    bare = HP._Candidate(title="Some Other Stack", snippet="", rank=0, coverage=1.0,
+                         parenthetical=False, snippet_hits=0, exact=False)
+
+    async def fake_fetch(http, url):
+        return _COVERED_HTML if "Inco" in url else _PROSE_ONLY_HTML
+
+    monkeypatch.setattr(HP, "_fetch", fake_fetch)
+    picked, _ = asyncio.run(HP._verify(None, [bare, covered], ["its height, in meters"]))
+    assert picked is not None and "Inco" in picked[0]
+
+
+def test_no_candidates_at_all_is_still_a_miss():
+    import asyncio
+    from agent.app import host_prefetch as HP
+
+    picked, fetches = asyncio.run(HP._verify(None, [], ["its height, in meters"]))
+    assert picked is None and fetches == 0
+
+
+def test_a_title_naming_the_whole_entity_beats_a_verbose_impostor(monkeypatch):
+    """Task 221's wrong-building bug (2026-09-09). Both pages cover the same one field phrase, so
+    the tie fell to the TOKEN SUM -- and Burj Azizi's flat `Height` + `Observatory height` summed
+    4 matching tokens against Burj Khalifa's nested `Height -> Architectural` 3. "Burj Khalifa"
+    therefore resolved to wiki/Burj_Azizi, and 221 computed a floor height off the wrong building
+    while still naming the right winner, so nothing downstream noticed."""
+    import asyncio
+    from agent.app import host_prefetch as HP
+
+    khalifa = _infobox_html([("Architectural", "828 m"), ("Floor count", "163")])
+    azizi = _infobox_html([("Height", "725 m"), ("Observatory height", "700 m"),
+                           ("Floor count", "131")])
+    hits = [("Burj Azizi", ""), ("Burj Khalifa", "")]
+    cands = HP._candidates(hits, "Burj Khalifa", "its architectural HEIGHT and its FLOOR COUNT")
+
+    async def fake_fetch(http, url):
+        return khalifa if "Khalifa" in url else azizi
+
+    monkeypatch.setattr(HP, "_fetch", fake_fetch)
+    picked, _ = asyncio.run(HP._verify(
+        None, cands, ["its architectural HEIGHT and its FLOOR COUNT"]))
+    assert picked is not None and "Burj_Khalifa" in picked[0], picked
