@@ -402,6 +402,71 @@ def replay_cell(path: Path, raw: Dict[str, Any], ranker_names: Sequence[str],
     return rows
 
 
+def classify_for_replay(path: Path, prefixes: Sequence[str], *, prefetching: bool
+                        ) -> Tuple[Optional[Dict[str, Any]], List[str]]:
+    """``(cell or None, skip-counter keys)`` for one file -- the bookkeeping half of :func:`replay`.
+
+    Split out so the serial and parallel paths cannot drift: a worker process classifies a cell
+    with exactly this function, and the parent applies exactly these keys, in file order.
+    """
+    prefix = campaign_prefix(path.name, prefixes) or "?"
+    keys = [f"{prefix}|files"]
+    raw = LRC.load_cell(path)
+    if raw is None:
+        return None, keys + ["unreadable", f"{prefix}|unreadable"]
+    reason = skip_reason(raw, allow_no_pages=prefetching)
+    if reason is not None:
+        return None, keys + [reason, f"{prefix}|{reason}"]
+    source = cell_pages(raw)[1]
+    if prefetching and source == "none":
+        source = PREFETCHED_PAGE_SOURCE
+    return raw, keys + ["replayed", f"{prefix}|replayed",
+                        f"pages_{source}", f"{prefix}|pages_{source}"]
+
+
+#: Per-process state for the worker pool: built once per process by :func:`_worker_init`.
+_WORKER: Dict[str, Any] = {}
+
+
+def _worker_init(ranker_names: Sequence[str], prefixes: Sequence[str], prefetching: bool,
+                 results_dir: str, fixtures_mode: str) -> None:
+    """Build this worker's OWN connectors and event loop.
+
+    Connectors and an asyncio loop are not picklable, so the pool cannot be handed a prefetcher
+    -- each process constructs its own against the same on-disk web-fixture cache. The cache is
+    content-addressed and this runs under ``IDEA_TEST_FIXTURES=replay`` (load-or-fetch-and-save),
+    so concurrent workers reading it race only to write identical bytes.
+    """
+    os.environ["IDEA_TEST_FIXTURES"] = fixtures_mode
+    _WORKER.update(ranker_names=list(ranker_names), prefixes=list(prefixes),
+                   prefetching=prefetching, results_dir=results_dir, prefetcher=None)
+    if not prefetching:
+        return
+    from shared.connector_config import ConnectorConfig
+    from agent.app.connector_http import ConnectorHttp
+    from agent.app.connector_search import create_search_backend
+
+    config = ConnectorConfig()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    _WORKER["loop"] = loop
+    _WORKER["http"] = ConnectorHttp(config)
+    _WORKER["prefetcher"] = make_live_prefetcher(loop, http=_WORKER["http"],
+                                                 search=create_search_backend(config))
+
+
+def _worker_replay(name: str) -> Tuple[List[Dict[str, Any]], List[str]]:
+    """Replay one cell by FILE NAME (paths rebuilt here, so nothing path-like crosses the pipe)."""
+    path = Path(_WORKER["results_dir"]) / name
+    raw, keys = classify_for_replay(path, _WORKER["prefixes"],
+                                    prefetching=_WORKER["prefetching"])
+    if raw is None:
+        return [], keys
+    rows = replay_cell(path, raw, _WORKER["ranker_names"], _WORKER["prefixes"],
+                       prefetcher=_WORKER["prefetcher"])
+    return rows, keys
+
+
 def replay(files: Sequence[Path], ranker_names: Sequence[str],
            prefixes: Sequence[str], *, prefetcher: Any = None
            ) -> Tuple[List[Dict[str, Any]], Counter]:
@@ -420,26 +485,42 @@ def replay(files: Sequence[Path], ranker_names: Sequence[str],
     skips: Counter = Counter()
     skips["files"] = len(files)
     for path in files:
-        prefix = campaign_prefix(path.name, prefixes) or "?"
-        skips[f"{prefix}|files"] += 1
-        raw = LRC.load_cell(path)
+        raw, keys = classify_for_replay(path, prefixes, prefetching=prefetcher is not None)
+        for key in keys:
+            skips[key] += 1
         if raw is None:
-            skips["unreadable"] += 1
-            skips[f"{prefix}|unreadable"] += 1
             continue
-        reason = skip_reason(raw, allow_no_pages=prefetcher is not None)
-        if reason is not None:
-            skips[reason] += 1
-            skips[f"{prefix}|{reason}"] += 1
-            continue
-        skips["replayed"] += 1
-        skips[f"{prefix}|replayed"] += 1
-        source = cell_pages(raw)[1]
-        if prefetcher is not None and source == "none":
-            source = PREFETCHED_PAGE_SOURCE
-        skips[f"pages_{source}"] += 1
-        skips[f"{prefix}|pages_{source}"] += 1
         rows.extend(replay_cell(path, raw, ranker_names, prefixes, prefetcher=prefetcher))
+    return rows, skips
+
+
+def replay_parallel(files: Sequence[Path], ranker_names: Sequence[str], prefixes: Sequence[str],
+                    *, workers: int, prefetching: bool, results_dir: Path
+                    ) -> Tuple[List[Dict[str, Any]], Counter]:
+    """:func:`replay` across ``workers`` processes, byte-identical to the serial path.
+
+    Cells are independent by construction -- each builds a fresh ``LedgerToolkit`` and shares no
+    state -- so the only thing parallelism can disturb is ORDER, and order is load-bearing here
+    (the report's forensics print "first N shown"). ``Pool.imap`` with ``chunksize=1`` yields
+    results in submission order, so rows and skip keys are applied in exactly the file order the
+    serial loop would use. ``--workers 1`` must therefore be indistinguishable from no flag, and
+    a parallel run's ``summary.json`` must match a serial one modulo ``meta.wall_seconds``.
+    """
+    import multiprocessing
+
+    rows: List[Dict[str, Any]] = []
+    skips: Counter = Counter()
+    skips["files"] = len(files)
+    names = [path.name for path in files]
+    context = multiprocessing.get_context("spawn")
+    with context.Pool(processes=workers, initializer=_worker_init,
+                      initargs=(list(ranker_names), list(prefixes), prefetching,
+                                str(results_dir),
+                                os.environ.get("IDEA_TEST_FIXTURES", "replay"))) as pool:
+        for cell_rows, keys in pool.imap(_worker_replay, names, chunksize=1):
+            rows.extend(cell_rows)
+            for key in keys:
+                skips[key] += 1
     return rows, skips
 
 
@@ -1001,6 +1082,20 @@ def write_outputs(out_dir: Path, rows: Sequence[Dict[str, Any]], summary: Dict[s
     return paths
 
 
+def _force_replay_fixtures() -> None:
+    """Force ``IDEA_TEST_FIXTURES=replay`` unless it is already an explicit mode.
+
+    ``record`` never loads the cache and would re-bill, so it is never forced -- but an explicit
+    setting is always respected. Shared by the serial and parallel prefetch paths so both make
+    the same promise about spend.
+    """
+    mode = (os.environ.get("IDEA_TEST_FIXTURES") or "").strip().lower()
+    if mode not in ("record", "replay", "replay_strict"):
+        os.environ["IDEA_TEST_FIXTURES"] = "replay"
+        print("IDEA_TEST_FIXTURES not set to record/replay[_strict]; forcing 'replay' for "
+              "--prefetch (load-or-fetch-and-save).", file=sys.stderr)
+
+
 def _replay_with_prefetch(files: Sequence[Path], ranker_names: Sequence[str],
                           prefixes: Sequence[str]) -> Tuple[List[Dict[str, Any]], Counter]:
     """:func:`replay` behind live connectors and one event loop for the whole run.
@@ -1010,11 +1105,7 @@ def _replay_with_prefetch(files: Sequence[Path], ranker_names: Sequence[str],
     so it is never forced -- but an explicit setting is respected. Connectors are the prewarm
     set minus LLM/Chroma/AgentIO: ``host_prefetch`` reads the mandate and pages, never a model.
     """
-    mode = (os.environ.get("IDEA_TEST_FIXTURES") or "").strip().lower()
-    if mode not in ("record", "replay", "replay_strict"):
-        os.environ["IDEA_TEST_FIXTURES"] = "replay"
-        print("IDEA_TEST_FIXTURES not set to record/replay[_strict]; forcing 'replay' for "
-              "--prefetch (load-or-fetch-and-save).", file=sys.stderr)
+    _force_replay_fixtures()
     from shared.connector_config import ConnectorConfig
     from agent.app.connector_http import ConnectorHttp
     from agent.app.connector_search import create_search_backend
@@ -1047,6 +1138,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     help=f"comma-separated ranker names from {sorted(RANKERS)}")
     ap.add_argument("--limit", type=int, default=0,
                     help="replay only the first N cell files (smoke runs); 0 = all")
+    ap.add_argument("--workers", type=int, default=1,
+                    help="replay cells across N processes (default 1 = serial). Cells are "
+                         "independent, so this is a pure speedup: --workers N must produce the "
+                         "same summary as --workers 1, modulo meta.wall_seconds.")
     ap.add_argument("--prefetch", action="store_true",
                     help="run agent.app.host_prefetch once per cell (live search + visits via the "
                          "web-fixture cache; IDEA_TEST_FIXTURES forced to 'replay' when unset) "
@@ -1066,7 +1161,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         files = files[:args.limit]
 
     started = time.time()
-    if args.prefetch:
+    workers = max(1, int(args.workers))
+    if workers > 1:
+        if args.prefetch:
+            _force_replay_fixtures()
+        rows, skips = replay_parallel(files, ranker_names, prefixes, workers=workers,
+                                      prefetching=bool(args.prefetch), results_dir=results_dir)
+    elif args.prefetch:
         rows, skips = _replay_with_prefetch(files, ranker_names, prefixes)
     else:
         rows, skips = replay(files, ranker_names, prefixes)

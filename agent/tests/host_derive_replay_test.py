@@ -779,7 +779,7 @@ def test_main_prefetch_flag_uses_an_injected_live_prefetcher(results_dir: Path, 
     test never touches the network, while the pipeline below the flag is the real one."""
     fake = _FakePrefetcher()
     monkeypatch.delenv("IDEA_TEST_FIXTURES", raising=False)
-    monkeypatch.setattr(HDR, "make_live_prefetcher", lambda loop, *, http, search: fake)
+    monkeypatch.setattr(HDR, "make_live_prefetcher", lambda loop, *, http, search, memo=None: fake)
 
     class _Http:
         def __init__(self, config):
@@ -808,7 +808,7 @@ def test_main_prefetch_respects_an_explicit_fixture_mode(results_dir: Path, tmp_
                                                          monkeypatch):
     monkeypatch.setenv("IDEA_TEST_FIXTURES", "replay_strict")
     monkeypatch.setattr(HDR, "make_live_prefetcher",
-                        lambda loop, *, http, search: _FakePrefetcher())
+                        lambda loop, *, http, search, memo=None: _FakePrefetcher())
 
     class _Http:
         def __init__(self, config):
